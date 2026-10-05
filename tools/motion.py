@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFont
 W, H, FPS = 1080, 1920, 30
 SW, SH = 720, 1280
 FONTS = "fonts2/M%d.ttf"
-PINK = (243, 125, 184); PILL = (244, 156, 198); YEL = (246, 226, 127)
+PINK = (228, 210, 210); NAVY = (16, 46, 70); MAUVE = (103, 96, 104)
 WHITE = (255, 255, 255); DARK = (30, 30, 30); GREY = (90, 90, 90)
 
 # word start times (new timeline) from the subtitle file
@@ -67,19 +67,19 @@ def render(txt, style, card):
         a, b = italic(*text_img(txt, font(500, 58), DARK if card else WHITE))
     elif style == "b":
         a, b = italic(*text_img(txt, font(300, 46), GREY if card else WHITE))
-    elif style in ("a", "y"):
+    elif style == "a":
         s = 108
         while font(900, s).getlength(txt) > 860: s -= 4
-        a, b = text_img(txt, font(900, s), PINK if style == "a" else YEL)
+        a, b = text_img(txt, font(900, s), PINK)
         a = cv2.resize(a, (int(a.shape[1] * 1.06), a.shape[0]))
         a, b = italic(a, b)
     elif style == "n":
         a, b = italic(*text_img(txt, font(900, 210), PINK))
-    elif style == "p":
-        t, _ = text_img(txt, font(600, 44), WHITE)
+    elif style in ("p", "y"):
+        t, _ = text_img(txt, font(600, 44), PINK if style == "p" else WHITE)
         th, tw = t.shape[:2]; ph, pw = th + 6, tw + 44
         im = Image.new("RGBA", (pw, ph), (0, 0, 0, 0))
-        ImageDraw.Draw(im).rounded_rectangle((0, 0, pw - 1, ph - 1), radius=ph // 2, fill=PILL + (255,))
+        ImageDraw.Draw(im).rounded_rectangle((0, 0, pw - 1, ph - 1), radius=ph // 2, fill=(NAVY if style == "p" else MAUVE) + (255,))
         bg = np.asarray(im).astype(np.float32) / 255
         y0, x0 = 3, 22
         ta = t[..., 3:4]
