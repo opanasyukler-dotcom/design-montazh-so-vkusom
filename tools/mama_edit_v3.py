@@ -463,6 +463,8 @@ def compose(src, tt):
     lay = layout(tt)
     fr = np.empty((OH, OW, 3), np.float32); fr[:] = lay["bg"]
     x, y, w, h = lay["rect"]; wi, hi = max(2, P(w)), max(2, P(h))
+    full = w > W - 2 and h > H - 2
+    if full: x, y, w, h, wi, hi = 0, 0, W, H, OW, OH
     zoom = lay["zoom"] * (1 + 0.035 * ((tt - SCENES[scene_at(tt)][0]) / 8))
     if SCENES[scene_at(tt)][1] == "collB": zoom *= 1 + 0.22 * ease_io((tt - VAR_ZOOM) / 0.6)
     a = w / h; cw = OW / zoom; ch = cw / a
@@ -478,7 +480,6 @@ def compose(src, tt):
     if lay["gray"] > 0.01:
         g = vid @ np.float32([0.299, 0.587, 0.114]); vid *= 1 - lay["gray"]; vid += g[..., None] * lay["gray"]
     if lay["dim"] > 0: vid *= 1 - lay["dim"]
-    full = w > W - 2 and h > H - 2
     if full:
         fr[:] = vid[:OH, :OW]; fr *= VIG_KEEP; fr += VIG_INK
     else:
