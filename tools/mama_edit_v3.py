@@ -14,7 +14,7 @@ W, H = 1080, 1920            # design units
 K = 2                         # 4K output
 OW, OH = W * K, H * K
 SRC_FPS, FPS = 25, 50
-FONT_M, FONT_MI, FONT_S = "Montserrat-VariableFont_wght.ttf", "Montserrat-Italic-VariableFont_wght.ttf", "GreatVibes-Regular.ttf"
+FONT_M, FONT_MI, FONT_S = "Montserrat-VariableFont_wght.ttf", "Montserrat-Italic-VariableFont_wght.ttf", "BiroScriptUSPlus-Regular.ttf"
 TEST = [float(x) for x in os.environ.get("TEST", "").split(",") if x]
 MAT = "mat/"
 PHOTOS = ["IMG_6878.JPG", "IMG_6879.JPG", "IMG_6880.JPG", "IMG_6881.JPG"]
@@ -81,7 +81,7 @@ def style_font(st, size):
     size = size * K
     if st == "t": return font("i", size, 520)
     if st == "b": return font("m", int(size * 1.45), 800)
-    if st == "s": return font("s", int(size * 1.75))
+    if st == "s": return font("s", int(size * 2.0))
     if st == "k": return font("i", int(size * 0.72), 350)
     if st == "g": return font("m", int(size * 2.3), 900)
     if st == "T": return font("m", size, 800)
@@ -92,6 +92,8 @@ class Word:
         col = th[st] if st in th else (INK if theme == "light" else BLUSH)
         if st == "g": txt = txt.upper()
         self.img, self.base, self.pad, self.adv = raster(txt, style_font(st, size), col)
+        if st == "s":   # thicken the thin pen stroke a touch
+            al_ = cv2.dilate(self.img[..., 3], np.ones((3, 3), np.uint8)); self.img[..., 3] = al_; self.img[..., :3] = col * al_[..., None]
         self.alpha_mul = 0.33 if st == "g" else 1.0
         self.glow = None
         if st == "b" and th["glow"] is not None:
@@ -319,8 +321,8 @@ ins.append(Group([
 ], "dark", wt(117) - 0.1, 64.8, deco=[("hl", 3, 0, 1, wt(127) + 0.1)]))
 ins.append(Group([
     dict(words=[("Pinterest:", "T")], x=520, y=300, t=wt(142), size=44),
-    dict(words=[("эстетичное", "s")], x=520, y=400, t=wt(142) + 0.3, size=46),
-    dict(words=[("материнство", "s")], x=560, y=480, t=wt(142) + 0.6, size=46),
+    dict(words=[("эстетичное", "s")], x=500, y=395, t=wt(142) + 0.3, size=40),
+    dict(words=[("материнство", "s")], x=500, y=470, t=wt(142) + 0.6, size=40),
 ], "light", wt(142) - 0.1, 76.6))
 ins.append(Group([
     dict(words=[("Я:", "T")], x=80, y=930, t=wt(144), size=48),
