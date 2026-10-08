@@ -158,16 +158,22 @@ def kenburns(img, p, z0=1.0, z1=1.08, fx=540, fy=800):
     M = np.float32([[z, 0, fx - z * fx], [0, z, fy - z * fy]])
     return cv2.warpAffine(img, M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
 PH = {n: photo(n) for n in ["before_a", "before_b", "d6_b", "m1_b", "m2_a", "m2_b", "m2_c"]}
-def blur_ell(img, cx, cy, rx, ry):
+def blur_ell(img, cx, cy, rx, ry, k=24, sg=18):
     h, w = img.shape[:2]; m = np.zeros((h, w), np.float32)
     cv2.ellipse(m, (int(cx), int(cy)), (int(rx), int(ry)), 0, 0, 360, 1, -1, cv2.LINE_AA)
     m = cv2.GaussianBlur(m, (0, 0), max(4, rx / 8))[..., None]
-    sm = cv2.resize(img, (w // 24, h // 24), interpolation=cv2.INTER_AREA)
-    bl = cv2.GaussianBlur(cv2.resize(sm, (w, h), interpolation=cv2.INTER_LINEAR), (0, 0), 18)
+    sm = cv2.resize(img, (w // k, h // k), interpolation=cv2.INTER_AREA)
+    bl = cv2.GaussianBlur(cv2.resize(sm, (w, h), interpolation=cv2.INTER_LINEAR), (0, 0), sg)
     return img * (1 - m) + bl * m
 PH["before_a"] = blur_ell(PH["before_a"], 640, 0, 230, 150)
 PH["before_b"] = blur_ell(PH["before_b"], 545, 0, 170, 90)
 PH["m1_b"] = blur_ell(PH["m1_b"], 545, 0, 190, 100)
+import sys as _s; _s.path.insert(0, "../v4"); from retouch import retouch
+PH["d6_b"] = retouch(PH["d6_b"])
+PI = [np.load("pose_i1.npy"), np.load("pose_i2.npy"), np.load("pose_i3.npy")]
+def blur_pose(img, P, f):
+    a = P[min(f, len(P) - 1)]; w = abs(a[7, 0] - a[8, 0]); cx = (a[7, 0] + a[8, 0]) / 2; cy = a[0, 1] - 0.25 * w
+    return blur_ell(img, cx, cy, w * 0.85, w * 1.15, 40, 30)
 FB1 = np.load("fb_b1.npy"); FB4 = np.load("fb_b4.npy")
 def blur_box(img, bx, pad=1.35):
     x0, y0, x1, y1 = bx; cx, cy = (x0 + x1) / 2, (y0 + y1) / 2 - (y1 - y0) * 0.05
@@ -190,7 +196,7 @@ class Vid:
             if len(b) == W * H * 3:
                 s.last = np.frombuffer(b, np.uint8).reshape(H, W, 3).astype(np.float32) / 255; return s.last
             s.p.kill(); s.p = None
-VID = {"months": [("m1_a", 9.0, 12.6)], "after1": [("surgeon", 15.35, 21.10)], "edema": [("surgeon", 50.20, 55.45)], "feel": [("interview", 0.0, 2.56), ("interview", 4.35, 7.85)]}
+VID = {"final": [("interview", 49.0, 50.48)], "months": [("m1_a", 9.0, 12.6)], "after1": [("surgeon", 15.35, 21.10)], "edema": [("surgeon", 50.20, 55.45)], "feel": [("interview", 0.0, 2.56), ("interview", 4.35, 7.85)]}
 
 POSE1 = np.load("pose_b1.npy")
 def b1_poles(f):
@@ -218,7 +224,7 @@ class Txt:
                 while osw(600, sz).getlength(txt) > maxw: sz -= 2
                 f = osw(600, sz)
             else:
-                f = mont(500 if kind in ("SB", "SL") else 300, 42 if kind == "SL" else (28 if kind != "SS" else 24))
+                f = mont(500 if kind in ("SB", "SL") else 300, 42 if kind == "SL" else (36 if kind != "SS" else 30))
             asc, desc = f.getmetrics()
             s.items.append(dict(txt=txt, kind=kind, f=f, asc=asc, desc=desc, w=f.getlength(txt)))
         s.x = x; s.align = align
@@ -272,6 +278,16 @@ d_.rectangle((0, 0, tw + 30, qi.height - 1), fill=BLUE + (255,)); d_.text((15, 1
 QUOTE = to_np(qi)
 T7a = Txt([("«С НЕЙ ВСЁ СОШЛОСЬ»", "HB")], size=40, align="C")
 T7 = Txt([("«ПОЧЕМУ Я НЕ СДЕЛАЛА", "H"), ("ЭТО РАНЬШЕ?»", "H")], size=60, align="C")
+def word_img(txt, col=(255, 255, 255)):
+    f = osw(600, 66); asc, desc = f.getmetrics(); w = int(f.getlength(txt))
+    im = Image.new("RGBA", (w + 28, asc + desc + 14), BLUE + (255,)); ImageDraw.Draw(im).text((14, 7 + asc), txt, font=f, fill=col + (255,), anchor="ls")
+    return to_np(im)
+WORDS7 = []
+for li, (line, times) in enumerate([(["«ПОЧЕМУ", "Я", "НЕ", "СДЕЛАЛА"], [3.4, 3.5, 3.6, 3.7]), (["ЭТО", "РАНЬШЕ?»"], [4.0, 4.1])]):
+    ims = [word_img(w_, POWDER if w_.startswith("РАНЬШЕ") else (255, 255, 255)) for w_ in line]
+    tot = sum(i.shape[1] for i in ims) + 10 * (len(ims) - 1); x = (W - tot) / 2
+    for i_, (im_, wt) in enumerate(zip(ims, times)):
+        WORDS7.append((im_, x, 1150 + li * 100, wt, False)); x += im_.shape[1] + 10
 LOGO = np.asarray(Image.open("../v4/logo.png").resize((320, int(115 * 320 / 620)), Image.LANCZOS)).astype(np.float32) / 255
 LOGO = premul(LOGO)
 SUBC = {}
@@ -303,7 +319,7 @@ def render_block(b, lt, fi, vid):
     global END
     n = b["name"]; d = b["t1"] - b["t0"]; p = lt / d; END = False
     if n == "after1":
-        fr = grade(blur_box(vid.next(), FB1[min(fi, len(FB1) - 1)]))
+        fr = grade(retouch(blur_box(vid.next(), FB1[min(fi, len(FB1) - 1)])))
         T1.draw(fr, 1250, lt, 0.1)
         pts, w = b1_poles(fi)
         q, al = env(lt, 2.05, 99, 0.45)
@@ -319,14 +335,14 @@ def render_block(b, lt, fi, vid):
         fr = grade(kenburns(img, p, 1.0, 1.1, 540, 650))
         T2.draw(fr, 1250, lt, 0.05, cps=40)
         blend(fr, TAG_BEFORE, 80, 330, 1)
-        for i, tx in enumerate(REQ): tx.draw(fr, 1320 + i * 44, lt, 0.55 + i * 0.55, cps=40)
+        for i, tx in enumerate(REQ): tx.draw(fr, 1320 + i * 54, lt, 0.55 + i * 0.55, cps=40)
         return fr
     if n == "after_photo":
         fr = grade(kenburns(PH["d6_b"], p, 1.04, 1.12, 540, 600))
         z = 1.04 + 0.08 * p
         def mp_(x, y): return np.array([540 + (x - 540) * z, 600 + (y - 600) * z])
         T3.draw(fr, 1250, lt, 0.2)
-        blend(fr, TAG_AFTER, 80, 330, 1)
+        blend(fr, TAG_AFTER, 80, 1180, 1)
         q, al = env(lt, 4.9, 99, 0.6)
         for (x0, y0, x1, y1, x2, y2) in [(120, 440, 238, 372, 380, 420), (600, 425, 745, 366, 880, 425)]:
             pts = np.array([mp_(x0, y0), mp_(x1, y1), mp_(x2, y2)])
@@ -336,7 +352,7 @@ def render_block(b, lt, fi, vid):
         return fr
     if n == "edema":
         src = blur_box(vid.next(), FB4[min(fi, len(FB4) - 1)], 1.15); x0, y0, cw, ch = CR4
-        fr = cv2.resize(src[int(y0):int(y0 + ch), int(x0):int(x0 + cw)], (W, H), interpolation=cv2.INTER_CUBIC)
+        fr = retouch(cv2.resize(src[int(y0):int(y0 + ch), int(x0):int(x0 + cw)], (W, H), interpolation=cv2.INTER_CUBIC))
         fr = grade(fr)
         pls = b4_poles(lt)
         q, al = env(lt, 0.3, 99, 0.4)
@@ -345,7 +361,7 @@ def render_block(b, lt, fi, vid):
             for i, c in enumerate(pls): glow(fr, c + [0, 10], (150 * q, 85 * q), -10 if i == 0 else 10, 0.3 * al * pulse, (235, 235, 240))
             for i, c in enumerate(pls): stroke(fr, partial(arc_pts(c + [0, 25], 150, 85, 190, 350), q), al, WHITE, 5, dash=True)
         T4a.draw(fr, 250, lt, 0.3, cps=20)
-        T4b.draw(fr, 1270, lt, 1.5, cps=30)
+        T4b.draw(fr, 1190, lt, 1.5, cps=30)
         return fr
     if n == "months":
         if lt < 3.6:     # 1 month: video
@@ -364,6 +380,7 @@ def render_block(b, lt, fi, vid):
         return fr
     if n == "feel":
         fr = vid.next().copy()
+        fr = blur_pose(fr, PI[0], fi) if lt < 2.56 else blur_pose(fr, PI[1], fi - 77)
         if lt >= 2.5: fr = kenburns(fr, 0, 1.1, 1.1, 540, 700)
         fr = grade(fr)
         T6.draw(fr, 1130, lt, 0.05, cps=30)
@@ -379,8 +396,18 @@ def render_block(b, lt, fi, vid):
             T7a.draw(fr, 925, lt, 0.9)
             return fr
         END = True
-        fr = np.zeros((H, W, 3), np.float32)
-        T7.draw(fr, 820, lt, 3.35, cps=22)
+        k = fi - int(round(3.3 * FPS))
+        fr = blur_pose(vid.next().copy(), PI[2], k)
+        a = PI[2][min(max(k, 0), len(PI[2]) - 1)]
+        z = 1.0 + 0.32 * ease((lt - 3.3) / 2.6)
+        fr = grade(kenburns(fr, 0, z, z, a[0, 0], a[0, 1] + 150))
+        for (im, x, y, wt, last) in WORDS7:
+            age = lt - wt
+            if age < 0: continue
+            s_ = max(back(age / 0.32), 0.05); al = min(1, age / 0.08)
+            im2 = cv2.resize(im, (max(1, int(im.shape[1] * s_)), max(1, int(im.shape[0] * s_))))
+            blend(fr, shadow_of(im2, 12, 0.6), x + (im.shape[1] - im2.shape[1]) / 2, y + (im.shape[0] - im2.shape[0]) / 2 + 8, al)
+            blend(fr, im2, x + (im.shape[1] - im2.shape[1]) / 2, y + (im.shape[0] - im2.shape[0]) / 2, al)
         return fr
 
 dec_rng = [(b, Vid(VID[b["name"]]) if b["name"] in VID else None) for b in B]
@@ -394,9 +421,8 @@ for f in range(NF):
     fr = render_block(b, lt, f - bstart, vid)
     if bi > 0 and lt < 0.2 and not END:
         e = ease(lt / 0.2); z = 1 + 0.05 * (1 - e); fr = kenburns(fr, 0, z, z, 540, 960)
-    if not END:
-        blend(fr, LOGO, 540 - LOGO.shape[1] / 2, 120, 0.9)
-        subtitles(fr, t)
+    blend(fr, LOGO, 540 - LOGO.shape[1] / 2, 120, 0.9)
+    if not END: subtitles(fr, t)
     enc.stdin.write((np.clip(fr, 0, 1) * 255 + 0.5).astype(np.uint8).tobytes())
 enc.stdin.close(); enc.wait()
 
@@ -428,9 +454,9 @@ CLK = (lambda n: (lambda x: x / np.abs(x).max())(np.diff(rng.standard_normal(n),
 def typing(t0, nch, cps, g=0.05):
     for k in range(nch): put(CLK, t0 + k / cps, g * rng.uniform(0.6, 1))
 typing(at("after1", 0.1), 42, 28); typing(at("before", 0.05), 20, 40); typing(at("after_photo", 0.2), 30, 28)
-typing(at("edema", 1.5), 25, 30); typing(at("months", 3.7), 50, 30, 0.04); typing(at("feel", 0.05), 15, 30); typing(at("final", 3.35), 30, 22, 0.06)
+typing(at("edema", 1.5), 25, 30); typing(at("months", 3.7), 50, 30, 0.04); typing(at("feel", 0.05), 15, 30); [put(PP, at("final", wt), 0.2) for wt in (3.4, 3.5, 3.6, 3.7, 4.0, 4.1)]
 for nm, lt in [("after1", 2.2), ("feel", 1.35)]: put(PP, at(nm, lt), 0.22)
-put(TH, at("after1", 0.1), 0.3); put(TH, at("edema", 0.3), 0.45); put(DG, at("final", 3.3), 0.14)
+put(TH, at("after1", 0.1), 0.3); put(TH, at("edema", 0.3), 0.45); put(DG, at("final", 4.15), 0.14); put(WB, at("final", 3.0), 0.2)
 trk = trk[:int(DUR * SR)]
 with wave.open("sfx2.wav", "wb") as w:
     w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR); w.writeframes((np.clip(trk, -1, 1) * 32767).astype(np.int16).tobytes())
