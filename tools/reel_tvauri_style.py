@@ -12,7 +12,7 @@ B = [
  dict(name="before", aud=[("interview", 43.30, 45.57)], hold=1.1),
  dict(name="after_photo", aud=[("surgeon", 21.15, 22.45), ("surgeon", 24.05, 29.05)]),
  dict(name="edema", aud=[("surgeon", 50.20, 55.45)], hold=0.3),
- dict(name="months", aud=[("sil", 0, 0.30), ("surgeon", 46.80, 49.89), ("sil", 0, 0.32), ("surgeon", 80.82, 84.98), ("sil", 0, 0.28), ("surgeon", 85.02, 87.30)], hold=0.17),
+ dict(name="months", aud=[("sil", 0, 0.20), ("surgeon", 77.18, 80.82), ("sil", 0, 0.18), ("surgeon", 80.84, 84.98), ("sil", 0, 0.12), ("surgeon", 85.02, 87.30)], hold=0.04),
  dict(name="feel", aud=[("interview", 0.0, 2.56), ("interview", 4.35, 7.85)]),
  dict(name="final", aud=[("interview", 45.70, 50.30)], hold=1.6),
 ]
