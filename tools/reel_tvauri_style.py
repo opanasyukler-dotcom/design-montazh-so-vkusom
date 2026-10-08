@@ -191,7 +191,7 @@ def b4_poles(t):
 
 # ---------------- texts (Anna Tvauri style) ----------------
 FD = "/tmp/claude-0/-home-user-design-montazh-so-vkusom/b26b20a4-6ac5-50f8-8404-dcbad88c88d3/scratchpad/v4/fonts/"
-BLUE = (4, 128, 232)
+BLUE = (16, 46, 70)
 def osw(w, s): return ImageFont.truetype(FD + f"Oswald-{w}.ttf", s)
 def mont(w, s): return ImageFont.truetype(FONTS % w, s)
 class Txt:
@@ -204,7 +204,7 @@ class Txt:
                 while osw(600, sz).getlength(txt) > maxw: sz -= 2
                 f = osw(600, sz)
             else:
-                f = mont(500 if kind == "SB" else 300, 40 if kind != "SS" else 34)
+                f = mont(500 if kind == "SB" else 300, 28 if kind != "SS" else 24)
             asc, desc = f.getmetrics()
             s.items.append(dict(txt=txt, kind=kind, f=f, asc=asc, desc=desc, w=f.getlength(txt)))
         s.x = x; s.align = align
@@ -239,31 +239,31 @@ def osw_tag(txt, size=52, bg=BLUE):
     im = Image.new("RGBA", (w + 32, asc + desc + 12), bg + (255,)); ImageDraw.Draw(im).text((16, 6 + asc), txt, font=f, fill=(255, 255, 255, 255), anchor="ls")
     return to_np(im)
 
-T1 = Txt([("«А ВДРУГ ГРУДЬ ПОЛУЧИЛАСЬ", "H"), ("СЛИШКОМ БОЛЬШАЯ?»", "H"), ("6 дней после операции", "S")], size=80)
-LBL_TOP = osw_tag("ОБЪЁМНЫЙ ВЕРХ", 46)
-T2 = Txt([("ВОТ КАКОЙ БЫЛ ЗАПРОС", "H")], size=78)
+T1 = Txt([("«А ВДРУГ ГРУДЬ ПОЛУЧИЛАСЬ", "H"), ("СЛИШКОМ БОЛЬШАЯ?»", "H"), ("6 дней после операции", "S")], size=50)
+LBL_TOP = osw_tag("ОБЪЁМНЫЙ ВЕРХ", 30)
+T2 = Txt([("ВОТ КАКОЙ БЫЛ ЗАПРОС", "H")], size=48)
 REQ = [Txt([(s, "SB")]) for s in ["— круглая", "— наполненная", "— но естественная"]]
-TAG_BEFORE = osw_tag("ДО", 50, (40, 40, 40)); TAG_AFTER = osw_tag("ПОСЛЕ", 50)
-T3 = Txt([("СЕЙЧАС ЭТО ЕЩЁ", "H"), ("НЕ ФИНАЛЬНАЯ ФОРМА", "HB"), ("6 дней после операции", "S")], size=80, bar=True)
+TAG_BEFORE = osw_tag("ДО", 32, (40, 40, 40)); TAG_AFTER = osw_tag("ПОСЛЕ", 32)
+T3 = Txt([("СЕЙЧАС ЭТО ЕЩЁ", "H"), ("НЕ ФИНАЛЬНАЯ ФОРМА", "HB"), ("6 дней после операции", "S")], size=50, bar=True)
 LBL_SLOPE = Txt([("верхний склон будет ровным", "SB")], align="C")
-T4a = Txt([("ОТЁК", "HB")], size=150)
-T4b = Txt([("ТКАНИ ЕЩЁ", "H"), ("НЕ АДАПТИРОВАЛИСЬ", "H"), ("поэтому верх груди сейчас", "S"), ("выглядит объёмнее", "S")], size=78, bar=True)
-T5 = Txt([("ЧЕРЕЗ НЕСКОЛЬКО МЕСЯЦЕВ", "H"), ("ФОРМА БУДЕТ ВЫГЛЯДЕТЬ", "H"), ("СОВСЕМ ИНАЧЕ", "HB")], size=74)
+T4a = Txt([("ОТЁК", "HB")], size=90)
+T4b = Txt([("ТКАНИ ЕЩЁ", "H"), ("НЕ АДАПТИРОВАЛИСЬ", "H"), ("поэтому верх груди сейчас", "S"), ("выглядит объёмнее", "S")], size=48, bar=True)
+T5 = Txt([("ЧЕРЕЗ НЕСКОЛЬКО МЕСЯЦЕВ", "H"), ("ФОРМА БУДЕТ ВЫГЛЯДЕТЬ", "H"), ("СОВСЕМ ИНАЧЕ", "HB")], size=44)
 CAP_M2 = Txt([("2 месяца после операции", "S")], align="C"); CAP_M1 = Txt([("месяц после операции", "S")], align="C")
-T6 = Txt([("А САМОЧУВСТВИЕ?", "H")], size=86)
-f_ = osw(600, 76); qt = "«КАК НА КУРОРТЕ»"; tw = int(f_.getlength(qt)); asc, desc = f_.getmetrics()
-em = Image.open("emoji.png").crop((19, 17, 136, 129)).resize((92, 88), Image.LANCZOS)
-qi = Image.new("RGBA", (tw + 140, asc + desc + 20), (0, 0, 0, 0)); d_ = ImageDraw.Draw(qi)
+T6 = Txt([("А САМОЧУВСТВИЕ?", "H")], size=54)
+f_ = osw(600, 46); qt = "«КАК НА КУРОРТЕ»"; tw = int(f_.getlength(qt)); asc, desc = f_.getmetrics()
+em = Image.open("emoji.png").crop((19, 17, 136, 129)).resize((56, 54), Image.LANCZOS)
+qi = Image.new("RGBA", (tw + 90, asc + desc + 20), (0, 0, 0, 0)); d_ = ImageDraw.Draw(qi)
 d_.rectangle((0, 0, tw + 30, qi.height - 1), fill=BLUE + (255,)); d_.text((15, 10 + asc), qt, font=f_, fill=(255, 255, 255, 255), anchor="ls")
-qi.alpha_composite(em, (tw + 44, (qi.height - 88) // 2)); QUOTE = to_np(qi)
-T7a = Txt([("«С НЕЙ ВСЁ СОШЛОСЬ»", "H")], size=80, align="C")
-T7 = Txt([("«ПОЧЕМУ Я НЕ СДЕЛАЛА", "H"), ("ЭТО РАНЬШЕ?»", "H")], size=84, align="C")
-LOGO = np.asarray(Image.open("../v4/logo.png").resize((420, int(115 * 420 / 620)), Image.LANCZOS)).astype(np.float32) / 255
+qi.alpha_composite(em, (tw + 34, (qi.height - 54) // 2)); QUOTE = to_np(qi)
+T7a = Txt([("«С НЕЙ ВСЁ СОШЛОСЬ»", "H")], size=50, align="C")
+T7 = Txt([("«ПОЧЕМУ Я НЕ СДЕЛАЛА", "H"), ("ЭТО РАНЬШЕ?»", "H")], size=60, align="C")
+LOGO = np.asarray(Image.open("../v4/logo.png").resize((320, int(115 * 320 / 620)), Image.LANCZOS)).astype(np.float32) / 255
 LOGO = premul(LOGO)
 SUBC = {}
 def sub_img(w):
     if w not in SUBC:
-        f = mont(400, 46); asc, desc = f.getmetrics(); tw = int(f.getlength(w.lower()))
+        f = mont(400, 34); asc, desc = f.getmetrics(); tw = int(f.getlength(w.lower()))
         im = Image.new("RGBA", (tw + 20, asc + desc + 10), (0, 0, 0, 0)); ImageDraw.Draw(im).text((10, 5 + asc), w.lower(), font=f, fill=(255, 255, 255, 255), anchor="ls")
         a = to_np(im); SUBC[w] = (a, shadow_of(a, 6, 0.7))
     return SUBC[w]
@@ -273,8 +273,8 @@ def subtitles(frame, t):
         t1 = min(t1, t0 + 1.0)
         if t0 <= t < t1:
             im, sh = sub_img(w); al = min(1, (t - t0) / 0.06)
-            blend(frame, sh, 540 - im.shape[1] / 2, 1580 - im.shape[0] / 2 + 3, al)
-            blend(frame, im, 540 - im.shape[1] / 2, 1580 - im.shape[0] / 2, al)
+            blend(frame, sh, 540 - im.shape[1] / 2, 1650 - im.shape[0] / 2 + 3, al)
+            blend(frame, im, 540 - im.shape[1] / 2, 1650 - im.shape[0] / 2, al)
 def grade(fr):
     g = fr @ np.float32([0.299, 0.587, 0.114])
     fr = fr * 0.82 + g[..., None] * 0.18
@@ -290,7 +290,7 @@ def render_block(b, lt, fi, vid):
     n = b["name"]; d = b["t1"] - b["t0"]; p = lt / d; END = False
     if n == "after1":
         fr = grade(vid.next().copy())
-        T1.draw(fr, 1000, lt, 0.1)
+        T1.draw(fr, 1250, lt, 0.1)
         pts, w = b1_poles(fi)
         q, al = env(lt, 2.05, 99, 0.45)
         for c in pts: stroke(fr, partial(arc_pts(c + [0, 0.05 * w], 0.2 * w, 0.12 * w, 200, 340), q), al, WHITE, 6)
@@ -303,15 +303,15 @@ def render_block(b, lt, fi, vid):
     if n == "before":
         img = PH["before_b"] if lt < 1.9 else PH["before_a"]
         fr = grade(kenburns(img, p, 1.0, 1.1, 540, 650))
-        T2.draw(fr, 1000, lt, 0.05, cps=40)
+        T2.draw(fr, 1250, lt, 0.05, cps=40)
         blend(fr, TAG_BEFORE, 80, 330, 1)
-        for i, tx in enumerate(REQ): tx.draw(fr, 1110 + i * 62, lt, 0.55 + i * 0.55, cps=40)
+        for i, tx in enumerate(REQ): tx.draw(fr, 1320 + i * 44, lt, 0.55 + i * 0.55, cps=40)
         return fr
     if n == "after_photo":
         fr = grade(kenburns(PH["d6_b"], p, 1.04, 1.12, 540, 600))
         z = 1.04 + 0.08 * p
         def mp_(x, y): return np.array([540 + (x - 540) * z, 600 + (y - 600) * z])
-        T3.draw(fr, 1040, lt, 0.2)
+        T3.draw(fr, 1250, lt, 0.2)
         blend(fr, TAG_AFTER, 80, 330, 1)
         q, al = env(lt, 4.9, 99, 0.6)
         for (x0, y0, x1, y1, x2, y2) in [(120, 440, 238, 372, 380, 420), (600, 425, 745, 366, 880, 425)]:
@@ -328,10 +328,10 @@ def render_block(b, lt, fi, vid):
         q, al = env(lt, 0.3, 99, 0.4)
         if q > 0:
             pulse = 0.7 + 0.3 * np.sin((lt - 0.3) * 5)
-            for i, c in enumerate(pls): glow(fr, c + [0, 10], (150 * q, 85 * q), -10 if i == 0 else 10, 0.3 * al * pulse, (120, 180, 255))
+            for i, c in enumerate(pls): glow(fr, c + [0, 10], (150 * q, 85 * q), -10 if i == 0 else 10, 0.3 * al * pulse, (235, 235, 240))
             for i, c in enumerate(pls): stroke(fr, partial(arc_pts(c + [0, 25], 150, 85, 190, 350), q), al, WHITE, 5, dash=True)
         T4a.draw(fr, 250, lt, 0.3, cps=20)
-        T4b.draw(fr, 1060, lt, 1.5, cps=30)
+        T4b.draw(fr, 1270, lt, 1.5, cps=30)
         return fr
     if n == "months":
         seq = [("m2_c", 0, 3.6, CAP_M2), ("m2_b", 3.6, 7.1, CAP_M2), ("m1_b", 7.1, 99, CAP_M1)]
@@ -342,14 +342,14 @@ def render_block(b, lt, fi, vid):
                 if k.startswith("m2"):
                     blend(fr, TAG_AFTER, 960 - TAG_AFTER.shape[1], 830, 1); blend(fr, TAG_BEFORE, 960 - TAG_BEFORE.shape[1], 1790, 1)
                 cap.draw(fr, 1555 if k == "m1_b" else 920, lt, a + 0.2, cps=40)
-        T5.draw(fr, 240, lt, 0.2, cps=30)
+        T5.draw(fr, 230, lt, 0.2, cps=30)
         return fr
     if n == "feel":
         fr = vid.next().copy()
         if lt >= 2.5: fr = kenburns(fr, 0, 1.1, 1.1, 540, 700)
         fr = grade(fr)
-        T6.draw(fr, 1000, lt, 0.05, cps=30)
-        pop_img(fr, QUOTE, 540, 1180, lt, 1.35, sh=False)
+        T6.draw(fr, 1130, lt, 0.05, cps=30)
+        pop_img(fr, QUOTE, 540, 1270, lt, 1.35, sh=False)
         return fr
     if n == "final":
         if lt < 3.3:   # stacked before / after
@@ -358,7 +358,7 @@ def render_block(b, lt, fi, vid):
             k = ease(lt / 0.5); fr[960:] = fr[960:] * k + 0 * (1 - k)
             fr = grade(fr)
             blend(fr, TAG_AFTER, 80, 840, 1); blend(fr, TAG_BEFORE, 80, 1800 - TAG_BEFORE.shape[0], min(1, lt / 0.5))
-            T7a.draw(fr, 1210, lt, 0.9)
+            T7a.draw(fr, 1240, lt, 0.9)
             return fr
         END = True
         fr = np.zeros((H, W, 3), np.float32)
