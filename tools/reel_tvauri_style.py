@@ -190,7 +190,7 @@ class Vid:
             if len(b) == W * H * 3:
                 s.last = np.frombuffer(b, np.uint8).reshape(H, W, 3).astype(np.float32) / 255; return s.last
             s.p.kill(); s.p = None
-VID = {"after1": [("surgeon", 15.35, 21.10)], "edema": [("surgeon", 50.20, 55.45)], "feel": [("interview", 0.0, 2.56), ("interview", 4.35, 7.85)]}
+VID = {"months": [("m1_a", 9.0, 12.6)], "after1": [("surgeon", 15.35, 21.10)], "edema": [("surgeon", 50.20, 55.45)], "feel": [("interview", 0.0, 2.56), ("interview", 4.35, 7.85)]}
 
 POSE1 = np.load("pose_b1.npy")
 def b1_poles(f):
@@ -348,15 +348,19 @@ def render_block(b, lt, fi, vid):
         T4b.draw(fr, 1270, lt, 1.5, cps=30)
         return fr
     if n == "months":
-        seq = [("m2_c", 0, 3.6, CAP_M2), ("m2_b", 3.6, 7.1, CAP_M2), ("m1_b", 7.1, 99, CAP_M1)]
-        for (k, a, e, cap) in seq:
+        if lt < 3.6:     # 1 month: video
+            fr = grade(blur_ell(vid.next(), 540, 0, 210, 120))
+            CAP_M1.draw(fr, 1320, lt, 0.2, cps=40)
+            blend(fr, TAG_AFTER, 960 - TAG_AFTER.shape[1], 330, 1)
+            return fr
+        seq = [("m2_c", 3.6, 7.1), ("m2_b", 7.1, 99)]
+        for (k, a, e) in seq:
             if a <= lt < e:
                 pp = (lt - a) / max(0.1, min(e, d) - a)
                 fr = grade(kenburns(PH[k], pp, 1.0, 1.05, 540, 960))
-                if k.startswith("m2"):
-                    blend(fr, TAG_AFTER, 960 - TAG_AFTER.shape[1], 830, 1); blend(fr, TAG_BEFORE, 960 - TAG_BEFORE.shape[1], 1790, 1)
-                cap.draw(fr, 1400 if k == "m1_b" else 1060, lt, (a + 0.2) if k == "m1_b" else 0.9, cps=40)
-        T5.draw(fr, 820, lt, 0.2, 7.0, cps=30)
+                blend(fr, TAG_AFTER, 960 - TAG_AFTER.shape[1], 830, 1); blend(fr, TAG_BEFORE, 960 - TAG_BEFORE.shape[1], 1790, 1)
+        T5.draw(fr, 820, lt, 3.7, cps=30)
+        CAP_M2.draw(fr, 1060, lt, 4.6, cps=40)
         return fr
     if n == "feel":
         fr = vid.next().copy()
@@ -424,7 +428,7 @@ CLK = (lambda n: (lambda x: x / np.abs(x).max())(np.diff(rng.standard_normal(n),
 def typing(t0, nch, cps, g=0.05):
     for k in range(nch): put(CLK, t0 + k / cps, g * rng.uniform(0.6, 1))
 typing(at("after1", 0.1), 42, 28); typing(at("before", 0.05), 20, 40); typing(at("after_photo", 0.2), 30, 28)
-typing(at("edema", 1.5), 25, 30); typing(at("months", 0.2), 50, 30, 0.04); typing(at("feel", 0.05), 15, 30); typing(at("final", 3.35), 30, 22, 0.06)
+typing(at("edema", 1.5), 25, 30); typing(at("months", 3.7), 50, 30, 0.04); typing(at("feel", 0.05), 15, 30); typing(at("final", 3.35), 30, 22, 0.06)
 for nm, lt in [("after1", 2.2), ("feel", 1.35)]: put(PP, at(nm, lt), 0.22)
 put(TH, at("after1", 0.1), 0.3); put(TH, at("edema", 0.3), 0.45); put(DG, at("final", 3.3), 0.14)
 trk = trk[:int(DUR * SR)]
