@@ -9,11 +9,11 @@ POWDER = (228, 210, 210); NAVY = (16, 46, 70); MAUVE = (103, 96, 104); WHITE = (
 # ---------------- blocks: audio segments (src, a, b) / holds ----------------
 B = [
  dict(name="after1", aud=[("surgeon", 15.35, 21.10)]),
- dict(name="before", aud=[("interview", 43.35, 45.65)], hold=1.3),
+ dict(name="before", aud=[("interview", 43.30, 45.57)], hold=1.1),
  dict(name="after_photo", aud=[("surgeon", 21.15, 22.45), ("surgeon", 24.05, 29.05)]),
  dict(name="edema", aud=[("surgeon", 50.20, 55.45)], hold=0.3),
  dict(name="months", aud=[("surgeon", 29.15, 35.95), ("surgeon", 42.75, 46.55)]),
- dict(name="feel", aud=[("interview", 0.0, 2.5), ("interview", 4.35, 7.85)]),
+ dict(name="feel", aud=[("interview", 0.0, 2.56), ("interview", 4.35, 7.85)]),
  dict(name="final", aud=[("interview", 45.70, 50.30)], hold=1.6),
 ]
 AUD = {}
@@ -28,7 +28,7 @@ for b in B:
     b["t0"] = t
     for (src, a, e) in b["aud"]:
         seg = AUD[src][int(a * SR):int(e * SR)].copy(); fd = int(0.012 * SR)
-        seg[:fd] *= np.linspace(0, 1, fd); seg[-fd:] *= np.linspace(1, 0, fd)
+        seg[:fd] *= np.linspace(0, 1, fd); fo = int(0.07 * SR); seg[-fo:] *= np.linspace(1, 0, fo) ** 1.5
         voice.append(seg)
         ws = [w for w in WJ[src] if w[0] >= a - 0.05 and w[0] < e - 0.05]
         if src == "surgeon" and abs(a - 42.75) < 0.01:
@@ -158,6 +158,20 @@ def kenburns(img, p, z0=1.0, z1=1.08, fx=540, fy=800):
     M = np.float32([[z, 0, fx - z * fx], [0, z, fy - z * fy]])
     return cv2.warpAffine(img, M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
 PH = {n: photo(n) for n in ["before_a", "before_b", "d6_b", "m1_b", "m2_a", "m2_b", "m2_c"]}
+def blur_ell(img, cx, cy, rx, ry):
+    h, w = img.shape[:2]; m = np.zeros((h, w), np.float32)
+    cv2.ellipse(m, (int(cx), int(cy)), (int(rx), int(ry)), 0, 0, 360, 1, -1, cv2.LINE_AA)
+    m = cv2.GaussianBlur(m, (0, 0), max(4, rx / 8))[..., None]
+    sm = cv2.resize(img, (w // 24, h // 24), interpolation=cv2.INTER_AREA)
+    bl = cv2.GaussianBlur(cv2.resize(sm, (w, h), interpolation=cv2.INTER_LINEAR), (0, 0), 18)
+    return img * (1 - m) + bl * m
+PH["before_a"] = blur_ell(PH["before_a"], 640, 0, 230, 150)
+PH["before_b"] = blur_ell(PH["before_b"], 545, 0, 170, 90)
+PH["m1_b"] = blur_ell(PH["m1_b"], 545, 0, 190, 100)
+FB1 = np.load("fb_b1.npy"); FB4 = np.load("fb_b4.npy")
+def blur_box(img, bx, pad=1.35):
+    x0, y0, x1, y1 = bx; cx, cy = (x0 + x1) / 2, (y0 + y1) / 2 - (y1 - y0) * 0.05
+    return blur_ell(img, cx, cy, (x1 - x0) / 2 * pad, (y1 - y0) / 2 * pad)
 
 class Vid:
     def __init__(s, segs): s.segs = list(segs); s.p = None; s.last = None
@@ -176,7 +190,7 @@ class Vid:
             if len(b) == W * H * 3:
                 s.last = np.frombuffer(b, np.uint8).reshape(H, W, 3).astype(np.float32) / 255; return s.last
             s.p.kill(); s.p = None
-VID = {"after1": [("surgeon", 15.35, 21.10)], "edema": [("surgeon", 50.20, 55.45)], "feel": [("interview", 0.0, 2.5), ("interview", 4.35, 7.85)]}
+VID = {"after1": [("surgeon", 15.35, 21.10)], "edema": [("surgeon", 50.20, 55.45)], "feel": [("interview", 0.0, 2.56), ("interview", 4.35, 7.85)]}
 
 POSE1 = np.load("pose_b1.npy")
 def b1_poles(f):
@@ -204,7 +218,7 @@ class Txt:
                 while osw(600, sz).getlength(txt) > maxw: sz -= 2
                 f = osw(600, sz)
             else:
-                f = mont(500 if kind == "SB" else 300, 28 if kind != "SS" else 24)
+                f = mont(500 if kind in ("SB", "SL") else 300, 42 if kind == "SL" else (28 if kind != "SS" else 24))
             asc, desc = f.getmetrics()
             s.items.append(dict(txt=txt, kind=kind, f=f, asc=asc, desc=desc, w=f.getlength(txt)))
         s.x = x; s.align = align
@@ -248,22 +262,22 @@ T3 = Txt([("СЕЙЧАС ЭТО ЕЩЁ", "H"), ("НЕ ФИНАЛЬНАЯ ФОР�
 LBL_SLOPE = Txt([("верхний склон будет ровным", "SB")], align="C")
 T4a = Txt([("ОТЁК", "HB")], size=90)
 T4b = Txt([("ТКАНИ ЕЩЁ", "H"), ("НЕ АДАПТИРОВАЛИСЬ", "H"), ("поэтому верх груди сейчас", "S"), ("выглядит объёмнее", "S")], size=48, bar=True)
-T5 = Txt([("ЧЕРЕЗ НЕСКОЛЬКО МЕСЯЦЕВ", "H"), ("ФОРМА БУДЕТ ВЫГЛЯДЕТЬ", "H"), ("СОВСЕМ ИНАЧЕ", "HB")], size=44)
-CAP_M2 = Txt([("2 месяца после операции", "S")], align="C"); CAP_M1 = Txt([("месяц после операции", "S")], align="C")
+T5 = Txt([("ЧЕРЕЗ НЕСКОЛЬКО МЕСЯЦЕВ", "H"), ("ГРУДЬ БУДЕТ ВЫГЛЯДЕТЬ", "H"), ("СОВСЕМ ИНАЧЕ", "HB")], size=46, align="C")
+CAP_M2 = Txt([("2 месяца после операции", "SL")], align="C"); CAP_M1 = Txt([("месяц после операции", "SL")], align="C")
 T6 = Txt([("А САМОЧУВСТВИЕ?", "H")], size=54)
 f_ = osw(600, 46); qt = "«КАК НА КУРОРТЕ»"; tw = int(f_.getlength(qt)); asc, desc = f_.getmetrics()
 em = Image.open("emoji.png").crop((19, 17, 136, 129)).resize((56, 54), Image.LANCZOS)
-qi = Image.new("RGBA", (tw + 90, asc + desc + 20), (0, 0, 0, 0)); d_ = ImageDraw.Draw(qi)
+qi = Image.new("RGBA", (tw + 31, asc + desc + 20), (0, 0, 0, 0)); d_ = ImageDraw.Draw(qi)
 d_.rectangle((0, 0, tw + 30, qi.height - 1), fill=BLUE + (255,)); d_.text((15, 10 + asc), qt, font=f_, fill=(255, 255, 255, 255), anchor="ls")
-qi.alpha_composite(em, (tw + 34, (qi.height - 54) // 2)); QUOTE = to_np(qi)
-T7a = Txt([("«С НЕЙ ВСЁ СОШЛОСЬ»", "H")], size=50, align="C")
+QUOTE = to_np(qi)
+T7a = Txt([("«С НЕЙ ВСЁ СОШЛОСЬ»", "HB")], size=40, align="C")
 T7 = Txt([("«ПОЧЕМУ Я НЕ СДЕЛАЛА", "H"), ("ЭТО РАНЬШЕ?»", "H")], size=60, align="C")
 LOGO = np.asarray(Image.open("../v4/logo.png").resize((320, int(115 * 320 / 620)), Image.LANCZOS)).astype(np.float32) / 255
 LOGO = premul(LOGO)
 SUBC = {}
 def sub_img(w):
     if w not in SUBC:
-        f = mont(400, 34); asc, desc = f.getmetrics(); tw = int(f.getlength(w.lower()))
+        f = mont(500, 44); asc, desc = f.getmetrics(); tw = int(f.getlength(w.lower()))
         im = Image.new("RGBA", (tw + 20, asc + desc + 10), (0, 0, 0, 0)); ImageDraw.Draw(im).text((10, 5 + asc), w.lower(), font=f, fill=(255, 255, 255, 255), anchor="ls")
         a = to_np(im); SUBC[w] = (a, shadow_of(a, 6, 0.7))
     return SUBC[w]
@@ -273,8 +287,8 @@ def subtitles(frame, t):
         t1 = min(t1, t0 + 1.0)
         if t0 <= t < t1:
             im, sh = sub_img(w); al = min(1, (t - t0) / 0.06)
-            blend(frame, sh, 540 - im.shape[1] / 2, 1650 - im.shape[0] / 2 + 3, al)
-            blend(frame, im, 540 - im.shape[1] / 2, 1650 - im.shape[0] / 2, al)
+            blend(frame, sh, 540 - im.shape[1] / 2, 1500 - im.shape[0] / 2 + 3, al)
+            blend(frame, im, 540 - im.shape[1] / 2, 1500 - im.shape[0] / 2, al)
 def grade(fr):
     g = fr @ np.float32([0.299, 0.587, 0.114])
     fr = fr * 0.82 + g[..., None] * 0.18
@@ -289,7 +303,7 @@ def render_block(b, lt, fi, vid):
     global END
     n = b["name"]; d = b["t1"] - b["t0"]; p = lt / d; END = False
     if n == "after1":
-        fr = grade(vid.next().copy())
+        fr = grade(blur_box(vid.next(), FB1[min(fi, len(FB1) - 1)]))
         T1.draw(fr, 1250, lt, 0.1)
         pts, w = b1_poles(fi)
         q, al = env(lt, 2.05, 99, 0.45)
@@ -321,7 +335,7 @@ def render_block(b, lt, fi, vid):
         LBL_SLOPE.draw(fr, 250, lt, 4.95)
         return fr
     if n == "edema":
-        src = vid.next(); x0, y0, cw, ch = CR4
+        src = blur_box(vid.next(), FB4[min(fi, len(FB4) - 1)], 1.15); x0, y0, cw, ch = CR4
         fr = cv2.resize(src[int(y0):int(y0 + ch), int(x0):int(x0 + cw)], (W, H), interpolation=cv2.INTER_CUBIC)
         fr = grade(fr)
         pls = b4_poles(lt)
@@ -341,8 +355,8 @@ def render_block(b, lt, fi, vid):
                 fr = grade(kenburns(PH[k], pp, 1.0, 1.05, 540, 960))
                 if k.startswith("m2"):
                     blend(fr, TAG_AFTER, 960 - TAG_AFTER.shape[1], 830, 1); blend(fr, TAG_BEFORE, 960 - TAG_BEFORE.shape[1], 1790, 1)
-                cap.draw(fr, 1555 if k == "m1_b" else 920, lt, a + 0.2, cps=40)
-        T5.draw(fr, 230, lt, 0.2, cps=30)
+                cap.draw(fr, 1400 if k == "m1_b" else 1060, lt, (a + 0.2) if k == "m1_b" else 0.9, cps=40)
+        T5.draw(fr, 820, lt, 0.2, 7.0, cps=30)
         return fr
     if n == "feel":
         fr = vid.next().copy()
@@ -358,7 +372,7 @@ def render_block(b, lt, fi, vid):
             k = ease(lt / 0.5); fr[960:] = fr[960:] * k + 0 * (1 - k)
             fr = grade(fr)
             blend(fr, TAG_AFTER, 80, 840, 1); blend(fr, TAG_BEFORE, 80, 1800 - TAG_BEFORE.shape[0], min(1, lt / 0.5))
-            T7a.draw(fr, 1240, lt, 0.9)
+            T7a.draw(fr, 925, lt, 0.9)
             return fr
         END = True
         fr = np.zeros((H, W, 3), np.float32)
