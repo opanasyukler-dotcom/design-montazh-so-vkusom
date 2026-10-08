@@ -12,7 +12,7 @@ B = [
  dict(name="before", aud=[("interview", 43.30, 45.57)], hold=1.1),
  dict(name="after_photo", aud=[("surgeon", 21.15, 22.45), ("surgeon", 24.05, 29.05)]),
  dict(name="edema", aud=[("surgeon", 50.20, 55.45)], hold=0.3),
- dict(name="months", aud=[("surgeon", 29.15, 35.95), ("surgeon", 42.75, 46.55)]),
+ dict(name="months", aud=[("sil", 0, 0.30), ("surgeon", 46.80, 49.89), ("sil", 0, 0.32), ("surgeon", 80.82, 84.98), ("sil", 0, 0.28), ("surgeon", 85.02, 87.30)], hold=0.17),
  dict(name="feel", aud=[("interview", 0.0, 2.56), ("interview", 4.35, 7.85)]),
  dict(name="final", aud=[("interview", 45.70, 50.30)], hold=1.6),
 ]
@@ -20,13 +20,15 @@ AUD = {}
 for n in ("surgeon", "interview"):
     with wave.open(f"a_{n}.wav") as w: AUD[n] = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float32) / 32768
 WJ = {n: json.load(open(f"{n}.json")) for n in ("surgeon", "interview")}
-FIX = {"объемный": "объёмный", "нее": "неё", "отечная": "отёчная", "объем": "объём", "еще": "ещё", "все": "всё", "Ане": "Анне", "Романе": "Романовне", "Чем": "о чём"}
+FIX = {"объемный": "объёмный", "нее": "неё", "отечная": "отёчная", "объем": "объём", "объема": "объёма", "Естественно": "естественно", "еще": "ещё", "все": "всё", "Ане": "Анне", "Романе": "Романовне", "Чем": "о чём"}
 REPL_42 = ["мы", "нашей", "сегодняшней", "пациентке", "показали", "как", "раз", "ту,", "чтобы", "она", "не", "волновалась"]
 
 voice = []; t = 0.0; SUBS = []
 for b in B:
     b["t0"] = t
     for (src, a, e) in b["aud"]:
+        if src == "sil":
+            voice.append(np.zeros(int(e * SR), np.float32)); t += e; continue
         seg = AUD[src][int(a * SR):int(e * SR)].copy(); fd = int(0.012 * SR)
         seg[:fd] *= np.linspace(0, 1, fd); fo = int(0.07 * SR); seg[-fo:] *= np.linspace(1, 0, fo) ** 1.5
         voice.append(seg)
@@ -43,7 +45,7 @@ for b in B:
     b["t1"] = t
 DUR = t
 voice = np.concatenate(voice)
-with wave.open("voice_cat.wav", "wb") as w:
+with wave.open("voice_cat3.wav", "wb") as w:
     w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR); w.writeframes((np.clip(voice, -1, 1) * 32767).astype(np.int16).tobytes())
 SUBS.sort()
 def bt(name): return next(b for b in B if b["name"] == name)
@@ -412,7 +414,7 @@ def render_block(b, lt, fi, vid):
 
 dec_rng = [(b, Vid(VID[b["name"]]) if b["name"] in VID else None) for b in B]
 enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
-                        "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "video_only2.mp4"], stdin=subprocess.PIPE)
+                        "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "video_only3.mp4"], stdin=subprocess.PIPE)
 NF = int(round(DUR * FPS)); bi = 0; bstart = 0
 for f in range(NF):
     t = f / FPS
@@ -458,5 +460,5 @@ typing(at("edema", 1.5), 25, 30); typing(at("months", 3.7), 50, 30, 0.04); typin
 for nm, lt in [("after1", 2.2), ("feel", 1.35)]: put(PP, at(nm, lt), 0.22)
 put(TH, at("after1", 0.1), 0.3); put(TH, at("edema", 0.3), 0.45); put(DG, at("final", 4.15), 0.14); put(WB, at("final", 3.0), 0.2)
 trk = trk[:int(DUR * SR)]
-with wave.open("sfx2.wav", "wb") as w:
+with wave.open("sfx3.wav", "wb") as w:
     w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR); w.writeframes((np.clip(trk, -1, 1) * 32767).astype(np.int16).tobytes())
