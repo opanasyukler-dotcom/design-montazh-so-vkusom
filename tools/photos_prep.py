@@ -11,20 +11,23 @@ def fit(img):  # cover-fit to 1080x1920 on black
     h, w = img.shape[:2]; s = min(1080 / w, 1920 / h); im = cv2.resize(img, (round(w * s), round(h * s)), interpolation=cv2.INTER_AREA)
     out = np.zeros((1920, 1080, 3), np.uint8); y = (1920 - im.shape[0]) // 2; x = (1080 - im.shape[1]) // 2
     out[y:y + im.shape[0], x:x + im.shape[1]] = im; return out
-from tat import tattoo_mask, remove4
+import tat3; tat3.PROT[:] = [4.7, 2.3, -0.5]
+from tat3 import ink_mask, remove_ink
 def cl(img, top=0.0):
-    p = pose_of(img)
-    if p is not None: return clean(img, p)
-    r = img
-    for _ in range(3):
-        m = tattoo_mask(r, None); m[: int(img.shape[0] * top)] = 0; r = remove4(r, m)
+    p = pose_of(img); r = img
+    for _ in range(4):
+        m = ink_mask(r, p)
+        if p is None: m[: int(img.shape[0] * top)] = 0
+        r = remove_ink(r, m)
     return r
 def bbox_fit(img):
     g = (cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) > 60).astype(np.uint8)
     g = cv2.morphologyEx(g, cv2.MORPH_OPEN, np.ones((9, 9), np.uint8))
     n, lab, st, _ = cv2.connectedComponentsWithStats(g, 8); k = 1 + np.argmax(st[1:, cv2.CC_STAT_AREA])
     ys, xs = np.where(lab == k)
-    img = img.copy(); img[cv2.dilate((lab == k).astype(np.uint8), np.ones((15, 15), np.uint8)) == 0] = 0
+    body = (lab == k).astype(np.uint8); cs, _ = cv2.findContours(body, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    body = np.zeros_like(body); cv2.drawContours(body, cs, -1, 1, -1)
+    img = img.copy(); img[cv2.dilate(body, np.ones((15, 15), np.uint8)) == 0] = 0
     x0, x1, y0, y1 = xs.min(), xs.max(), ys.min(), ys.max()
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2; h = (y1 - y0) * 1.12; w = h * 9 / 16
     if w < (x1 - x0) * 1.1: w = (x1 - x0) * 1.1; h = w * 16 / 9
@@ -39,4 +42,25 @@ for n, kind in [("434d627b", "col"), ("4f55eeac", "col"), ("e4a87217", "col"), (
         im = bbox_fit(im); im = cl(im)
     else:
         im = fit(im); im[:960] = cl(im[:960].copy(), 0.1); im[960:] = cl(im[960:].copy(), 0.1)
-    cv2.imwrite(f"p_{n}.png", im); print(n, "ok")
+    def fill_zone(im, m):
+        from tat import nconv
+        f = im.astype(np.float32); L = cv2.cvtColor(im, cv2.COLOR_BGR2LAB)[..., 0]
+        R = cv2.dilate(m, np.ones((7, 7), np.uint8)); Wt = ((L > 70) & (R == 0)).astype(np.float32)
+        low, _ = nconv(f, Wt, 8); hi = np.clip(f - cv2.GaussianBlur(f, (0, 0), 2), -1, 4)
+        a = cv2.GaussianBlur(R.astype(np.float32), (0, 0), 1.6)[..., None]
+        return np.clip(f * (1 - a) + (low + hi) * a, 0, 255).astype(np.uint8)
+    Z = {"3681468f": [("r", 860, 680, 1060, 1330), ("r", 40, 920, 150, 1320), ("c", 370, 1380, 45), ("c", 790, 815, 40)],
+         "34b6868e": [("c", 490, 1040, 70)]}
+    if n in Z:
+        from tat2 import tattoo_mask_z, remove_z
+        zone = np.zeros(im.shape[:2], np.uint8)
+        for zz in Z[n]:
+            if zz[0] == "r": cv2.rectangle(zone, zz[1:3], zz[3:5], 1, -1)
+            else: cv2.circle(zone, zz[1:3], zz[3], 1, -1)
+        from tat import raw_skin
+        for _ in range(3):
+            L = cv2.cvtColor(im, cv2.COLOR_BGR2LAB)[..., 0]
+            rs = cv2.erode((L > 70).astype(np.uint8), np.ones((9, 9), np.uint8))
+            m = ((L.astype(int) < cv2.medianBlur(L, 41).astype(int) - 6) & (rs > 0) & (zone > 0)).astype(np.uint8)
+            im = fill_zone(im, m)
+    cv2.imwrite(f"q_{n}.png", im); print(n, "ok")

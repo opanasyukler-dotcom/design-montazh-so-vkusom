@@ -150,9 +150,9 @@ def subtitles(frame, t):
 
 # ---------------- sources ----------------
 def load_png(n): return cv2.cvtColor(cv2.imread(n), cv2.COLOR_BGR2RGB).astype(np.float32) / 255
-PH = {k: load_png(f"p_{k}.png") for k in ["434d627b", "4f55eeac", "e4a87217", "3681468f", "af0d1e43", "34b6868e"]}
+PH = {k: load_png(f"q_{k}.png") for k in ["434d627b", "4f55eeac", "e4a87217", "3681468f", "af0d1e43", "34b6868e"]}
 POSE = {"79": np.load("pose79.npy"), "80": np.load("pose80.npy"), "80o": np.load("pose80.npy"), "78": np.load("pose78.npy")}
-VSRC = {"80o": "dl/v80.mov", "79": "c79.mp4", "80": "c80.mp4", "78": SP + "v6/out.mp4"}
+VSRC = {"80o": "dl/v80.mov", "79": "d79.mp4", "80": "d80.mp4", "78": "d78.mp4"}
 def read_frames(src, a, e):
     p = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(a), "-i", src, "-t", str(e - a + 0.1), "-vf", "fps=30,scale=1080:1920:flags=bicubic",
                         "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True)
@@ -180,7 +180,7 @@ T_HOOK = Txt([("«ОТКУДА У ТЕБЯ ТАКОЕ?»", "HB"), ("— спро
 T_BEFORE = Txt([("ДО ОПЕРАЦИИ", "H")], size=58)
 L_POLE = tag("ПУСТОЙ ВЕРХНИЙ ПОЛЮС", 34); L_VOL = tag("МАЛО ОБЪЁМА", 34)
 TAG_B = tag("ДО", 34, (40, 40, 40)); TAG_A = tag("ПОСЛЕ", 34)
-L_SEAM = tag("ВЕРХНИЙ ПОЛЮС", 36)
+L_FULL = tag("НАПОЛНЕН", 30); L_EMPTY = tag("ПУСТОЙ", 30, (40, 40, 40))
 T_DIFF = Txt([("«ЭТО ВООБЩЕ СОВСЕМ", "H"), ("ПО-ДРУГОМУ»", "HB")], size=56)
 T_SURG = Txt([("«У ВАС ОЧЕНЬ КРАСИВО»", "HB"), ("— хирург на осмотре", "S")], size=58)
 T_TANK = Txt([("И ДАЖЕ В ОДЕЖДЕ", "H"), ("БЕЗ ПУШ-АПА", "HB")], size=60)
@@ -199,13 +199,19 @@ def render(b, lt):
         blend(fr, TAG_B, 80, 300, 1)
         if k == "3681468f":
             z = 1.0 + 0.05 * p
-            def M(x, y): return (540 + (x - 540) * z, 760 + (y - 760) * z)
-            q, al = env(lt, 0.25, 1.62, 0.35)
-            for (x, y) in [(330, 560), (750, 550)]: stroke(fr, partial(bez((540, 420), M(x, y), 0.15 if x < 540 else -0.15), q), al, 5, head=q > 0.95)
-            pop_img(fr, L_POLE, 540, 395, lt, 0.2, 1.6)
+            def M(x, y): return np.array([540 + (x - 540) * z, 760 + (y - 760) * z])
+            q, al = env(lt, 0.2, 1.62, 0.4)
+            for (sx, sy) in [(335, 700), (750, 686)]:
+                arc = np.array([M(sx + 95 * np.cos(th), sy - 40 - 75 * np.sin(th)) for th in np.linspace(np.pi, 0, 40)])
+                stroke(fr, partial(arc, q), al, 6, dash=True)
+            q2, al2 = env(lt, 0.45, 1.62, 0.3)
+            for (sx, sy) in [(335, 700), (750, 686)]:
+                stroke(fr, partial(bez((540 + (-70 if sx < 540 else 70), 455), M(sx, sy - 125), 0.12 if sx < 540 else -0.12), q2), al2, 4, head=q2 > 0.95)
+            pop_img(fr, L_POLE, 540, 430, lt, 0.2, 1.6)
             q, al = env(lt, 0.8, 1.62, 0.35)
-            for (x, y) in [(330, 790), (750, 780)]: stroke(fr, partial(bez((540, 1010), M(x, y), -0.15 if x < 540 else 0.15), q), al, 5, head=q > 0.95)
-            pop_img(fr, L_VOL, 540, 1035, lt, 0.75, 1.6)
+            for (sx, sy) in [(335, 805), (750, 795)]:
+                stroke(fr, partial(bez((540 + (-60 if sx < 540 else 60), 990), M(sx, sy), -0.12 if sx < 540 else 0.12), q), al, 4, head=q > 0.95)
+            pop_img(fr, L_VOL, 540, 1015, lt, 0.75, 1.6)
         else:
             T_BEFORE.draw(fr, 1240, lt, 1.75, cps=30)
         return fr
@@ -217,12 +223,19 @@ def render(b, lt):
                 fr = grade(kenburns(PH[k], 1.0 + 0.04 * pp, 540, 960))
                 blend(fr, TAG_A, W - 80 - TAG_A.shape[1], 300, 1); blend(fr, TAG_B, W - 80 - TAG_B.shape[1], 1830 - TAG_B.shape[0], 1)
                 if k == "434d627b":
-                    q, al = env(lt, 0.2, 1.8, 0.4)
-                    for (x, y) in [(425, 205), (680, 205)]:
-                        stroke(fr, partial(bez((540, 935), (x, y), 0.12 if x < 540 else -0.12), q), al, 5, head=q > 0.95)
-                    for (x, y) in [(415, 1150), (670, 1150)]:
-                        stroke(fr, partial(bez((540, 985), (x, y), -0.12 if x < 540 else 0.12), q), al, 5, head=q > 0.95, dash=True)
-                    pop_img(fr, L_SEAM, 540, 960, lt, 0.1, 1.8)
+                    z = 1.0 + 0.04 * pp
+                    def M(x, y): return np.array([540 + (x - 540) * z, 960 + (y - 960) * z])
+                    q, al = env(lt, 0.15, 1.8, 0.45)
+                    for (sx, sy) in [(405, 265), (673, 258)]:
+                        arc = np.array([M(sx + 85 * np.cos(th), sy - 30 - 70 * np.sin(th)) for th in np.linspace(np.pi, 0, 40)])
+                        stroke(fr, partial(arc, q), al, 6)
+                    for (sx, sy) in [(407, 1252), (671, 1243)]:
+                        arc = np.array([M(sx + 85 * np.cos(th), sy - 30 - 55 * np.sin(th)) for th in np.linspace(np.pi, 0, 40)])
+                        stroke(fr, partial(arc, q), al, 6, dash=True)
+                    q2, al2 = env(lt, 0.45, 1.8, 0.3)
+                    stroke(fr, partial(bez((175, 255), M(318, 232), 0.15), q2), al2, 4, head=q2 > 0.95)
+                    stroke(fr, partial(bez((175, 1245), M(320, 1222), 0.15), q2), al2, 4, head=q2 > 0.95)
+                    pop_img(fr, L_FULL, 150, 215, lt, 0.4, 1.8); pop_img(fr, L_EMPTY, 150, 1205, lt, 0.5, 1.8)
         if lt >= 1.95: T_DIFF.draw(fr, 870, lt, 1.95, cps=32)
         return fr
     if n == "surgeon":
