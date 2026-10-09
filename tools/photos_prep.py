@@ -13,11 +13,14 @@ def fit(img):  # cover-fit to 1080x1920 on black
     out[y:y + im.shape[0], x:x + im.shape[1]] = im; return out
 import tat3; tat3.PROT[:] = [4.7, 2.3, -0.5]
 from tat3 import ink_mask, remove_ink
-def cl(img, top=0.0):
+from tat4 import dense
+def cl(img, top=0.0, bottom=1.0):
     p = pose_of(img); r = img
+    L0 = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)[..., 0]
+    shiny = cv2.dilate((L0 > 225).astype(np.uint8), np.ones((31, 31), np.uint8))     # jewellery / piercing
     for _ in range(4):
-        m = ink_mask(r, p)
-        if p is None: m[: int(img.shape[0] * top)] = 0
+        m = dense(ink_mask(r, p)).astype(np.uint8); m[shiny > 0] = 0
+        if p is None: m[: int(img.shape[0] * top)] = 0; m[int(img.shape[0] * bottom):] = 0
         r = remove_ink(r, m)
     return r
 def bbox_fit(img):
@@ -41,7 +44,7 @@ for n, kind in [("434d627b", "col"), ("4f55eeac", "col"), ("e4a87217", "col"), (
         h, w = im.shape[:2]; im[int(h * 0.94):, int(w * 0.7):] = 0   # Bazaart watermark
         im = bbox_fit(im); im = cl(im)
     else:
-        im = fit(im); im[:960] = cl(im[:960].copy(), 0.1); im[960:] = cl(im[960:].copy(), 0.1)
+        im = fit(im); im[:960] = cl(im[:960].copy(), 0.1, 0.85); im[960:] = cl(im[960:].copy(), 0.1, 0.85)
     def fill_zone(im, m):
         from tat import nconv
         f = im.astype(np.float32); L = cv2.cvtColor(im, cv2.COLOR_BGR2LAB)[..., 0]

@@ -134,7 +134,7 @@ VIG = (1 - 0.38 * (((xx_ - 540) / 760) ** 2 + ((yy_ - 960) / 1250) ** 2))[..., N
 def grade(fr):
     g = fr @ np.float32([0.299, 0.587, 0.114]); fr = fr * 0.84 + g[..., None] * 0.16
     return np.clip((fr - 0.5) * 1.07 + 0.475, 0, 1) * VIG
-LOGO = np.asarray(Image.open(SP + "v4/logo.png").resize((320, int(115 * 320 / 620)), Image.LANCZOS)).astype(np.float32) / 255
+LOGO = np.asarray(Image.open("logo_clean.png").resize((320, int(115 * 320 / 620)), Image.LANCZOS)).astype(np.float32) / 255
 LOGO[..., :3] *= LOGO[..., 3:4]
 SUBC = {}
 def subtitles(frame, t):
@@ -152,7 +152,7 @@ def subtitles(frame, t):
 def load_png(n): return cv2.cvtColor(cv2.imread(n), cv2.COLOR_BGR2RGB).astype(np.float32) / 255
 PH = {k: load_png(f"q_{k}.png") for k in ["434d627b", "4f55eeac", "e4a87217", "3681468f", "af0d1e43", "34b6868e"]}
 POSE = {"79": np.load("pose79.npy"), "80": np.load("pose80.npy"), "80o": np.load("pose80.npy"), "78": np.load("pose78.npy")}
-VSRC = {"80o": "dl/v80.mov", "79": "d79.mp4", "80": "d80.mp4", "78": "d78.mp4"}
+VSRC = {"80o": "dl/v80.mov", "79": "e79.mp4", "80": "e80.mp4", "78": "e78.mp4"}
 def read_frames(src, a, e):
     p = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(a), "-i", src, "-t", str(e - a + 0.1), "-vf", "fps=30,scale=1080:1920:flags=bicubic",
                         "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True)
@@ -277,7 +277,9 @@ if not os.environ.get('SKIPV'):
         if bi > 0 and lt < 0.25:   # punch-in + white flash transition
             e = ease(lt / 0.25); fr = kenburns(fr, 1 + 0.08 * (1 - e), 540, 960)
             fr = fr * (1 - 0.35 * (1 - e)) + 0.35 * (1 - e)
-        blend(fr, LOGO, 540 - LOGO.shape[1] / 2, 120, 0.9)
+        la = 0.9
+        if b["n"] == "collage": la = 0.9 * max(0, 1 - lt / 0.2) if lt < 1.9 else 0.9 * min(1, (lt - 1.9) / 0.3)
+        blend(fr, LOGO, 540 - LOGO.shape[1] / 2, 120, la)
         subtitles(fr, t)
         enc.stdin.write((np.clip(fr, 0, 1) * 255 + 0.5).astype(np.uint8).tobytes())
     enc.stdin.close(); enc.wait()

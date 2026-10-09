@@ -13,7 +13,10 @@ def ink_mask(bgr, pose=None):
     dark = Lm - L
     chroma = np.sqrt(A ** 2 + B ** 2); chroma_m = np.sqrt(Am ** 2 + Bm ** 2)
     # ink: darker AND loses warm chroma (grey/blue); shadows/creases keep or gain chroma
-    blue = cv2.dilate((B < -10).astype(np.uint8), K(21))                 # stickers are strongly blue
+    bl0 = cv2.morphologyEx((B < -10).astype(np.uint8), cv2.MORPH_OPEN, K(5))
+    nb0, lb0, sb0, _ = cv2.connectedComponentsWithStats(bl0, 8)
+    big = np.isin(lb0, [i for i in range(1, nb0) if sb0[i, 4] > 300]).astype(np.uint8)
+    blue = cv2.dilate(big, K(21))                                       # stickers: large blue blobs only
     ink = (dark > 6) & (chroma < chroma_m * 0.9) & (inner > 0) & (L > 35) & (blue == 0)
     ink = ink.astype(np.uint8)
     g = L.astype(np.uint8)
@@ -41,7 +44,7 @@ def ink_mask(bgr, pose=None):
     return ok[lab_].astype(np.uint8)
 def remove_ink(bgr, m):
     rs = cv2.morphologyEx(raw_skin(bgr), cv2.MORPH_OPEN, K(3)); sk = skin_mask2(bgr)
-    body = cv2.dilate(rs, K(7)) & sk
+    body = cv2.morphologyEx(rs, cv2.MORPH_CLOSE, K(9)) & sk
     R = cv2.morphologyEx(cv2.dilate(m, K(11)), cv2.MORPH_CLOSE, K(21)) & body
     f = bgr.astype(np.float32)
     Wt = (cv2.erode(rs, K(5)) & (1 - R)).astype(np.float32)
