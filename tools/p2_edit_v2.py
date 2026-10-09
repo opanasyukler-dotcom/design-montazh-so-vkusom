@@ -142,7 +142,7 @@ class Retouch:
         ex, ey = (x1 - x0) // 4, (y1 - y0) // 4          # feather the box edges
         fx = np.minimum(1, np.minimum(np.arange(ex), np.arange(ex)[::-1]) / (ex * 0.12 + 1))
         fy = np.minimum(1, np.minimum(np.arange(ey), np.arange(ey)[::-1]) / (ey * 0.12 + 1))
-        m = cv2.GaussianBlur(skin, (0, 0), 3) * fy[:, None] * fx[None, :] * 0.55
+        m = cv2.GaussianBlur(skin, (0, 0), 3) * fy[:, None] * fx[None, :] * 0.35
         smooth = cv2.resize(sm, (x1 - x0, y1 - y0), interpolation=cv2.INTER_LINEAR).astype(np.float32)
         m = cv2.resize(m, (x1 - x0, y1 - y0), interpolation=cv2.INTER_LINEAR)[..., None]
         c = crop.astype(np.float32)
@@ -182,7 +182,7 @@ def viewfinder(dst, tt, a):
 
 def zoom_at(tt):
     i = min(int(np.searchsorted(STARTS, tt, side="right") - 1), len(CUTS) - 1); d = tt - STARTS[i]
-    z = (1.0 if i % 2 == 0 else 1.06) * (1 + 0.02 * d / max(0.5, STARTS[i + 1] - STARTS[i]))
+    z = 1.0                       # no constant re-scaling: keeps the source pixels untouched (quality)
     if i > 0 and d < 0.2: z *= 1 + 0.035 * (1 - ease(d / 0.2))
     if 0 <= tt - T_TWO2 < 0.35: z *= 1 + 0.12 * (1 - ease((tt - T_TWO2) / 0.35))
     return z
@@ -203,7 +203,7 @@ def render_frame(src, tt):
     else:
         z = zoom_at(tt); fy = H * 0.42 * K
         M = np.float32([[z, 0, (1 - z) * OW / 2], [0, z, (1 - z) * fy]])
-        out = cv2.warpAffine(fr, M, (OW, OH), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+        out = fr if abs(z - 1) < 1e-4 else cv2.warpAffine(fr, M, (OW, OH), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REFLECT)
     # framed video on its own blurred background
     a = amount(tt, *T_WORK)
     if a > 0.005:

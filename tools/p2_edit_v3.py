@@ -30,18 +30,18 @@ def _curve(x, lift, gain, contrast):
     s = lift + (gain - lift) * np.clip(s, 0, 1)
     return np.clip(s * 255 + 0.5, 0, 255).astype(np.uint8)
 _x = np.arange(256, dtype=np.float32)
-LUT = np.stack([_curve(_x, 0.022, 1.000, 0.22),                  # R: warm highlights
-                _curve(_x, 0.020, 0.985, 0.20),                  # G
-                _curve(_x, 0.035, 0.955, 0.18)], -1)             # B: slightly lifted, cooler shadows / warmer whites
+LUT = np.stack([_curve(_x, 0.006, 1.000, 0.12),                  # R: warm highlights
+                _curve(_x, 0.006, 0.992, 0.11),                  # G
+                _curve(_x, 0.010, 0.975, 0.10)], -1)             # B: slightly lifted, cooler shadows / warmer whites
 LUT = LUT.reshape(256, 1, 3)
 _yy, _xx = np.mgrid[0:OH, 0:OW].astype(np.float32)
 _r = np.sqrt(((_xx - OW / 2) / (OW * 0.7)) ** 2 + ((_yy - OH * 0.45) / (OH * 0.7)) ** 2)
-VIG = np.repeat((255 * (1 - 0.32 * np.clip((_r - 0.55) / 0.55, 0, 1) ** 1.8)).astype(np.uint8)[..., None], 3, 2)
+VIG = np.repeat((255 * (1 - 0.16 * np.clip((_r - 0.55) / 0.55, 0, 1) ** 1.8)).astype(np.uint8)[..., None], 3, 2)
 del _yy, _xx, _r
 def grade(fr):
     fr = cv2.LUT(fr, LUT)
     g = cv2.cvtColor(cv2.cvtColor(fr, cv2.COLOR_RGB2GRAY), cv2.COLOR_GRAY2RGB)
-    fr = cv2.addWeighted(fr, 1.10, g, -0.10, 0)                  # +10 % saturation
+    fr = cv2.addWeighted(fr, 1.05, g, -0.05, 0)                  # +5 % saturation
     return cv2.multiply(fr, VIG, scale=1 / 255)
 
 # ---------------------------------------------------------------- text with brand-colour marker highlights
@@ -406,6 +406,22 @@ def sfx(path):
     w = wave.open(path, "wb"); w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR)
     w.writeframes((np.clip(trk, -1, 1) * 32767).astype(np.int16).tobytes()); w.close()
 
+def source_frames(f0, f1):
+    """decode straight from the original HEVC (no intermediate re-encode): same frame selection as p2_edit.do_cut"""
+    starts = np.cumsum([0] + B.NF)
+    for i, (a, b, _) in enumerate(B.CUTS):
+        p0, p1 = starts[i], starts[i + 1]
+        if p1 <= f0 or p0 >= f1: continue
+        skip, take = max(0, f0 - p0), min(p1, f1) - max(p0, f0)
+        dec = subprocess.Popen(["ffmpeg", "-v", "error", "-ss", f"{a:.4f}", "-i", "in/src.mov", "-an", "-vf", f"fps={FPS}", "-frames:v", str(B.NF[i]),
+                                "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE, bufsize=OW * OH * 3)
+        last = None
+        for k in range(skip + take):
+            buf = dec.stdout.read(OW * OH * 3)
+            if len(buf) == OW * OH * 3: last = np.frombuffer(buf, np.uint8).reshape(OH, OW, 3)
+            if k >= skip: yield last
+        dec.kill(); dec.wait()
+
 if __name__ == "__main__":
     mode = sys.argv[1]
     if mode == "sfx": sfx(sys.argv[2]); sys.exit()
@@ -423,12 +439,10 @@ if __name__ == "__main__":
     f0, f1, outp = int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
     if int(V.T_HUSB * FPS) < f0 <= int((V.T_HUSB + V.HUSB_LEN) * FPS):
         raise SystemExit("chunk must not start inside the husband freeze")
-    dec = B.decoder(f0)
     enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{OW}x{OH}", "-r", str(FPS), "-i", "-",
-                            "-c:v", "libx264", "-preset", "medium", "-crf", "16", "-g", "120", "-pix_fmt", "yuv420p",
+                            "-c:v", "libx264", "-preset", "slow", "-crf", "12", "-g", "120", "-pix_fmt", "yuv420p", "-profile:v", "high", "-level", "5.2",
                             "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709", outp], stdin=subprocess.PIPE)
-    for fo in range(f0, f1):
-        buf = dec.stdout.read(OW * OH * 3)
-        if len(buf) < OW * OH * 3: break
-        enc.stdin.write(render_frame(np.frombuffer(buf, np.uint8).reshape(OH, OW, 3), fo / FPS).tobytes())
-    dec.kill(); enc.stdin.close(); enc.wait(); print("done", outp)
+    fo = f0
+    for src in source_frames(f0, f1):
+        enc.stdin.write(render_frame(src, fo / FPS).tobytes()); fo += 1
+    enc.stdin.close(); enc.wait(); print("done", outp, fo - f0)
