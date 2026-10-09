@@ -12,8 +12,8 @@ def src_of(t):
         best = so
     return best
 
-BL = [("hook", 0, 4.6), ("talk1", 4.6, 7.05), ("before", 7.05, 11.65), ("talk2", 11.65, 13.6), ("front", 13.6, 15.3),
-      ("cut", 15.3, 23.7), ("after", 23.7, 27.0), ("split", 27.0, 31.0), ("talk3", 31.0, 33.8), ("side", 33.8, 36.6),
+BL = [("hook", 0, 4.6), ("talk1", 4.6, 7.05), ("before", 7.05, 11.65), ("talk2", 11.65, 13.6), ("front", 13.6, 16.98),
+      ("cut", 16.98, 23.7), ("after", 23.7, 27.0), ("split", 27.0, 31.0), ("talk3", 31.0, 33.8), ("side", 33.8, 36.6),
       ("collage", 36.6, 38.6), ("slider", 38.6, 40.9), ("final", 40.9, DUR)]
 def block(t):
     for n, a, b in BL:
@@ -52,6 +52,12 @@ for i in range(len(SUB)):
     nxt = SUB[i + 1][0] if i + 1 < len(SUB) else DUR
     SUB[i][1] = min(nxt, max(SUB[i][1], SUB[i][0] + 0.3) + 0.25)
 
+def dark_grad(img, y0, y1):
+    a = np.clip((np.arange(img.shape[0]) - y0) / (y1 - y0), 0, 1); a = (a * a * (3 - 2 * a) * 0.97)[:, None, None]
+    img[:] = (img * (1 - a)).astype(np.uint8)
+dark_grad(PO, 1880, 2090)                      # soft black over the lowered jeans
+top = COL[:1250]; dark_grad(top, 890, 1040)    # same on the "after" half of the collage
+T_NOIMP = Txt([("ВЫПОЛНИМ УВЕЛИЧЕНИЕ ГРУДИ", "H"), ("БЕЗ ИМПЛАНТОВ", "HB")], size=64)
 T_NAME = Txt([("ИРИНА", "H"), ("пациентка, мама двоих детей", "S")], size=50, align="L", x=70)
 
 def render(t):
@@ -71,10 +77,11 @@ def render(t):
         items_list(fr, t, [("форма изменилась", t0 + 0.85), ("появилась разница в объёме", t0 + 1.9), ("хочется вернуть наполненность", t0 + 2.95)], 80, 1250)
     elif n == "front":
         tz, _ = trans(t, t0)
-        fr = grade(mblur(vframe(17.2 + lt, (1.75 + 0.06 * lt / 1.7) * tz, fyo=230), lt))
+        fr = grade(mblur(vframe(17.0 + lt, (1.6 + 0.06 * lt / 3.4) * tz, fyo=180), lt))
         slide_chip(fr, CH_DO, 60, 228, t, t0 + 0.05)
+        T_NOIMP.draw(fr, 1170, t, t0 + 0.15, t1 - 0.1, cps=32)
     elif n == "cut":
-        segs = [(15.3, 9.3, 1.22), (16.98, 10.4, 1.5), (18.66, 12.3, 1.3), (20.34, 14.6, 1.45), (22.02, 18.4, 1.6)]
+        segs = [(16.98, 9.3, 1.22), (18.66, 10.4, 1.5), (20.34, 12.3, 1.3), (22.02, 14.6, 1.45)]
         s0, src, z = [s for s in segs if s[0] <= t][-1]; tz, _ = trans(t, s0)
         fr = grade(mblur(vframe(src + (t - s0) * 0.8, z * tz), t - s0))
         bracket(fr, t, t0 + 0.3, ["И ДАЛЬШЕ РЕШЕНИЕ", "ПРИШЛО БЫСТРО"], 1250, 62, t1 - 0.15)
