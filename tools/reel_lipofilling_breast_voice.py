@@ -63,12 +63,11 @@ def render(t):
     elif n.startswith("talk"):
         tz, _ = trans(t, t0); z = dict(talk1=1.08, talk2=1.38, talk3=1.2)[n] * (1 + 0.03 * lt / 2.5)
         fr = grade(mblur(iframe(t, z * tz, 820 if n == "talk2" else 900), lt))
-        if n == "talk1": T_NAME.draw(fr, 1300, t, t0 + 0.25, t1 - 0.1, cps=40)
     elif n == "before":
         tz, _ = trans(t, t0)
         fr = grade(mblur(vframe(11.0 + lt, (1.22 + 0.05 * lt / 4.6) * tz), lt))
         slide_chip(fr, CH_DO, 60, 228, t, t0 + 0.05)
-        T_KNOW.draw(fr, 1140, t, t0 + 0.15, t1 - 0.1, cps=40)
+        T_KNOW.draw(fr, 1140, t, t0 + 0.15, t1 - 0.1, cps=28)
         items_list(fr, t, [("форма изменилась", t0 + 0.85), ("появилась разница в объёме", t0 + 1.9), ("хочется вернуть наполненность", t0 + 2.95)], 80, 1250)
     elif n == "front":
         tz, _ = trans(t, t0)
@@ -82,8 +81,8 @@ def render(t):
     elif n == "after":
         tz, flash = trans(t, t0, True)
         fr = grade(photo(PO, MPO, (1.12 - 0.08 * ease(lt / 3.3)) * tz))
-        slide_chip(fr, CH_PO, 60, 228, t, t0 + 1.2)
-        T_AFT.draw(fr, 1215, t, t0 + 1.2, t1 - 0.1, cps=40)
+        slide_chip(fr, CH_PO, 60, 228, t, t0 + 1.0)
+        T_AFT.draw(fr, 1215, t, t0 + 1.0, t1 - 0.1, cps=32)
     elif n == "split":
         fr = np.zeros((H, W, 3), np.float32); z = 1.0 + 0.03 * lt / 4
         top = np.ascontiguousarray(vframe(16.0 + lt, 1.3 * z, fyo=-60)[400:1360]); bot = photo(PO, MPO, z, dy=-330, size=(W, 960))
@@ -92,7 +91,7 @@ def render(t):
         fr[960:] = cv2.warpAffine(bot, np.float32([[1, 0, ox2], [0, 1, 0]]), (W, 960))
         fr = grade(fr); fr[957:963] = 1.0 * min(1, lt / 0.5)
         slide_chip(fr, CH_DO, 60, 228, t, t0 + 0.3); slide_chip(fr, CH_PO, 60, 1088, t, t0 + 0.45)
-        T_FIRST.draw(fr, 862, t, t0 + 0.3, t1 - 0.1, cps=40)
+        T_FIRST.draw(fr, 862, t, t0 + 0.3, t1 - 0.1, cps=32)
     elif n == "side":
         tz, _ = trans(t, t0)
         fr = grade(mblur(photo(COL, MSIDE, (1.0 + 0.07 * lt / 2.8) * tz, fx=540, fy=700), lt))
@@ -101,7 +100,7 @@ def render(t):
     elif n == "collage":
         tz, _ = trans(t, t0)
         fr = grade(mblur(photo(COL, MCOL, (1.0 + 0.03 * lt / 2) * tz, fy=960), lt))
-        bar(fr, 872, 1036, 1.0, ease(lt / 0.3)); T_MON.draw(fr, 908, t, t0 + 0.2, 1e9, cps=45)
+        bar(fr, 872, 1036, 1.0, ease(lt / 0.3)); T_MON.draw(fr, 908, t, t0 + 0.2, 1e9, cps=32)
         slide_chip(fr, CH_PO, 60, 228, t, t0 + 0.3); slide_chip(fr, CH_DO, 60, 1090, t, t0 + 0.45)
     elif n == "slider":
         z = 1.0 + 0.04 * lt / 2.3; a = photo(DO, MDO, z); b = photo(PO, MPO, z)
@@ -115,10 +114,9 @@ def render(t):
         fr = grade(photo(PO, MPO, (1.10 - 0.06 * ease(lt / 4)) * tz))
         for k, (wd, tw) in enumerate([("ОЧЕНЬ", 0.25), ("ДОВОЛЬНА", 0.85)]):
             if ("fw", wd) not in BRC:
-                f = osw(124); asc, desc = f.getmetrics(); im = Image.new("RGBA", (int(f.getlength(wd)) + 40, asc + desc + 20), (0, 0, 0, 0))
+                f = osw(78); asc, desc = f.getmetrics(); im = Image.new("RGBA", (int(f.getlength(wd)) + 40, asc + desc + 20), (0, 0, 0, 0))
                 ImageDraw.Draw(im).text((20, 10 + asc), wd, font=f, fill=WHITE + (255,), anchor="ls"); BRC[("fw", wd)] = to_np(im)
-            pop_img(fr, BRC[("fw", wd)], 540, 1150 + k * 150, t, t0 + tw)
-        pop_img(fr, HEART, 540, 1420, t, t0 + 1.4)
+            pop_img(fr, BRC[("fw", wd)], 540, 1200 + k * 96, t, t0 + tw)
         fr *= 1 - 0.85 * max(0, (t - (DUR - 0.7)) / 0.7)
     subs(fr, t)
     blend(fr, LOGO, 540 - LOGO.shape[1] / 2, 120, 0.9)

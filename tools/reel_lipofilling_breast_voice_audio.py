@@ -26,10 +26,22 @@ WB,RS,IM,PP,DG,CK,TK=whoosh(),riser(),impact(),pop(),ding(),click(),tick()
 for c in [4.6,7.05,11.65,13.6,15.3,16.98,18.66,20.34,22.02,27.0,31.0,33.8,36.6,38.6]: put(WB,c-0.28,0.22)
 put(RS,23.7-1.4,0.3); put(RS,40.9-1.4,0.28)
 for c in [23.7,40.9]: put(IM,c,0.5)
-for k in range(38): put(CK,0.45+k/24,0.035*rng.uniform(0.6,1))
-for t in [7.1,7.9,8.95,10.0,24.9,27.3,36.8,37.0]: put(PP,t,0.16)
+def key():
+    k=int(0.06*SR); x=np.arange(k)/SR
+    nz=rng.standard_normal(k); hi=nz-lp(nz,np.full(k,1800.0+rng.uniform(0,1500)))
+    o=hi*np.exp(-x*rng.uniform(350,600))+0.6*np.sin(2*np.pi*rng.uniform(170,260)*x)*np.exp(-x*90)
+    r=int(rng.uniform(0.025,0.04)*SR); o[r:]+=0.35*hi[:k-r]*np.exp(-x[:k-r]*700)
+    return o/np.abs(o).max()
+KEYS=[key() for _ in range(8)]
+TYPED=[(0.45,24,"ПОСЛЕ ДВУХ РОДОВГРУДЬ СТАЛАСОВСЕМ НЕ ТОЙ"),(7.2,28,"ЗНАКОМОЕ ОЩУЩЕНИЕ?"),
+       (24.7,32,"ПОСЛЕ ЛИПОФИЛИНГА ГРУДИсобственная жировая ткань, без имплантов"),
+       (27.3,32,"ПЕРВАЯ ОПЕРАЦИЯИ, КОНЕЧНО, БЫЛО ВОЛНИТЕЛЬНО"),(36.8,32,"2,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ")]
+for t0,cps,txt in TYPED:
+    for i,ch in enumerate(txt):
+        if ch!=" ": put(KEYS[rng.integers(8)],t0+i/cps+rng.uniform(-0.006,0.006),0.38*rng.uniform(0.7,1))
+for t in [7.9,8.95,10.0,36.7,36.85]: put(PP,t,0.16)
 for t in [15.6,33.9,38.9]: put(TK,t,0.12)
-put(PP,41.15,0.18); put(PP,41.75,0.18); put(DG,42.3,0.12)
+put(PP,41.15,0.18); put(PP,41.75,0.18)
 mix=mus+vo[:,None]+sfx[:n,None]*0.5
 mix/=max(1,np.abs(mix).max()/0.97)
 with wave.open("mix2.wav","wb") as w:
