@@ -150,9 +150,9 @@ def subtitles(frame, t):
 
 # ---------------- sources ----------------
 def load_png(n): return cv2.cvtColor(cv2.imread(n), cv2.COLOR_BGR2RGB).astype(np.float32) / 255
-PH = {k: load_png(f"q_{k}.png") for k in ["434d627b", "4f55eeac", "e4a87217", "3681468f", "af0d1e43", "34b6868e"]}
+PH = {k: load_png(f"r_{k}.png") for k in ["434d627b", "4f55eeac", "e4a87217", "3681468f", "af0d1e43", "34b6868e"]}
 POSE = {"79": np.load("pose79.npy"), "80": np.load("pose80.npy"), "80o": np.load("pose80.npy"), "78": np.load("pose78.npy")}
-VSRC = {"80o": "dl/v80.mov", "79": "e79.mp4", "80": "e80.mp4", "78": "e78.mp4"}
+VSRC = {"80o": "dl/v80.mov", "79": "b79.mp4", "80": "b80.mp4", "78": "b78.mp4"}
 def read_frames(src, a, e):
     p = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(a), "-i", src, "-t", str(e - a + 0.1), "-vf", "fps=30,scale=1080:1920:flags=bicubic",
                         "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True)

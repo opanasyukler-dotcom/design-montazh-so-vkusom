@@ -14,15 +14,20 @@ def fit(img):  # cover-fit to 1080x1920 on black
 import tat3; tat3.PROT[:] = [4.7, 2.3, -0.5]
 from tat3 import ink_mask, remove_ink
 from tat4 import dense
-def cl(img, top=0.0, bottom=1.0):
-    p = pose_of(img); r = img
+from tatblur import tattoo_region
+from tat import nconv
+def blur_mask(img, R, skin, sigma=16):
+    f = img.astype(np.float32); bl, _ = nconv(f, skin.astype(np.float32), sigma)
+    a = cv2.GaussianBlur(R.astype(np.float32), (0, 0), 6)[..., None] * skin[..., None]
+    return np.clip(f * (1 - a) + bl * a, 0, 255).astype(np.uint8)
+def cl(img, top=0.0, bottom=1.0, extra=None):
+    p = pose_of(img)
+    R, skin = tattoo_region(img, p)
     L0 = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)[..., 0]
-    shiny = cv2.dilate((L0 > 225).astype(np.uint8), np.ones((31, 31), np.uint8))     # jewellery / piercing
-    for _ in range(4):
-        m = dense(ink_mask(r, p)).astype(np.uint8); m[shiny > 0] = 0
-        if p is None: m[: int(img.shape[0] * top)] = 0; m[int(img.shape[0] * bottom):] = 0
-        r = remove_ink(r, m)
-    return r
+    R[cv2.dilate((L0 > 225).astype(np.uint8), np.ones((31, 31), np.uint8)) > 0] = 0
+    if p is None: R[: int(img.shape[0] * top)] = 0; R[int(img.shape[0] * bottom):] = 0
+    if extra is not None: R |= extra & skin
+    return blur_mask(img, R, skin)
 def bbox_fit(img):
     g = (cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) > 60).astype(np.uint8)
     g = cv2.morphologyEx(g, cv2.MORPH_OPEN, np.ones((9, 9), np.uint8))
@@ -38,11 +43,21 @@ def bbox_fit(img):
     pad = cv2.copyMakeBorder(img, 2000, 2000, 2000, 2000, cv2.BORDER_CONSTANT, value=0)
     crop = pad[Y0 + 2000:Y0 + 2000 + int(h), X0 + 2000:X0 + 2000 + int(w)]
     return cv2.resize(crop, (1080, 1920), interpolation=cv2.INTER_CUBIC)
+Z = {"3681468f": [("r", 860, 680, 1060, 1330), ("r", 40, 920, 150, 1320), ("c", 370, 1380, 45), ("c", 790, 815, 40)],
+     "34b6868e": [("c", 490, 1040, 70)]}
 for n, kind in [("434d627b", "col"), ("4f55eeac", "col"), ("e4a87217", "col"), ("3681468f", "bz"), ("af0d1e43", "bz"), ("34b6868e", "bz")]:
     im = cv2.imread(f"dl/{n}.jpg")
     if kind == "bz":
         h, w = im.shape[:2]; im[int(h * 0.94):, int(w * 0.7):] = 0   # Bazaart watermark
-        im = bbox_fit(im); im = cl(im)
+        im = bbox_fit(im); ex = None
+        if n in Z:
+            ex = np.zeros(im.shape[:2], np.uint8); L = cv2.cvtColor(im, cv2.COLOR_BGR2LAB)[..., 0]
+            for zz in Z[n]:
+                if zz[0] == "r": cv2.rectangle(ex, zz[1:3], zz[3:5], 1, -1)
+                else: cv2.circle(ex, zz[1:3], zz[3], 1, -1)
+            dk = (L.astype(int) < cv2.medianBlur(L, 41).astype(int) - 6).astype(np.uint8) & ex
+            ex = cv2.morphologyEx(cv2.dilate(dk, np.ones((15, 15), np.uint8)), cv2.MORPH_CLOSE, np.ones((31, 31), np.uint8))
+        im = cl(im, extra=ex)
     else:
         im = fit(im); im[:960] = cl(im[:960].copy(), 0.1, 0.85); im[960:] = cl(im[960:].copy(), 0.1, 0.85)
     def fill_zone(im, m):
@@ -52,18 +67,4 @@ for n, kind in [("434d627b", "col"), ("4f55eeac", "col"), ("e4a87217", "col"), (
         low, _ = nconv(f, Wt, 8); hi = np.clip(f - cv2.GaussianBlur(f, (0, 0), 2), -1, 4)
         a = cv2.GaussianBlur(R.astype(np.float32), (0, 0), 1.6)[..., None]
         return np.clip(f * (1 - a) + (low + hi) * a, 0, 255).astype(np.uint8)
-    Z = {"3681468f": [("r", 860, 680, 1060, 1330), ("r", 40, 920, 150, 1320), ("c", 370, 1380, 45), ("c", 790, 815, 40)],
-         "34b6868e": [("c", 490, 1040, 70)]}
-    if n in Z:
-        from tat2 import tattoo_mask_z, remove_z
-        zone = np.zeros(im.shape[:2], np.uint8)
-        for zz in Z[n]:
-            if zz[0] == "r": cv2.rectangle(zone, zz[1:3], zz[3:5], 1, -1)
-            else: cv2.circle(zone, zz[1:3], zz[3], 1, -1)
-        from tat import raw_skin
-        for _ in range(3):
-            L = cv2.cvtColor(im, cv2.COLOR_BGR2LAB)[..., 0]
-            rs = cv2.erode((L > 70).astype(np.uint8), np.ones((9, 9), np.uint8))
-            m = ((L.astype(int) < cv2.medianBlur(L, 41).astype(int) - 6) & (rs > 0) & (zone > 0)).astype(np.uint8)
-            im = fill_zone(im, m)
-    cv2.imwrite(f"q_{n}.png", im); print(n, "ok")
+    cv2.imwrite(f"r_{n}.png", im); print(n, "ok")
