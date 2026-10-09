@@ -149,9 +149,9 @@ def raster(txt, f, col, halo=None, halo_r=6, halo_a=0.85, dil=0):
     return out, sh, (pad + asc) / K, pad / K, f.getlength(txt) / K
 
 # subtitles: dark ink on a soft light halo (light coat / sky background)
-S = 44
+S = 50
 SUBSTY = {
-    "t": dict(f=lambda: font(FONT_MI, S * K, 560), col=INK, halo=WHITE),
+    "t": dict(f=lambda: font(FONT_MI, S * K, 620), col=INK, halo=WHITE),
     "b": dict(f=lambda: font(FONT_M, int(S * 1.3) * K, 800), col=INK, halo=None),     # sits on a blush selection box
     "s": dict(f=lambda: font(FONT_S, int(S * 2.0) * K), col=COCOA, halo=WHITE),
 }
@@ -217,6 +217,7 @@ for name, rngs in SECTIONS:
             if w is None or w in ("—", "–", "-"): continue
             t0, t1 = ws(i), we(i)
             if t0 is None: continue
+            if t1 is None or t1 < t0: t1 = t0 + min(0.4, SRCW[i][1] - SRCW[i][0])
             if w.startswith("-") and toks: toks[-1][2] += w; toks[-1][1] = t1; continue
             toks.append([t0, t1, w])
 chunks, cur = [], []
@@ -260,10 +261,15 @@ class Card:
     """lines: [(text, kind, size)], kind: T heavy caps ink / n medium ink / s script cocoa / e emphasis cocoa heavy"""
     def __init__(self, lines, t_in, t_out, top=230, line_t=None, chip=None, deco=None):
         self.t_in, self.t_out, self.top = t_in, t_out, top
+        def fnt(kind, size):
+            return {"T": lambda s: font(FONT_M, int(s * K), 850), "n": lambda s: font(FONT_M, int(s * K), 600),
+                    "e": lambda s: font(FONT_M, int(s * K), 850), "s": lambda s: font(FONT_S, int(s * 1.9 * K))}[kind](size)
+        widest = max(fnt(k, sz).getlength(t) / K for t, k, sz in lines)
+        fit = min(1.0, 880 / widest)            # card never wider than ~980 design px
+        lines = [(t, k, sz * fit) for t, k, sz in lines]
         rows = []
         for txt, kind, size in lines:
-            f = {"T": lambda s: font(FONT_M, s * K, 850), "n": lambda s: font(FONT_M, s * K, 600),
-                 "e": lambda s: font(FONT_M, s * K, 850), "s": lambda s: font(FONT_S, int(s * 1.9) * K)}[kind](size)
+            f = fnt(kind, size)
             col = COCOA if kind in ("s", "e") else INK
             img, _, base, pad, adv = raster(txt, f, col, dil=(2 if kind == "s" else 0))
             rows.append((img, base, pad, adv, size * (1.25 if kind != "s" else 1.35)))
@@ -314,7 +320,7 @@ class Card:
 def sec_end(name):
     idx = [i for i, c in enumerate(CUTS) if c[2] == name]; return STARTS[idx[-1] + 1]
 CARDS = [
-    Card([("Я НЕ ЛЮБЛЮ", "T", 62), ("МАТЕРИНСТВО", "T", 74), ("что конкретно меня бесит?", "s", 50)],
+    Card([("Я НЕ ЛЮБЛЮ", "T", 62), ("МАТЕРИНСТВО", "T", 74), ("Что конкретно меня бесит?", "s", 40)],
          0.05, sec_end("hook") - 0.2, top=210, line_t=[0.15, 0.55, 1.3], chip="ЧАСТЬ 2"),
     Card([("Каждый день хочу уволиться.", "n", 44), ("Каждый день передумываю.", "e", 44)],
          ws(99) - 0.1, sec_end("work") - 0.15, line_t=[ws(99), ws(106)]),
@@ -327,7 +333,7 @@ CARDS = [
     Card([("Иногда просто хочется снова", "n", 42), ("почувствовать себя собой.", "s", 44)],
          ws(478) - 0.1, sec_end("why") - 0.15, line_t=[ws(478), ws(484)]),
 ]
-FINAL = Card([("Материнство, 2:0.", "T", 66), ("Телефон тоже не выдержал.", "s", 48)],
+FINAL = Card([("Материнство, 2:0.", "T", 66), ("Телефон тоже не выдержал.", "s", 40)],
              SPEECH_END - 0.25, DUR + 1, top=760, line_t=[SPEECH_END - 0.05, SPEECH_END + 0.6])
 CARDS.append(FINAL)
 
