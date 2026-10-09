@@ -3,7 +3,12 @@ SR=48000; DUR=36.5; M0=0.86
 y,_=librosa.load("mus.wav",sr=SR,mono=False,offset=M0,duration=DUR); mus=y.T.copy()
 n=len(mus); tt=np.arange(n)/SR
 mus*= (np.minimum(1,tt/0.15)*np.clip((DUR-tt)/1.3,0,1))[:,None]
-mus/= np.abs(mus).max(); mus*=0.62
+mus/= np.abs(mus).max(); mus*=0.24
+import os
+if os.path.exists("voice.wav"):   # patient interview: duck the music under the voice
+    vo,_=librosa.load("voice.wav",sr=SR,mono=True); vo=np.pad(vo,(0,max(0,n-len(vo))))[:n]; vo/=np.abs(vo).max()/0.9
+    import cv2; d=cv2.GaussianBlur((np.abs(vo)>0.03).astype(np.float32).reshape(1,-1),(0,0),sigmaX=SR*0.2).ravel()
+    mus*=(1-0.7*np.clip(d*3,0,1))[:,None]; mus+=vo[:,None]
 rng=np.random.default_rng(5)
 def lp(x,cut):
     out=np.zeros_like(x); s=0.0; a=1-np.exp(-2*np.pi*cut/SR)
@@ -39,7 +44,7 @@ for t in [4.18,5.11,6.08,7.06]: put(PP,t,0.25)                          # list i
 for t in [8.28,20.0,28.55]: put(TK,t,0.18)                               # bracket opens
 for t in [13.03,15.9,23.6,23.8]: put(PP,t,0.2)
 put(DG,32.49,0.12); put(PP,32.97,0.25); put(DG,33.45,0.16)
-mix=mus+ sfx[:n,None]*0.85
+mix=mus+ sfx[:n,None]*0.45
 mix/=max(1,np.abs(mix).max()/0.97)
 with wave.open("mix.wav","wb") as w:
     w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR); w.writeframes((mix*32767).astype(np.int16).tobytes())

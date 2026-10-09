@@ -16,6 +16,7 @@ BEATS = np.array(BEATS)
 BL = dict(hook=(0, 4.13), before=(4.13, 8.03), cut=(8.03, 11.56), after=(11.56, 15.46), split=(15.46, 19.36),
           side=(19.36, 23.31), collage=(23.31, 27.74), slider=(27.74, 32.44), final=(32.44, DUR))
 def pulse(t):
+    return 1.0
     if t < 3.0 or 27.75 < t < 32.4: return 1.0
     k = np.searchsorted(BEATS, t) - 1
     return 1 + 0.02 * np.exp(-(t - BEATS[k]) / 0.13) if k >= 0 else 1.0
@@ -184,13 +185,13 @@ def render(t):
         T_HOOK.draw(fr, 1090, t, 0.35, 3.95, cps=26)
     elif t < BL["before"][1]:
         t0 = BL["before"][0]; lt = t - t0; tz, flash = trans(t, t0)
-        fr = photo(DO, MDO, (1.0 + 0.05 * lt / 3.9) * tz * pz); fr = grade(mblur(fr, lt))
+        fr = vframe(11.0 + lt, (1.22 + 0.05 * lt / 3.9) * tz); fr = grade(mblur(fr, lt))
         slide_chip(fr, CH_DO, 60, 228, t, t0 + 0.05)
         T_KNOW.draw(fr, 1140, t, t0 + 0.2, BL["before"][1] - 0.1, cps=40)
         items_list(fr, t, [("форма изменилась", t0 + 0.98), ("появилась разница в объёме", t0 + 1.95), ("хочется вернуть наполненность", t0 + 2.93)], 80, 1250)
     elif t < BL["cut"][1]:
         t0 = BL["cut"][0]; lt = t - t0
-        segs = [(8.03, 1.2, 1.18), (9.03, 4.6, 1.38), (10.03, 8.4, 1.22), (11.03, 11.6, 1.42)]
+        segs = [(8.03, 1.2, 1.18), (9.03, 4.6, 1.38), (10.03, 8.4, 1.22), (11.03, 6.6, 1.42)]
         s0, src, z = [s for s in segs if s[0] <= t][-1]
         tz, _ = trans(t, s0)
         fr = vframe(src + (t - s0) * 1.35, z * tz * pz); fr = grade(mblur(fr, t - s0))
@@ -203,7 +204,7 @@ def render(t):
     elif t < BL["split"][1]:
         t0 = BL["split"][0]; lt = t - t0; fr = np.zeros((H, W, 3), np.float32)
         z = 1.0 + 0.03 * lt / 3.9
-        top = photo(DO, MDO, z * pz, dy=-330, size=(W, 960)); bot = photo(PO, MPO, z * pz, dy=-330, size=(W, 960))
+        top = np.ascontiguousarray(vframe(16.0 + lt, 1.3 * z, fyo=-60)[400:1360]); bot = photo(PO, MPO, z * pz, dy=-330, size=(W, 960))
         ox1 = -W * (1 - ease(lt / 0.4)); ox2 = W * (1 - ease((lt - 0.12) / 0.4))
         M1 = np.float32([[1, 0, ox1], [0, 1, 0]]); M2 = np.float32([[1, 0, ox2], [0, 1, 0]])
         fr[:960] = cv2.warpAffine(top, M1, (W, 960)); fr[960:] = cv2.warpAffine(bot, M2, (W, 960))
