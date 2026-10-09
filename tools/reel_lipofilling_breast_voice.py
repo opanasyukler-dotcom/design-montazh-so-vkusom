@@ -53,10 +53,10 @@ for i in range(len(SUB)):
     SUB[i][1] = min(nxt, max(SUB[i][1], SUB[i][0] + 0.3) + 0.25)
 
 def dark_grad(img, y0, y1):
-    a = np.clip((np.arange(img.shape[0]) - y0) / (y1 - y0), 0, 1); a = (a * a * (3 - 2 * a) * 0.97)[:, None, None]
+    a = np.clip((np.arange(img.shape[0]) - y0) / (y1 - y0), 0, 1); a = (a * a * (3 - 2 * a) * 1.0)[:, None, None]
     img[:] = (img * (1 - a)).astype(np.uint8)
-dark_grad(PO, 1880, 2090)                      # soft black over the lowered jeans
-top = COL[:1250]; dark_grad(top, 890, 1040)    # same on the "after" half of the collage
+dark_grad(PO, 1760, 1960)                      # soft black over the lowered jeans
+top = COL[:1250]; dark_grad(top, 840, 980)    # same on the "after" half of the collage
 T_NOIMP = Txt([("ВЫПОЛНИМ УВЕЛИЧЕНИЕ ГРУДИ", "H"), ("БЕЗ ИМПЛАНТОВ", "HB")], size=64)
 T_NAME = Txt([("ИРИНА", "H"), ("пациентка, мама двоих детей", "S")], size=50, align="L", x=70)
 
