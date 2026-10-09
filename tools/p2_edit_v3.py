@@ -233,6 +233,8 @@ STK = [
     Sticker("1f4a5", L_ + 40, 860, ws(550) + 0.35, rot=0, dur=0.9, size=200),
 ]
 
+STK = [] if os.environ.get("STICKERS", "0") != "1" else STK      # stickers removed on request (STICKERS=1 brings them back)
+
 # ---------------------------------------------------------------- word-support animations
 class Counter100:
     """«сто раз»: a quick ×1 → ×100 counter on a cocoa pill + 💯"""
@@ -252,7 +254,7 @@ class Counter100:
         al = min(1, age / 0.1) * (1 - out)
         blend(dst, sh, self.x - im.shape[1] / K / 2, self.y - im.shape[0] / K / 2, al)
         blend(dst, im, self.x - im.shape[1] / K / 2, self.y - im.shape[0] / K / 2, al)
-        if age > 0.9:
+        if age > 0.9 and STK:
             s = Sticker("1f4af", self.x + 230, self.y - 40, self.t0 + 0.9, dur=self.t1 - self.t0 - 0.9, size=150, rot=10); s.draw(dst, tt)
 
 class Confetti:
