@@ -191,10 +191,10 @@ def render(t):
         items_list(fr, t, [("форма изменилась", t0 + 0.98), ("появилась разница в объёме", t0 + 1.95), ("хочется вернуть наполненность", t0 + 2.93)], 80, 1250)
     elif t < BL["cut"][1]:
         t0 = BL["cut"][0]; lt = t - t0
-        segs = [(8.03, 1.2, 1.18), (9.03, 4.6, 1.38), (10.03, 8.4, 1.22), (11.03, 6.6, 1.42)]
+        segs = [(8.03, 9.3, 1.22), (9.03, 10.3, 1.45), (10.03, 13.0, 1.3), (11.03, 18.0, 1.5)]
         s0, src, z = [s for s in segs if s[0] <= t][-1]
         tz, _ = trans(t, s0)
-        fr = vframe(src + (t - s0) * 1.35, z * tz * pz); fr = grade(mblur(fr, t - s0))
+        fr = vframe(src + (t - s0) * 1.0, z * tz * pz); fr = grade(mblur(fr, t - s0))
         bracket(fr, t, t0 + 0.25, ["И ДАЛЬШЕ РЕШЕНИЕ", "ПРИШЛО БЫСТРО"], 1250, 62, BL["cut"][1] - 0.15)
     elif t < BL["after"][1]:
         t0 = BL["after"][0]; lt = t - t0; tz, flash = trans(t, t0, True)
