@@ -213,7 +213,7 @@ STK = [
     Sticker("1f634", L_, 980, ws(289), rot=-8, size=150),         # сон
     Sticker("1f37c", R_, 990, ws(293), rot=10, size=150),         # еду
     Sticker("1f525", L_, 950, ws(309), rot=-4, size=190),         # ад
-    Sticker("1f300", R_, 820, ws(316), rot=0, size=140),          # шизофрению
+    Sticker("1f300", L_, 640, ws(316), rot=0, size=150),          # шизофрению (left/top: husband is on the right)
     Sticker("1f475", L_, 960, ws(329), rot=-6),                   # бабушки
     Sticker("1f440", R_, 960, ws(335), rot=6, size=150),          # смотрит
     Sticker("1f484", R_, 940, ws(380), rot=10),                   # краситься
