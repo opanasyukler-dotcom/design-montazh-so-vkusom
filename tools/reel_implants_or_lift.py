@@ -7,12 +7,12 @@ SP = "/tmp/claude-0/-home-user-design-montazh-so-vkusom/b26b20a4-6ac5-50f8-8404-
 BLUE = (16, 46, 70); WHITE = (255, 255, 255); POWDER = (228, 210, 210)
 def osw(s): return ImageFont.truetype(SP + "v14/fonts/BN-Bold.ttf", s)          # Bebas Neue (Cyrillic)
 def mont(w, s): return ImageFont.truetype(SP + f"fonts2/M{w}.ttf", s)
-SUBS = []; DUR = 32.5
+SUBS = []; DUR = 34.9
 exec(open("helpers_src.py").read())
 
 # ---------------- timeline (music: "One more", offset 17.44s; hits at 0, 3.27, 7.43, 10.54, drop 13.91) ----------------
 BL = [("hook", 0, 3.27), ("mark", 3.27, 7.43), ("task", 7.43, 10.54), ("or", 10.54, 15.42), ("after", 15.42, 19.44),
-      ("compare", 19.44, 23.45), ("final", 23.45, 26.96), ("col1", 26.96, 29.72), ("col2", 29.72, DUR)]
+      ("compare", 19.44, 23.45), ("final", 23.45, 26.96), ("col1", 26.96, 29.47), ("col2", 29.47, 31.98), ("col3", 31.98, DUR)]
 HITS = [0.0, 3.27, 7.43, 10.54, 11.19]
 BEATS = 13.91 + 0.5017 * np.arange(30)
 def block(t):
@@ -134,7 +134,7 @@ def cmp_top(lt):
 def cmp_bot(lt):
     f = PO.get(int((7.2 + lt * 0.18) * 30)); return warp(f, 1.2, 620, 690, 540, 470, (W, 960))[0]
 
-PAFT = cv2.cvtColor(cv2.imread("dl/После"), cv2.COLOR_BGR2RGB)
+COLS = [cv2.cvtColor(cv2.imread(f"col/c{i}.png"), cv2.COLOR_BGR2RGB) for i in (1, 2, 3)]
 def short_arrow(fr, t, t0, src, tgt, al, L=125, bend=0.25):
     d = np.asarray(src, float) - tgt; d /= max(np.linalg.norm(d), 1e-6)
     arrow(fr, t, t0, tgt + d * L, tgt + d * 12, bend, al, dur=0.3)
@@ -227,18 +227,12 @@ def render(t):
         chip(fr, CH_PO, 60, 228, t, t0 + 0.1)
         T_FIN.draw(fr, 1160, t, t0 + 0.2, t1 - 0.05, cps=30)
     else:
-        # result collages: ДО | ПОСЛЕ side by side, held so the result can be examined
-        z = (1 + 0.025 * lt) * trans(t, t0, 0.08)
-        if n == "col1":
-            L = column(do_frame(7.9 + lt * 0.12), 1.56 * z, 562, 483); R = column(PAFT, 0.94 * z, 757, 532)
-        else:
-            L = column(do_frame(1.0 + lt * 0.1), 3.0 * z, 700, 430, 640); R = column(PO.get(int((3.45 + lt * 0.1) * 30)), 1.0 * z, 360, 860, 640)
-        fr = np.zeros((H, W, 3), np.float32)
-        o1 = -140 * (1 - ease(lt / 0.3)); o2 = 140 * (1 - ease(lt / 0.3))
-        fr[:, :540] = cv2.warpAffine(L, np.float32([[1, 0, o1], [0, 1, 0]]), (540, H)); fr[:, 540:] = cv2.warpAffine(R, np.float32([[1, 0, o2], [0, 1, 0]]), (540, H))
-        fr[:, 537:543] = 1.0 * min(1, lt / 0.4)
-        chip(fr, CH_DO, 40, 228, t, t0 + 0.3); chip(fr, CH_PO, 580, 228, t, t0 + 0.4)
-    fr = dark_fx(fr, t) if n not in ("col1", "col2") else fr * (1 - 0.15 * EDGE)
+        # the clinic's own collages (top = ПОСЛЕ, bottom = ДО), held so the result can be examined
+        img = COLS[int(n[-1]) - 1]
+        fr = warp(img, (1 + 0.02 * lt) * trans(t, t0, 0.06), 540, 960)[0]; fr = mblur(fr, lt)
+        fr[957:963] = np.maximum(fr[957:963], min(1, lt / 0.4))
+        chip(fr, CH_PO, 40, 228, t, t0 + 0.25); chip(fr, CH_DO, 40, 990, t, t0 + 0.4)
+    fr = dark_fx(fr, t) if n not in ("col1", "col2", "col3") else fr * (1 - 0.15 * EDGE)
     blend(fr, LOGO, 540 - LOGO.shape[1] / 2, 120, 0.9)
     if flash > 0: fr = fr * (1 - flash) + flash
     if t > DUR - 0.7: fr *= 1 - 0.9 * (t - (DUR - 0.7)) / 0.7

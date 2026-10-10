@@ -1,5 +1,5 @@
 import numpy as np, wave, librosa
-SR=48000; DUR=32.5; M0=17.44
+SR=48000; DUR=34.9; M0=17.44
 rng=np.random.default_rng(7)
 def lp(x,cut):
     out=np.zeros_like(x); s=0.0; a=1-np.exp(-2*np.pi*cut/SR)
@@ -24,14 +24,14 @@ mus/=np.abs(mus).max(); mus*=0.8
 sfx=np.zeros(n+SR)
 def put(s,t,g): i=int(max(0,t)*SR); seg=sfx[i:i+len(s)]; seg+=s[:len(seg)]*g
 WB,PP=whoosh(),pop(); KEYS=[key() for _ in range(8)]
-for c in [1.95,3.27,7.43,10.54,11.19,12.9,15.42,17.94,19.44,23.45,26.96,29.72]: put(WB,c-0.25,0.16)
+for c in [1.95,3.27,7.43,10.54,11.19,12.9,15.42,17.94,19.44,23.45,26.96,29.47,31.98]: put(WB,c-0.25,0.16)
 TYPED=[(0.12,30,"ЗДЕСЬ НУЖНАПОДТЯЖКА?или можно обойтись имплантами?"),(3.37,34,"СМОТРИМ НА НАШЕ ДО"),(6.05,32,"ПОДТЯЖКУНЕ ПЛАНИРУЕМ"),
        (7.51,30,"ЗАДАЧА"),(12.05,34,"ПЕРВЫЙ РЕЗУЛЬТАТувеличение груди имплантами"),(20.04,34,"ИМПЛАНТЫ ИЛИ ПОДТЯЖКА?решаем только после оценки вашего ДО"),
        (23.65,30,"НЕ КАЖДОЙ ГРУДИПОСЛЕ ПОТЕРИ ОБЪЁМАНУЖНА ПОДТЯЖКА")]
 for t0,cps,txt in TYPED:
     for i,ch in enumerate(txt):
         if ch!=" ": put(KEYS[rng.integers(8)],t0+i/cps+rng.uniform(-0.006,0.006),0.22*rng.uniform(0.7,1))
-for t in [4.27,4.87,5.47,7.98,8.58,9.18,16.42,16.92,17.42,27.3,30.05]: put(PP,t,0.18)
+for t in [4.27,4.87,5.47,7.98,8.58,9.18,16.42,16.92,17.42,27.25,29.75,32.25]: put(PP,t,0.18)
 mix=mus+sfx[:n,None]*0.6
 mix/=max(1,np.abs(mix).max()/0.97)
 with wave.open("mix.wav","wb") as w:
