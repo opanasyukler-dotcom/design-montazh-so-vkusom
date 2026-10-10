@@ -535,7 +535,7 @@ def s06():
 # ---- 7. whole figure: before -> after wipe with the slide text
 def s07():
     FPS = 30; cw, ch = 540, 720; cx, cy = (W - cw) // 2, 372
-    views = [("IMG_7465.JPG", "IMG_7475.JPG"), ("IMG_7466.JPG", "IMG_7469.JPG")]
+    views = [("IMG_7467.JPG", "IMG_7468.JPG"), ("IMG_7466.JPG", "IMG_7469.JPG")]
     base = Image.new("RGBA", (W, H), (0, 0, 0, 255)); put_logo(base)
     hb = Block(W - 2 * MARGIN, "center").head("Посмотрите не на отдельные зоны, а на фигуру целиком", 62, 0)
     hb.draw(base, MARGIN, 206)
