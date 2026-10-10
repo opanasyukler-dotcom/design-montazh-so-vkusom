@@ -287,12 +287,16 @@ GRADE_WALL = "eq=brightness=-0.04:contrast=1.04:saturation=0.95"
 GRADE_DARK = "eq=contrast=1.03:saturation=1.02"
 
 
-def caption_overlay(block, bottom=1300, strength=0.72):
-    """short caption at the very bottom; shade only right under it so the body stays visible"""
+def caption_overlay(block, bottom=1300, strength=0.72, top=None):
+    """short caption at the very bottom (or right under the logo); shade only behind it so the body stays visible"""
     ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    y = bottom - block.height()
-    ov.alpha_composite(vgrad(y - 170, y + 70, 0, strength))
-    ov.alpha_composite(vgrad(0, 230, 0.22, 0))
+    if top is not None:
+        y = top
+        ov.alpha_composite(vgrad(y + block.height() - 40, y + block.height() + 140, strength, 0))
+    else:
+        y = bottom - block.height()
+        ov.alpha_composite(vgrad(y - 170, y + 70, 0, strength))
+        ov.alpha_composite(vgrad(0, 230, 0.22, 0))
     put_logo(ov)
     block.draw(ov, MARGIN, y)
     return ov
@@ -318,17 +322,17 @@ def body_img(f, w, h, wm_cut=0.90):
 
 # ---- 1. cover: after footage, whole torso visible
 def s01():
-    b = (Block().head("Подтяжка груди и абдоминопластика", 76, 18).rule(0.30, 20)
-         .ital("За одну операцию. Разбираем случай", 36, 16).arrows())
+    b = (Block().head("Я вроде уже в форме.\nПочему тело всё равно\nне нравится?", 74, 18).rule(0.30, 20)
+         .ital("История комплексной коррекции груди и живота", 30, 16).arrows())
     render_video("01", [("IMG_3375.MOV", 0, None), ("IMG_3376.MOV", 0, None), ("IMG_3377.MOV", 0, None)],
-                 caption_overlay(b, 1310), f"{OUT}/01_cover.mp4", crop_y=0.0, zoom=0.72, grade=GRADE_DARK)
+                 caption_overlay(b, 1300), f"{OUT}/01_cover.mp4", crop_y=0.45, grade=GRADE_DARK)
 
 
 # ---- 2. before footage, minimal caption
 def s02():
     b = Block().head("Наше до", 84, 8).ital("С этим пациентка пришла на консультацию", 32, 0)
-    render_video("02", [("IMG_3357.MOV", 0, None)], caption_overlay(b, 1310), f"{OUT}/02_before.mp4",
-                 crop_y=0.0, zoom=0.80, grade=GRADE_WALL)
+    render_video("02", [("IMG_3357.MOV", 0, None)], caption_overlay(b, top=210), f"{OUT}/02_before.mp4",
+                 crop_y=0.17, grade=GRADE_WALL)
 
 
 # ---- 3. before photo with arrows
@@ -389,15 +393,15 @@ def s03():
 # ---- 4. pinch video
 def s04():
     b = Block().head("Почему не помогут спорт и диета?", 68, 8).ital("Растянутую кожу убирает только хирургия", 32, 0)
-    render_video("04", [("IMG_3374.MOV", 0, None)], caption_overlay(b, 1310), f"{OUT}/04_why.mp4",
-                 crop_y=0.0, zoom=0.80, grade=GRADE_WALL)
+    render_video("04", [("IMG_3374.MOV", 0, None)], caption_overlay(b, top=210), f"{OUT}/04_why.mp4",
+                 crop_y=0.17, grade=GRADE_WALL)
 
 
 # ---- 5. bending video
 def s05():
     b = Block().head("В наклоне", 84, 8).ital("хорошо видно, насколько растянуты ткани груди", 32, 0)
-    render_video("05", [("IMG_3358.MOV", 0, None)], caption_overlay(b, 1310), f"{OUT}/05_bend.mp4",
-                 crop_y=0.0, zoom=0.80, grade=GRADE_WALL)
+    render_video("05", [("IMG_3358.MOV", 0, None)], caption_overlay(b, top=210), f"{OUT}/05_bend.mp4",
+                 crop_y=0.17, grade=GRADE_WALL)
 
 
 # ---- 6. surgeon photo: plan + one operation
@@ -503,7 +507,7 @@ def s10(): before_after("10", "IMG_7466.JPG", "IMG_7469.JPG", "Вид сбоку
 def s11():
     b = Block().head("Что получили в итоге", 80, 8).ital("Грудь приподнята, живот ровный, талия выразительнее", 30, 0)
     render_video("11", [("IMG_3378.MOV", 0, None)], caption_overlay(b, 1310), f"{OUT}/11_result.mp4",
-                 crop_y=0.0, zoom=0.80, grade=GRADE_DARK)
+                 crop_y=0.60, grade=GRADE_DARK)
 
 
 # ---- 12. CTA: surgeon photo kept whole (cap to shoulders), white panel below
