@@ -375,22 +375,81 @@ def panel_video(name, srcs, block, out, src_top=0.4, speed=1.0, grade="", text_t
     os.remove(ovp)
 
 
+
+def frame_canvas(card, radius=26):
+    """graphite slide with a rounded window (alpha 0) where the footage shows through"""
+    x, y, w, h = card
+    c = Image.new("RGBA", (W, H), GRAPHITE + (255,))
+    m = Image.new("L", (W * 3, H * 3), 0)
+    ImageDraw.Draw(m).rounded_rectangle((x * 3, y * 3, (x + w) * 3, (y + h) * 3), radius=radius * 3, fill=255)
+    m = m.resize((W, H), Image.LANCZOS)
+    c.putalpha(Image.eval(m, lambda v: 255 - v))
+    ImageDraw.Draw(c).rounded_rectangle((x - 1, y - 1, x + w, y + h), radius=radius, outline=LILAC + (120,), width=2)
+    return c
+
+
+def framed_video(name, srcs, ov, out, card, src_top=0.0, speed=1.0, grade=""):
+    """whole body: footage scaled into a centred window, nothing cropped off the figure"""
+    x, y, w, h = card
+    ovp = os.path.join(OUT, f"_{name}_overlay.png"); ov.save(ovp)
+    ins, fl, dur = [], [], 0.0
+    for i, (f, a, b) in enumerate(srcs):
+        dur += ((b or probe_dur(os.path.join(SRC, f))) - a) / speed
+        ins += ["-ss", str(a)] + (["-to", str(b)] if b else []) + ["-i", os.path.join(SRC, f)]
+        fl.append(f"[{i}:v]scale={w}:-2:flags=lanczos,crop={w}:{h}:0:'min(ih-{h},ih*{src_top})',"
+                  f"setpts=PTS/{speed},setsar=1,fps=30,format=yuv420p[v{i}]")
+    n = len(srcs)
+    cat = "".join(f"[v{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=0[cat]" if n > 1 else "[v0]null[cat]"
+    g = f"[cat]{grade}[g]" if grade else "[cat]null[g]"
+    fc = ";".join(fl + [cat, g, f"color=c=0x{GRAPHITE[0]:02x}{GRAPHITE[1]:02x}{GRAPHITE[2]:02x}:s={W}x{H}:r=30[bg]",
+                        f"[bg][g]overlay={x}:{y}:shortest=1[c]", f"[c][{n}:v]overlay=0:0:format=auto:shortest=1,format=yuv420p[out]"])
+    run(["ffmpeg", "-v", "error", "-y"] + ins + ["-loop", "1", "-i", ovp, "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo",
+         "-filter_complex", fc, "-map", "[out]", "-map", f"{n + 1}:a", "-t", f"{dur:.3f}",
+         "-c:v", "libx264", "-preset", "medium", "-crf", "17", "-profile:v", "high", "-pix_fmt", "yuv420p",
+         "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", out])
+    os.remove(ovp)
+
+
+def card_for(w, frac, x=None, y=None):
+    """window of width w showing the top `frac` of a 1080x1920 clip"""
+    h = int(1920 * w / 1080 * frac) // 2 * 2
+    return ((W - w) // 2 if x is None else x, (H - h) // 2 if y is None else y, w, h)
+
+
 # ---- 1. cover on the "before" footage
 def s01():
-    b = (Block().head("Я вроде уже скинула вес...\nПочему тело всё равно\nне нравится?", 62, 14).rule(0.22, 14)
-         .ital("История комплексной коррекции груди и живота", 26, 10).arrows())
-    render_video("01", [("IMG_3357.MOV", 0, None)], caption_overlay(b, 1290), f"{OUT}/01_cover.mp4",
-                 crop_y=0.55, grade=GRADE_WALL)
+    card = card_for(580, 0.88, y=104)
+    ov = frame_canvas(card); put_logo(ov, y=62)
+    b = (Block(W - 2 * MARGIN, "center").head("Восстановление тела после родов\nза одну операцию", 62, 12).rule(0.22, 14)
+         .ital("История комплексной коррекции груди и живота", 26, 0))
+    b.draw(ov, MARGIN, card[1] + card[3] + 30)
+    f3 = mont(30, 700); shadow_text(ov, ((W - f3.getlength(">>>")) / 2, card[1] + card[3] + 30 + b.height() + 12), ">>>", f3, WHITE)
+    framed_video("01", [("IMG_3357.MOV", 0, None)], ov, f"{OUT}/01_cover.mp4", card, grade=GRADE_WALL)
 
 
 # ---- 2. not about weight: text panel + pinch footage
 def s02():
-    b = (Block().head("Иногда проблема уже не в весе", 70, 20)
-         .body("Можно похудеть.", TS, 4).body("Можно заниматься спортом.", TS, 4).body("Можно следить за питанием.", TS, 18)
-         .body("Но если после беременности, похудения или колебаний веса остались избытки кожи и изменилось положение груди, тренировки не всегда способны это исправить.", TS, 18)
-         .body("И вот здесь женщина часто думает:", TS, 10)
-         .ital("«Что ещё мне сделать, чтобы наконец нравиться себе?»", 33, 0))
-    panel_video("02", [("IMG_3374.MOV", 1.9, None)], b, f"{OUT}/02_not_weight.mp4", src_top=0.36, speed=0.6, grade=GRADE_WALL)
+    card = card_for(500, 0.85, y=372)
+    x, y, w, h = card
+    ov = frame_canvas(card); put_logo(ov)
+    d = ImageDraw.Draw(ov)
+    t1 = bebas(100); tw = t1.getlength("УВЫ, СПОРТ"); d.text(((W - tw) / 2, 196), "УВЫ, СПОРТ", font=t1, fill=WHITE)
+    t2 = mont(40, 300, italic=True); tw = t2.getlength("не поможет"); d.text(((W - tw) / 2, 300), "не поможет", font=t2, fill=LILAC)
+    # left column: "даже если"
+    cw = x - 60
+    lb = Block(cw).head("Даже если:", 46, 14).bullets(["снизить вес", "держать питание", "регулярно тренироваться"], 26, 0)
+    lb.draw(ov, 36, y + h // 2 - lb.height() // 2 - 40)
+    # right column: pointer to the stretched tissue on the footage
+    rb = Block(cw).ital("растянутые ткани", 28, 0)
+    rx, ry = x + w + 24, y + int(h * 0.50)
+    rb.draw(ov, rx, ry)
+    S = 3; hi = Image.new("RGBA", (W * S, H * S), (0, 0, 0, 0))
+    pts = curve((rx + 60, ry + 70), (x + w * 0.70, y + h * 0.66), -0.35)
+    arrow(ImageDraw.Draw(hi), pts * S, col=LILAC + (255,), w=4 * S, head=20 * S)
+    ov.alpha_composite(hi.resize((W, H), Image.LANCZOS))
+    bb = Block(W - 2 * MARGIN + 40, "center").body("Если есть растянутые ткани, как на видео, лучше проконсультироваться с пластическим хирургом", 28, 0)
+    bb.draw(ov, MARGIN - 20, y + h + 26)
+    framed_video("02", [("IMG_3374.MOV", 1.9, None)], ov, f"{OUT}/02_not_weight.mp4", card, speed=0.6, grade=GRADE_WALL)
 
 
 # ---- 3. "наше до": before photo, findings with arrows
@@ -444,25 +503,33 @@ def s04():
 
 # ---- 5. breast: surgery footage
 def s05():
-    b = (Block().head("Что сделали с грудью", 76, 14)
-         .plaque("Выполнили подтяжку груди", 27, 18)
-         .body("Задача:", TS, 8)
+    bw = 560
+    b = (Block(bw).head("Что сделали с грудью", 64, 12)
+         .plaque("Выполнили подтяжку груди", 25, 14)
+         .body("Задача:", 25, 6)
          .bullets(["поднять ткани", "изменить положение груди", "сделать форму более собранной",
-                   "скорректировать выраженное опущение"], TS, 16)
-         .body("Без попытки сделать грудь «другой».", TS, 10)
-         .ital("Хотелось сохранить её собственный объём, но изменить форму и положение.", 33, 0))
-    render_video("05", [("IMG_8058.mov", 0, None)], text_overlay(b, bottom=1280), f"{OUT}/05_breast.mp4",
+                   "скорректировать выраженное опущение"], 25, 12)
+         .body("Без попытки сделать грудь «другой».", 25, 8)
+         .ital("Хотелось сохранить её собственный объём, но изменить форму и положение.", 28, 0))
+    ov = Image.new("RGBA", (W, H), (0, 0, 0, 0)); put_logo(ov)
+    boxed(ov, b, W - 56 - int(b.max_width()), 222)
+    render_video("05", [("IMG_8058.mov", 0, None)], ov, f"{OUT}/05_breast.mp4",
                  crop_y=0.0, grade="eq=brightness=-0.03:contrast=1.04")
 
 
 # ---- 6. abdomen: text panel + "after" belly footage
 def s06():
-    b = (Block().head("Что сделали с животом", 72, 14)
-         .plaque("Выполнили абдоминопластику", 27, 18)
-         .body("При такой коррекции мы работаем не просто с объёмом.", TS, 12)
-         .body("Основная задача — убрать избыток кожи и сформировать более аккуратный контур живота.", TS, 12)
-         .ital("Поэтому абдоминопластику нельзя заменить только спортом или липосакцией, если проблема уже в избытке тканей.", 31, 0))
-    panel_video("06", [("IMG_3378.MOV", 0, None)], b, f"{OUT}/06_abdomen.mp4", src_top=0.42, grade=GRADE_DARK)
+    card = card_for(530, 0.92, x=36)
+    x, y, w, h = card
+    ov = frame_canvas(card); put_logo(ov, y=card[1] - 46 if card[1] > 120 else 62)
+    cw = W - (x + w) - 76
+    b = (Block(cw).head("Что сделали с животом", 58, 12)
+         .plaque("Выполнили абдоминопластику", 24, 16)
+         .body("При такой коррекции мы работаем не просто с объёмом.", 25, 10)
+         .body("Основная задача — убрать избыток кожи и сформировать более аккуратный контур живота.", 25, 10)
+         .ital("Поэтому абдоминопластику нельзя заменить только спортом или липосакцией, если проблема уже в избытке тканей.", 27, 0))
+    b.draw(ov, x + w + 40, y + h // 2 - b.height() // 2)
+    framed_video("06", [("IMG_3378.MOV", 0, None)], ov, f"{OUT}/06_abdomen.mp4", card, grade=GRADE_DARK)
 
 
 # ---- 7. whole figure: before -> after wipe with the slide text
@@ -518,34 +585,39 @@ def s07():
 
 # ---- 8. why several zones: text panel + "after" footage on the dark backdrop
 def s08():
-    b = (Block(W - 2 * MARGIN + 20).head("Почему иногда лучше\nкорректировать не одну зону", 52, 12)
-         .body("Потому что тело мы воспринимаем целиком.", 25, 8)
+    card = card_for(530, 0.90, x=W - 36 - 530)
+    x, y, w, h = card
+    ov = frame_canvas(card); put_logo(ov, y=card[1] - 46 if card[1] > 120 else 62)
+    cw = x - 76
+    b = (Block(cw).head("Почему иногда лучше корректировать не одну зону", 54, 12)
+         .body("Потому что тело мы воспринимаем целиком.", 25, 10)
          .body("Можно идеально скорректировать живот, но при выраженном опущении груди всё равно чувствовать, что образ не завершён. И наоборот.", 25, 10)
          .ital("Поэтому на консультации я всегда смотрю не только на одну жалобу, а на всю фигуру и пропорции в целом.", 27, 0))
-    render_video("08", [("IMG_3376.MOV", 0, None), ("IMG_3377.MOV", 0, None)], caption_overlay(b, 1300),
-                 f"{OUT}/08_whole_body.mp4", crop_y=0.80, grade=GRADE_DARK)
+    b.draw(ov, 40, y + h // 2 - b.height() // 2)
+    framed_video("08", [("IMG_3376.MOV", 0, None), ("IMG_3377.MOV", 0, None)], ov, f"{OUT}/08_whole_body.mp4", card, grade=GRADE_DARK)
 
 
 # ---- 9. "if you look at our before": quotes over the before footage (reference layout)
 def s09():
-    ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    hb = Block().head("Если вы смотрите на наше до и думаете:", 60, 0)
-    put_logo(ov); boxed(ov, hb, MARGIN - 30, 222)
-    quotes = [("«У меня очень похоже»", "right", 470), ("«Живот не уходит, даже когда вес нормальный»", "left", 600),
-              ("«Грудь сильно изменилась и опустилась»", "right", 730),
-              ("«Хочется не одну операцию, а привести фигуру в порядок целиком»", "left", 860)]
-    f = mont(28, 400, italic=True); d = ImageDraw.Draw(ov)
-    for q, al, y in quotes:
-        lines = wrap(q, f, 470); lh = 36
-        w_ = max(f.getlength(l) for l in lines) + 40; h_ = lh * len(lines) + 22
-        x = MARGIN - 30 if al == "left" else W - MARGIN + 30 - w_
-        d.rounded_rectangle((x, y, x + w_, y + h_), radius=16, fill=GRAPHITE + (200,))
-        for i, l in enumerate(lines): d.text((x + 20, y + 10 + i * lh), l, font=f, fill=WHITE)
-    b = (Block().body("Не нужно самостоятельно решать, какие именно операции вам нужны.", TS, 10)
-         .ital("Сначала важно оценить ваше ДО.", 36, 0))
-    y = 1280 - b.height()
-    boxed(ov, b, MARGIN - 30, y)
-    render_video("09", [("IMG_3358.MOV", 0, None)], ov, f"{OUT}/09_if_you.mp4", crop_y=0.17, grade=GRADE_WALL)
+    card = card_for(480, 1.0, y=318)
+    x, y, w, h = card
+    ov = frame_canvas(card); put_logo(ov)
+    hb = Block(W - 2 * MARGIN, "center").head("Если вы смотрите на наше до и думаете:", 56, 0)
+    hb.draw(ov, MARGIN, 206)
+    quotes = [("«У меня очень похоже»", "right", y + 40), ("«Живот не уходит, даже когда вес нормальный»", "left", y + 150),
+              ("«Грудь сильно изменилась и опустилась»", "right", y + 300),
+              ("«Хочется не одну операцию, а привести фигуру в порядок целиком»", "left", y + 430)]
+    f = mont(25, 400, italic=True); d = ImageDraw.Draw(ov)
+    for q, al, qy in quotes:
+        lines = wrap(q, f, 300); lh = 32
+        w_ = max(f.getlength(l) for l in lines) + 36; h_ = lh * len(lines) + 20
+        qx = 30 if al == "left" else W - 30 - w_
+        d.rounded_rectangle((qx, qy, qx + w_, qy + h_), radius=16, fill=(40, 44, 58, 235), outline=LILAC + (110,), width=2)
+        for i, l in enumerate(lines): d.text((qx + 18, qy + 9 + i * lh), l, font=f, fill=WHITE)
+    b = (Block(W - 2 * MARGIN, "center").body("Не нужно самостоятельно решать, какие именно операции вам нужны.", 25, 6)
+         .ital("Сначала важно оценить ваше ДО.", 32, 0))
+    b.draw(ov, MARGIN, y + h + 22)
+    framed_video("09", [("IMG_3358.MOV", 0, None)], ov, f"{OUT}/09_if_you.mp4", card, grade=GRADE_WALL)
 
 
 # ---- 10. consultation + contacts: surgeon photo, white panel
