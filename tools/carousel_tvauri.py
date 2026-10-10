@@ -140,6 +140,18 @@ class Block:
 
     def height(self): return sum(self._h(i) for i in self.items)
 
+    def max_width(self):
+        w = 0
+        for it in self.items:
+            k = it[0]
+            if k == "text": w = max([w] + [it[1].getlength(l) for l in it[2]])
+            elif k == "rule": w = max(w, it[1] + 4)
+            elif k == "arrows": w = max(w, 60)
+            elif k == "plaque": w = max(w, it[1].getlength(it[2]) + 36)
+            elif k == "bullets": w = max([w] + [it[1].getlength(l) + 34 for g in it[2] for l in g])
+        return w
+
+
     def draw(self, canvas, x, y):
         d = ImageDraw.Draw(canvas)
         for it in self.items:
@@ -172,6 +184,13 @@ class Block:
             elif k == "space": y += it[1]
         return y
 
+
+def boxed(canvas, block, x, y, pad=26, alpha=190):
+    """compact translucent plate exactly under the text: no haze over the footage"""
+    w, h = block.max_width(), block.height()
+    ImageDraw.Draw(canvas).rounded_rectangle((x - pad, y - pad + 4, x + w + pad, y + h + pad - 6), radius=22,
+                                             fill=GRAPHITE + (alpha,))
+    block.draw(canvas, x, y)
 
 def shadow_text(canvas, pos, text, f, col, blur=6, a=110):
     """soft dark halo for legibility over footage (like the original posts)"""
@@ -285,21 +304,15 @@ def save_jpg(canvas, out):
 # ================= slides =================
 GRADE_WALL = "eq=brightness=-0.04:contrast=1.04:saturation=0.95"
 GRADE_DARK = "eq=contrast=1.03:saturation=1.02"
-TS = 29  # running text size
+TS = 27  # running text size
 
 
 def caption_overlay(block, bottom=1300, strength=0.72, top=None):
     """short caption at the very bottom (or right under the logo); shade only behind it so the body stays visible"""
     ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    if top is not None:
-        y = top
-        ov.alpha_composite(vgrad(y + block.height() - 40, y + block.height() + 140, strength, 0))
-    else:
-        y = bottom - block.height()
-        ov.alpha_composite(vgrad(y - 170, y + 70, 0, strength))
-        ov.alpha_composite(vgrad(0, 230, 0.22, 0))
+    y = top if top is not None else bottom - block.height()
     put_logo(ov)
-    block.draw(ov, MARGIN, y)
+    boxed(ov, block, MARGIN - 30, y)
     return ov
 
 
@@ -334,14 +347,14 @@ def curve(a, b, bend=0.25, n=40):
     return (1 - t) ** 2 * a + 2 * (1 - t) * t * c + t ** 2 * b
 
 
-def panel_video(name, srcs, block, out, src_top=0.4, speed=1.0, grade="", text_top=212):
+def panel_video(name, srcs, block, out, src_top=0.4, speed=1.0, grade="", text_top=200):
     """text on graphite at the top, footage full-width in the window below it (nothing drawn over the body)"""
     th = block.height()
-    y0 = text_top + th + 36
+    y0 = text_top + th + 30
     wh = H - y0
     ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    ov.alpha_composite(vgrad(y0 - 2, y0 + 110, 1, 0))   # soft seam between panel and footage
-    ImageDraw.Draw(ov).rectangle((0, 0, W, y0 - 2), fill=GRAPHITE + (255,))
+    ImageDraw.Draw(ov).rectangle((0, 0, W, y0 - 1), fill=GRAPHITE + (255,))
+    ImageDraw.Draw(ov).rectangle((0, y0 - 1, W, y0 + 1), fill=LILAC + (255,))
     put_logo(ov); block.draw(ov, MARGIN, text_top)
     ovp = os.path.join(OUT, f"_{name}_overlay.png"); ov.save(ovp)
     ins, fl, dur = [], [], 0.0
@@ -364,9 +377,9 @@ def panel_video(name, srcs, block, out, src_top=0.4, speed=1.0, grade="", text_t
 
 # ---- 1. cover on the "before" footage
 def s01():
-    b = (Block().head("Я вроде уже скинула вес...\nПочему тело всё равно\nне нравится?", 74, 18).rule(0.30, 20)
-         .ital("История комплексной коррекции груди и живота", 30, 16).arrows())
-    render_video("01", [("IMG_3357.MOV", 0, None)], caption_overlay(b, 1300), f"{OUT}/01_cover.mp4",
+    b = (Block().head("Я вроде уже скинула вес...\nПочему тело всё равно\nне нравится?", 62, 14).rule(0.22, 14)
+         .ital("История комплексной коррекции груди и живота", 26, 10).arrows())
+    render_video("01", [("IMG_3357.MOV", 0, None)], caption_overlay(b, 1290), f"{OUT}/01_cover.mp4",
                  crop_y=0.55, grade=GRADE_WALL)
 
 
@@ -377,7 +390,7 @@ def s02():
          .body("Но если после беременности, похудения или колебаний веса остались избытки кожи и изменилось положение груди, тренировки не всегда способны это исправить.", TS, 18)
          .body("И вот здесь женщина часто думает:", TS, 10)
          .ital("«Что ещё мне сделать, чтобы наконец нравиться себе?»", 33, 0))
-    panel_video("02", [("IMG_3374.MOV", 1.9, None)], b, f"{OUT}/02_not_weight.mp4", src_top=0.50, speed=0.6, grade=GRADE_WALL)
+    panel_video("02", [("IMG_3374.MOV", 1.9, None)], b, f"{OUT}/02_not_weight.mp4", src_top=0.36, speed=0.6, grade=GRADE_WALL)
 
 
 # ---- 3. "наше до": before photo, findings with arrows
@@ -510,15 +523,14 @@ def s08():
          .body("Можно идеально скорректировать живот, но при выраженном опущении груди всё равно чувствовать, что образ не завершён. И наоборот.", TS, 12)
          .ital("Поэтому на консультации я всегда смотрю не только на одну жалобу, а на всю фигуру и пропорции в целом.", 31, 0))
     panel_video("08", [("IMG_3376.MOV", 0, None), ("IMG_3377.MOV", 0, None)], b, f"{OUT}/08_whole_body.mp4",
-                src_top=0.24, grade=GRADE_DARK)
+                src_top=0.34, grade=GRADE_DARK)
 
 
 # ---- 9. "if you look at our before": quotes over the before footage (reference layout)
 def s09():
     ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    ov.alpha_composite(vgrad(0, 420, 0.78, 0))
-    hb = Block().head("Если вы смотрите на наше до и думаете:", 66, 0)
-    put_logo(ov); hb.draw(ov, MARGIN, 206)
+    hb = Block().head("Если вы смотрите на наше до и думаете:", 60, 0)
+    put_logo(ov); boxed(ov, hb, MARGIN - 30, 222)
     quotes = [("«У меня очень похоже»", "right", 470), ("«Живот не уходит, даже когда вес нормальный»", "left", 600),
               ("«Грудь сильно изменилась и опустилась»", "right", 730),
               ("«Хочется не одну операцию, а привести фигуру в порядок целиком»", "left", 860)]
@@ -531,8 +543,8 @@ def s09():
         for i, l in enumerate(lines): d.text((x + 20, y + 10 + i * lh), l, font=f, fill=WHITE)
     b = (Block().body("Не нужно самостоятельно решать, какие именно операции вам нужны.", TS, 10)
          .ital("Сначала важно оценить ваше ДО.", 36, 0))
-    y = 1290 - b.height()
-    ov.alpha_composite(vgrad(y - 150, y + 60, 0, 0.8)); b.draw(ov, MARGIN, y)
+    y = 1280 - b.height()
+    boxed(ov, b, MARGIN - 30, y)
     render_video("09", [("IMG_3358.MOV", 0, None)], ov, f"{OUT}/09_if_you.mp4", crop_y=0.17, grade=GRADE_WALL)
 
 
