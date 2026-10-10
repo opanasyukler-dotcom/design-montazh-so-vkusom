@@ -217,8 +217,15 @@ def render_video(name, srcs, ov, out, crop_y=0.5, zoom=1.0, grade="", trim=None)
     for i, (f, a, b) in enumerate(srcs):
         dur += (b or probe_dur(os.path.join(SRC, f))) - a
         ins += ["-ss", str(a)] + (["-to", str(b)] if b else []) + ["-i", os.path.join(SRC, f)]
-        sw = int(W * zoom)
-        fl.append(f"[{i}:v]scale={sw}:-2:flags=lanczos,crop={W}:{H}:(iw-{W})/2:(ih-{H})*{crop_y},setsar=1,fps=30,format=yuv420p[v{i}]")
+        if zoom >= 1:
+            sw = int(W * zoom)
+            fl.append(f"[{i}:v]scale={sw}:-2:flags=lanczos,crop={W}:{H}:(iw-{W})/2:(ih-{H})*{crop_y},setsar=1,fps=30,format=yuv420p[v{i}]")
+        else:  # whole body in frame: shrunk footage over a blurred, dimmed copy of itself
+            sw = int(W * zoom) // 2 * 2
+            fl.append(f"[{i}:v]split[a{i}][b{i}];"
+                      f"[a{i}]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},boxblur=40:2,eq=brightness=-0.10:saturation=0.8[bg{i}];"
+                      f"[b{i}]scale={sw}:-2:flags=lanczos,crop={sw}:'min(ih,{H})':0:'(ih-min(ih,{H}))*{crop_y}'[fg{i}];"
+                      f"[bg{i}][fg{i}]overlay=({W}-w)/2:0,setsar=1,fps=30,format=yuv420p[v{i}]")
     n = len(srcs)
     cat = "".join(f"[v{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=0[cat]" if n > 1 else "[v0]null[cat]"
     g = f"[cat]{grade}[g]" if grade else "[cat]null[g]"
@@ -276,68 +283,198 @@ def save_jpg(canvas, out):
 
 
 # ================= slides =================
-GRADE_WALL = "eq=brightness=-0.06:contrast=1.04:saturation=0.95,vignette=PI/4.2"
+GRADE_WALL = "eq=brightness=-0.04:contrast=1.04:saturation=0.95"
 GRADE_DARK = "eq=contrast=1.03:saturation=1.02"
 
 
+def caption_overlay(block, bottom=1300, strength=0.72):
+    """short caption at the very bottom; shade only right under it so the body stays visible"""
+    ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    y = bottom - block.height()
+    ov.alpha_composite(vgrad(y - 170, y + 70, 0, strength))
+    ov.alpha_composite(vgrad(0, 230, 0.22, 0))
+    put_logo(ov)
+    block.draw(ov, MARGIN, y)
+    return ov
+
+
+def body_box(im, aspect, pad=0.03, wm_cut=0.90):
+    a = np.asarray(im.convert("L"))[: int(im.height * wm_cut)]
+    m = a > 40
+    e = 12; m[:e] = m[-e:] = False; m[:, :e] = m[:, -e:] = False
+    xs = np.where(m.mean(0) > 0.03)[0]; ys = np.where(m.mean(1) > 0.03)[0]
+    x0, x1, y0, y1 = xs.min(), xs.max(), ys.min(), ys.max()
+    bw, bh = x1 - x0, y1 - y0
+    ch = bh * (1 + 2 * pad); cw = ch * aspect
+    if cw < bw * (1 + 2 * pad): cw = bw * (1 + 2 * pad); ch = cw / aspect
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    return (int(cx - cw / 2), int(cy - ch / 2), int(cx + cw / 2), int(cy + ch / 2))
+
+
+def body_img(f, w, h, wm_cut=0.90):
+    im = load_photo(f); box = body_box(im, w / h, wm_cut=wm_cut)
+    return body_crop(im, w / h, wm_cut=wm_cut).resize((w, h), Image.LANCZOS), box
+
+
+# ---- 1. cover: after footage, whole torso visible
 def s01():
-    b = (Block().head("Подтяжка груди и абдоминопластика за одну операцию", 84, 22)
-         .rule().ital("Разбираем случай: что было до и что получили после", 38, 26).arrows())
+    b = (Block().head("Подтяжка груди и абдоминопластика", 76, 18).rule(0.30, 20)
+         .ital("За одну операцию. Разбираем случай", 36, 16).arrows())
     render_video("01", [("IMG_3375.MOV", 0, None), ("IMG_3376.MOV", 0, None), ("IMG_3377.MOV", 0, None)],
-                 text_overlay(b, bottom=1200), f"{OUT}/01_cover.mp4", crop_y=0.28, grade=GRADE_DARK)
+                 caption_overlay(b, 1310), f"{OUT}/01_cover.mp4", crop_y=0.0, zoom=0.72, grade=GRADE_DARK)
 
 
+# ---- 2. before footage, minimal caption
 def s02():
-    b = (Block().head("С чем пациентка пришла на консультацию:", 70, 26)
-         .bullets(["Выраженное опущение груди: ареолы опустились ниже складки под грудью, ткани растянуты",
-                   "Избыток кожи на животе: она собирается в складку и нависает над бельём"], 30, 24)
-         .body("После беременностей и колебаний веса кожа теряет упругость и уже не сокращается сама.", 30, 0))
-    render_video("02", [("IMG_3357.MOV", 0, None)], text_overlay(b), f"{OUT}/02_before.mp4", crop_y=0.12, grade=GRADE_WALL)
+    b = Block().head("Наше до", 84, 8).ital("С этим пациентка пришла на консультацию", 32, 0)
+    render_video("02", [("IMG_3357.MOV", 0, None)], caption_overlay(b, 1310), f"{OUT}/02_before.mp4",
+                 crop_y=0.0, zoom=0.80, grade=GRADE_WALL)
+
+
+# ---- 3. before photo with arrows
+def arrow(d, pts, col=WHITE + (255,), w=4, head=22):
+    pts = np.asarray(pts, float)
+    d.line([tuple(p) for p in pts], fill=col, width=w, joint="curve")
+    e = pts[-1]; v = pts[-1] - pts[-3]; v /= np.linalg.norm(v); n = np.array([-v[1], v[0]])
+    d.polygon([tuple(e + v * 4), tuple(e - v * head + n * head * 0.5), tuple(e - v * head - n * head * 0.5)], fill=col)
+
+
+def curve(a, b, bend=0.25, n=40):
+    a, b = np.asarray(a, float), np.asarray(b, float); m = (a + b) / 2; dd = b - a
+    c = m + np.array([-dd[1], dd[0]]) * bend; t = np.linspace(0, 1, n)[:, None]
+    return (1 - t) ** 2 * a + 2 * (1 - t) * t * c + t ** 2 * b
 
 
 def s03():
-    b = (Block().head("Почему тут не помогут спорт и диета?", 76, 22).rule()
-         .body("Тренировки укрепляют мышцы, правильное питание уменьшает жировую ткань.", 30, 18)
-         .body("Но растянутую кожу они не уберут — её избыток так и останется складкой.", 30, 26)
-         .ital("Лишнюю кожу можно убрать только хирургически.", 38, 0))
-    render_video("03", [("IMG_3374.MOV", 0, None)], text_overlay(b, top=240), f"{OUT}/03_why.mp4", crop_y=1.0, grade=GRADE_WALL)
+    S = 3  # supersample for smooth arrows
+    c = Image.new("RGBA", (W, H), (0, 0, 0, 255))
+    put_logo(c)
+    t = bebas(84); tw = t.getlength("ЧТО ИМЕЕМ ДО")
+    ImageDraw.Draw(c).text(((W - tw) / 2, 196), "ЧТО ИМЕЕМ ДО", font=t, fill=WHITE)
+    bw, bh = 500, 768; bx, by = (W - bw) // 2, 330
+    ph, box = body_img("IMG_7465.JPG", bw, bh)
+    c.paste(ph, (bx, by))
+    k = bw / (box[2] - box[0])
+    def P(x, y):  # point on the 512x910 preview of IMG_7465 -> canvas
+        return (bx + (x * 4 - box[0]) * k, by + (y * 4 - box[1]) * k)
+    hi = Image.new("RGBA", (W * S, H * S), (0, 0, 0, 0)); d = ImageDraw.Draw(hi)
+    f1, f2 = mont(26, 600), mont(23, 300, italic=True)
+    labels = [  # (text, note, label x, label y, align, target)
+        ("Опущение груди", "ареолы ниже\nскладки под грудью", 40, 440, "left", P(190, 440)),
+        ("Растянутая кожа", "и растяжки\nна животе", 830, 520, "right", P(325, 515)),
+        ("Кожно-жировой «фартук»", "нависает\nнад бельём", 40, 880, "left", P(215, 640)),
+        ("Нет талии", "избыток тканей\nпо бокам", 830, 820, "right", P(380, 585)),
+    ]
+    for title, note, lx, ly, al, tgt in labels:
+        tl = wrap(title, f1, 215); nl = note.split("\n")
+        yy = ly
+        for ln in tl:
+            x = lx if al == "left" else W - 40 - f1.getlength(ln)
+            shadow_text(c, (x, yy), ln, f1, WHITE); yy += 33
+        for ln in nl:
+            x = lx if al == "left" else W - 40 - f2.getlength(ln)
+            ImageDraw.Draw(c).text((x, yy), ln, font=f2, fill=POWDER); yy += 29
+        # arrow from under the label towards the target
+        sx = (lx + 60) if al == "left" else (W - 100)
+        sy = yy + 14
+        pts = curve((sx, sy), (tgt[0] + (-14 if al == "left" else 14), tgt[1]), 0.28 if al == "left" else -0.28)
+        arrow(d, pts * S, w=4 * S, head=20 * S)
+    hi = hi.resize((W, H), Image.LANCZOS)
+    c.alpha_composite(hi)
+    f = mont(30, 300, italic=True); cap = "Эти изменения уже не уйдут сами по себе"
+    ImageDraw.Draw(c).text(((W - f.getlength(cap)) / 2, 1232), cap, font=f, fill=WHITE)
+    save_jpg(c, f"{OUT}/03_before_arrows.jpg")
 
 
+# ---- 4. pinch video
 def s04():
-    ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    b = (Block().body("В данном случае основная задача:", 30, 20)
-         .bullets(["поднять грудь и вернуть ей форму", "убрать избыток кожи и жира на животе",
-                   "сделать контур талии ровнее"], 30, 26)
-         .ital("Поэтому планируем подтяжку груди и абдоминопластику одним этапом.", 38, 0))
-    y = 1240 - b.height()
-    ov.alpha_composite(vgrad(y - 420, y + 60, 0, 0.88)); ov.alpha_composite(vgrad(0, 300, 0.35, 0))
-    put_logo(ov)
-    hb = Block(align="right").head("Наше до", 104, 0)
-    hb.draw(ov, MARGIN - 40, y - 150)
-    b.draw(ov, MARGIN, y)
-    render_video("04", [("IMG_3358.MOV", 0, None)], ov, f"{OUT}/04_nashe_do.mp4", crop_y=0.05, grade=GRADE_WALL)
+    b = Block().head("Почему не помогут спорт и диета?", 68, 8).ital("Растянутую кожу убирает только хирургия", 32, 0)
+    render_video("04", [("IMG_3374.MOV", 0, None)], caption_overlay(b, 1310), f"{OUT}/04_why.mp4",
+                 crop_y=0.0, zoom=0.80, grade=GRADE_WALL)
 
 
+# ---- 5. bending video
 def s05():
+    b = Block().head("В наклоне", 84, 8).ital("хорошо видно, насколько растянуты ткани груди", 32, 0)
+    render_video("05", [("IMG_3358.MOV", 0, None)], caption_overlay(b, 1310), f"{OUT}/05_bend.mp4",
+                 crop_y=0.0, zoom=0.80, grade=GRADE_WALL)
+
+
+# ---- 6. surgeon photo: plan + one operation
+def s06():
     im = load_photo("DSC00831.JPG")
     c = fit_cover(im, W, H, cy=0.18, cx=0.45).convert("RGBA")
-    b = (Block().head("Одна операция — две зоны", 84, 20).rule()
-         .body("Если есть показания сразу к двум вмешательствам, их можно объединить: один наркоз и один восстановительный период вместо двух.", 30, 26)
-         .ital("Но объединять операции можно не всем. Решение принимаем только после обследования.", 36, 0))
-    y = 1250 - b.height()
-    c.alpha_composite(vgrad(y - 380, y + 120, 0, 0.84)); c.alpha_composite(vgrad(0, 300, 0.25, 0))
+    b = (Block().head("План операции", 84, 18).rule()
+         .bullets(["поднять грудь и вернуть ей форму", "убрать избыток кожи и жира на животе",
+                   "сделать контур талии ровнее"], 30, 22)
+         .body("Обе задачи решаем за одну операцию: один наркоз и один восстановительный период.", 30, 22)
+         .ital("Объединять операции можно не всем — решение только после обследования.", 34, 0))
+    y = 1260 - b.height()
+    c.alpha_composite(vgrad(y - 380, y + 120, 0, 0.86)); c.alpha_composite(vgrad(0, 300, 0.25, 0))
     put_logo(c); b.draw(c, MARGIN, y)
-    save_jpg(c, f"{OUT}/05_one_operation.jpg")
+    save_jpg(c, f"{OUT}/06_plan.jpg")
 
 
-def s06():
+# ---- 7. surgery footage
+def s07():
     b = (Block().head("Что делаем во время операции", 76, 24)
          .plaque("Грудь", 28, 14)
          .body("поднимаем ткани железы, убираем лишнюю кожу и формируем новую, более высокую форму", 29, 24)
          .plaque("Живот", 28, 14)
          .body("удаляем избыток кожи и жира ниже пупка, при необходимости укрепляем мышцы передней брюшной стенки", 29, 0))
-    render_video("06", [("IMG_8058.mov", 0, None)], text_overlay(b, bottom=1250), f"{OUT}/06_surgery.mp4",
+    render_video("07", [("IMG_8058.mov", 0, None)], text_overlay(b, bottom=1250), f"{OUT}/07_surgery.mp4",
                  crop_y=0.0, zoom=1.0, grade="eq=brightness=-0.03:contrast=1.04")
+
+
+# ---- 8. before -> after wipe
+def s08():
+    FPS = 30; cw, ch, cx, cy = 720, 960, (W - 720) // 2, 236
+    views = [("IMG_7465.JPG", "IMG_7475.JPG", "Вид спереди"), ("IMG_7466.JPG", "IMG_7469.JPG", "Вид сбоку")]
+    base = Image.new("RGBA", (W, H), (0, 0, 0, 255)); base.alpha_composite(vgrad(1150, H, 0, 1)); put_logo(base)
+    base = np.asarray(base.convert("RGB")).astype(np.float32)
+    def label_layer(lab, cap):
+        im = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+        fb = bebas(72); tw = fb.getlength(lab); d.text(((W - tw) / 2, cy + ch + 22), lab, font=fb, fill=WHITE)
+        f = mont(28, 300, italic=True); tw = f.getlength(cap); d.text(((W - tw) / 2, cy + ch + 104), cap, font=f, fill=POWDER)
+        a = np.asarray(im).astype(np.float32) / 255; return a[..., :3] * a[..., 3:], a[..., 3:]
+    imgs = []
+    for bf, af, cap in views:
+        bi = np.asarray(body_crop(load_photo(bf), cw / ch).resize((cw, ch), Image.LANCZOS)).astype(np.float32)
+        ai = np.asarray(body_crop(load_photo(af), cw / ch).resize((cw, ch), Image.LANCZOS)).astype(np.float32)
+        imgs.append((bi, ai, label_layer("ДО", cap), label_layer("ПОСЛЕ", cap)))
+    HOLD_B, WIPE, HOLD_A, X = 1.2, 1.5, 2.0, 0.5
+    seg = HOLD_B + WIPE + HOLD_A
+    total = seg * 2 + X
+    xs = np.arange(cw)[None, :, None].astype(np.float32)
+    proc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS),
+                             "-i", "-", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", f"{total:.3f}",
+                             "-c:v", "libx264", "-preset", "medium", "-crf", "17", "-pix_fmt", "yuv420p",
+                             "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", f"{OUT}/08_transition.mp4"],
+                            stdin=subprocess.PIPE)
+    def frame_of(v, t):
+        bi, ai, lb, la = imgs[v]
+        p = min(max((t - HOLD_B) / WIPE, 0), 1); p = p * p * (3 - 2 * p)
+        lx = cw * (1 - p)  # line travels right -> left, "after" is revealed behind it
+        m = np.clip((xs - lx) / 6 + 0.5, 0, 1)
+        cell = bi * (1 - m) + ai * m
+        if 0 < p < 1:
+            glow = np.exp(-((xs - lx) / 5) ** 2)
+            cell = cell * (1 - glow) + np.array(LILAC, np.float32) * glow
+        fr = base.copy(); fr[cy:cy + ch, cx:cx + cw] = cell
+        q = min(max((p - 0.35) / 0.3, 0), 1)
+        for (col, al), w_ in ((lb, 1 - q), (la, q)):
+            if w_ > 0: fr = fr * (1 - al[..., 0:1] * w_) + col * 255 * w_
+        return fr
+    n = int(total * FPS)
+    for i in range(n):
+        t = i / FPS
+        if t < seg: fr = frame_of(0, t)
+        elif t < seg + X:  # cross-fade from front "after" to side "before"
+            k = (t - seg) / X; fr = frame_of(0, seg) * (1 - k) + frame_of(1, 0) * k
+        else: fr = frame_of(1, t - seg - X)
+        proc.stdin.write(np.clip(fr, 0, 255).astype(np.uint8).tobytes())
+    proc.stdin.close(); proc.wait()
+    run(["ffmpeg", "-v", "error", "-y", "-ss", "2.0", "-i", f"{OUT}/08_transition.mp4", "-frames:v", "1", f"{OUT}/08_transition_preview.jpg"])
 
 
 def before_after(name, before, after, caption, out, cut=0.90):
@@ -358,41 +495,47 @@ def before_after(name, before, after, caption, out, cut=0.90):
     save_jpg(c, out)
 
 
-def s07(): before_after("07", "IMG_7465.JPG", "IMG_7475.JPG", "Вид спереди", f"{OUT}/07_before_after_front.jpg")
-def s08(): before_after("08", "IMG_7466.JPG", "IMG_7469.JPG", "Вид сбоку", f"{OUT}/08_before_after_side.jpg")
+def s09(): before_after("09", "IMG_7465.JPG", "IMG_7475.JPG", "Вид спереди", f"{OUT}/09_before_after_front.jpg")
+def s10(): before_after("10", "IMG_7466.JPG", "IMG_7469.JPG", "Вид сбоку", f"{OUT}/10_before_after_side.jpg")
 
 
-def s09():
-    b = (Block().head("Что получили в итоге", 80, 20).rule(0.30, 22)
-         .ital("Грудь приподнята, живот ровный, талия выразительнее. Швы со временем светлеют.", 36, 0))
-    render_video("09", [("IMG_3378.MOV", 0, None)], text_overlay(b, bottom=1260), f"{OUT}/09_result.mp4", crop_y=0.50, grade=GRADE_DARK)
+# ---- 11. after footage, minimal caption
+def s11():
+    b = Block().head("Что получили в итоге", 80, 8).ital("Грудь приподнята, живот ровный, талия выразительнее", 30, 0)
+    render_video("11", [("IMG_3378.MOV", 0, None)], caption_overlay(b, 1310), f"{OUT}/11_result.mp4",
+                 crop_y=0.0, zoom=0.80, grade=GRADE_DARK)
 
 
-def s10():
+# ---- 12. CTA: surgeon photo kept whole (cap to shoulders), white panel below
+def s12():
+    PH = 930
     c = Image.new("RGBA", (W, H), WHITE + (255,))
-    ph = fit_cover(load_photo("DSC00888.JPG"), W, 640, cy=0.20, cx=0.5).convert("RGBA")
+    im = load_photo("DSC00888.JPG")
+    s = W / im.width; sh = im.height * s
+    off = 0.15 * sh  # start just above the surgical cap
+    ph = im.resize((W, round(sh)), Image.LANCZOS).crop((0, int(off), W, int(off) + PH)).convert("RGBA")
     c.alpha_composite(ph, (0, 0))
-    put_logo(c, y=80, alpha=0.95)
-    # soft white fade from photo into the panel
+    put_logo(c, y=70, alpha=0.95)
     arr = np.zeros((H, W, 4), np.uint8); arr[..., :3] = 255
-    ys = np.arange(H)[:, None]; xs = np.arange(W)[None, :]
-    p = np.clip((ys - 520 + (xs / W) * 60) / 160, 0, 1); arr[..., 3] = (p * p * (3 - 2 * p) * 255).astype(np.uint8)
+    ys = np.arange(H)[:, None]; p = np.clip((ys - (PH - 150)) / 150, 0, 1); p = np.broadcast_to(p, (H, W))
+    arr[..., 3] = (p * p * (3 - 2 * p) * 255).astype(np.uint8)
     c.alpha_composite(Image.fromarray(arr, "RGBA"))
-    bw = 820; x = (W - bw) // 2
-    b = (Block(bw, "center").head("Как понять, подходит ли это вам?", 64, 16, color=INK).rule(0.16, 30)
-         .body("Только на очной консультации: оцениваем положение груди, состояние кожи и мышц живота, ваше здоровье и пожелания.", 32, 34, 500, color=INK, lh=1.36))
-    y = b.draw(c, x, 720)
-    f = mont(33, 500); t = "Поэтому жду вас"; tw = f.getlength(t)
-    ImageDraw.Draw(c).text(((W - tw - 44) / 2, y), t, font=f, fill=INK)
-    heart(c, (W - tw - 44) / 2 + tw + 10, y + 4, 32)
-    y += 96
-    b2 = Block(bw, "center").ital("Для записи напишите в Direct «КОНСУЛЬТАЦИЯ» или свяжитесь с нами по телефону +7 926 636 30 00 в WhatsApp, Telegram или MAX.", 31, 0, color=MIST)
-    b2.draw(c, x, y)
-    save_jpg(c, f"{OUT}/10_cta.jpg")
+    bw = 860; x = (W - bw) // 2
+    b = (Block(bw, "center").head("Как понять, подходит ли это вам?", 58, 10, color=INK).rule(0.14, 22)
+         .body("Только на очной консультации — оцениваем именно ваш случай.", 30, 18, 500, color=INK))
+    y = b.draw(c, x, PH - 30)
+    f = mont(31, 500); t = "Жду вас"; tw = f.getlength(t)
+    ImageDraw.Draw(c).text(((W - tw - 42) / 2, y), t, font=f, fill=INK)
+    heart(c, (W - tw - 42) / 2 + tw + 10, y + 4, 30)
+    y += 62
+    Block(bw, "center").ital("Для записи напишите в Direct «КОНСУЛЬТАЦИЯ» или свяжитесь с нами по телефону +7 926 636 30 00 в WhatsApp, Telegram или MAX.", 27, 0, color=MIST).draw(c, x, y)
+    save_jpg(c, f"{OUT}/12_cta.jpg")
 
+
+SLIDES = [s01, s02, s03, s04, s05, s06, s07, s08, s09, s10, s11, s12]
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    for i, fn in enumerate([s01, s02, s03, s04, s05, s06, s07, s08, s09, s10], 1):
+    for i, fn in enumerate(SLIDES, 1):
         if not ONLY or i in ONLY:
             fn(); print("done", i, flush=True)
