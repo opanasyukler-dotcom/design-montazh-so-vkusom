@@ -324,15 +324,8 @@ def body_img(f, w, h, wm_cut=0.90):
 def s01():
     b = (Block().head("Я вроде уже в форме.\nПочему тело всё равно\nне нравится?", 74, 18).rule(0.30, 20)
          .ital("История комплексной коррекции груди и живота", 30, 16).arrows())
-    render_video("01", [("IMG_3375.MOV", 0, None), ("IMG_3376.MOV", 0, None), ("IMG_3377.MOV", 0, None)],
-                 caption_overlay(b, 1300), f"{OUT}/01_cover.mp4", crop_y=0.45, grade=GRADE_DARK)
-
-
-# ---- 2. before footage, minimal caption
-def s02():
-    b = Block().head("Наше до", 84, 8).ital("С этим пациентка пришла на консультацию", 32, 0)
-    render_video("02", [("IMG_3357.MOV", 0, None)], caption_overlay(b, top=210), f"{OUT}/02_before.mp4",
-                 crop_y=0.17, grade=GRADE_WALL)
+    render_video("01", [("IMG_3357.MOV", 0, None)], caption_overlay(b, 1300), f"{OUT}/01_cover.mp4",
+                 crop_y=0.55, grade=GRADE_WALL)
 
 
 # ---- 3. before photo with arrows
@@ -387,20 +380,20 @@ def s03():
     c.alpha_composite(hi)
     f = mont(30, 300, italic=True); cap = "Эти изменения уже не уйдут сами по себе"
     ImageDraw.Draw(c).text(((W - f.getlength(cap)) / 2, 1232), cap, font=f, fill=WHITE)
-    save_jpg(c, f"{OUT}/03_before_arrows.jpg")
+    save_jpg(c, f"{OUT}/02_before_arrows.jpg")
 
 
 # ---- 4. pinch video
 def s04():
     b = Block().head("Почему не помогут спорт и диета?", 68, 8).ital("Растянутую кожу убирает только хирургия", 32, 0)
-    render_video("04", [("IMG_3374.MOV", 0, None)], caption_overlay(b, top=210), f"{OUT}/04_why.mp4",
+    render_video("04", [("IMG_3374.MOV", 0, None)], caption_overlay(b, top=210), f"{OUT}/03_why.mp4",
                  crop_y=0.17, grade=GRADE_WALL)
 
 
 # ---- 5. bending video
 def s05():
     b = Block().head("В наклоне", 84, 8).ital("хорошо видно, насколько растянуты ткани груди", 32, 0)
-    render_video("05", [("IMG_3358.MOV", 0, None)], caption_overlay(b, top=210), f"{OUT}/05_bend.mp4",
+    render_video("05", [("IMG_3358.MOV", 0, None)], caption_overlay(b, top=210), f"{OUT}/04_bend.mp4",
                  crop_y=0.17, grade=GRADE_WALL)
 
 
@@ -416,7 +409,7 @@ def s06():
     y = 1260 - b.height()
     c.alpha_composite(vgrad(y - 380, y + 120, 0, 0.86)); c.alpha_composite(vgrad(0, 300, 0.25, 0))
     put_logo(c); b.draw(c, MARGIN, y)
-    save_jpg(c, f"{OUT}/06_plan.jpg")
+    save_jpg(c, f"{OUT}/05_plan.jpg")
 
 
 # ---- 7. surgery footage
@@ -426,7 +419,7 @@ def s07():
          .body("поднимаем ткани железы, убираем лишнюю кожу и формируем новую, более высокую форму", 29, 24)
          .plaque("Живот", 28, 14)
          .body("удаляем избыток кожи и жира ниже пупка, при необходимости укрепляем мышцы передней брюшной стенки", 29, 0))
-    render_video("07", [("IMG_8058.mov", 0, None)], text_overlay(b, bottom=1250), f"{OUT}/07_surgery.mp4",
+    render_video("07", [("IMG_8058.mov", 0, None)], text_overlay(b, bottom=1250), f"{OUT}/06_surgery.mp4",
                  crop_y=0.0, zoom=1.0, grade="eq=brightness=-0.03:contrast=1.04")
 
 
@@ -453,7 +446,7 @@ def s08():
     proc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS),
                              "-i", "-", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", f"{total:.3f}",
                              "-c:v", "libx264", "-preset", "medium", "-crf", "17", "-pix_fmt", "yuv420p",
-                             "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", f"{OUT}/08_transition.mp4"],
+                             "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", f"{OUT}/07_transition.mp4"],
                             stdin=subprocess.PIPE)
     def frame_of(v, t):
         bi, ai, lb, la = imgs[v]
@@ -478,7 +471,7 @@ def s08():
         else: fr = frame_of(1, t - seg - X)
         proc.stdin.write(np.clip(fr, 0, 255).astype(np.uint8).tobytes())
     proc.stdin.close(); proc.wait()
-    run(["ffmpeg", "-v", "error", "-y", "-ss", "2.0", "-i", f"{OUT}/08_transition.mp4", "-frames:v", "1", f"{OUT}/08_transition_preview.jpg"])
+    run(["ffmpeg", "-v", "error", "-y", "-ss", "2.0", "-i", f"{OUT}/07_transition.mp4", "-frames:v", "1", f"{OUT}/07_transition_preview.jpg"])
 
 
 def before_after(name, before, after, caption, out, cut=0.90):
@@ -499,14 +492,14 @@ def before_after(name, before, after, caption, out, cut=0.90):
     save_jpg(c, out)
 
 
-def s09(): before_after("09", "IMG_7465.JPG", "IMG_7475.JPG", "Вид спереди", f"{OUT}/09_before_after_front.jpg")
-def s10(): before_after("10", "IMG_7466.JPG", "IMG_7469.JPG", "Вид сбоку", f"{OUT}/10_before_after_side.jpg")
+def s09(): before_after("09", "IMG_7465.JPG", "IMG_7475.JPG", "Вид спереди", f"{OUT}/08_before_after_front.jpg")
+def s10(): before_after("10", "IMG_7466.JPG", "IMG_7469.JPG", "Вид сбоку", f"{OUT}/09_before_after_side.jpg")
 
 
 # ---- 11. after footage, minimal caption
 def s11():
     b = Block().head("Что получили в итоге", 80, 8).ital("Грудь приподнята, живот ровный, талия выразительнее", 30, 0)
-    render_video("11", [("IMG_3378.MOV", 0, None)], caption_overlay(b, 1310), f"{OUT}/11_result.mp4",
+    render_video("11", [("IMG_3378.MOV", 0, None)], caption_overlay(b, 1310), f"{OUT}/10_result.mp4",
                  crop_y=0.60, grade=GRADE_DARK)
 
 
@@ -533,10 +526,10 @@ def s12():
     heart(c, (W - tw - 42) / 2 + tw + 10, y + 4, 30)
     y += 62
     Block(bw, "center").ital("Для записи напишите в Direct «КОНСУЛЬТАЦИЯ» или свяжитесь с нами по телефону +7 926 636 30 00 в WhatsApp, Telegram или MAX.", 27, 0, color=MIST).draw(c, x, y)
-    save_jpg(c, f"{OUT}/12_cta.jpg")
+    save_jpg(c, f"{OUT}/11_cta.jpg")
 
 
-SLIDES = [s01, s02, s03, s04, s05, s06, s07, s08, s09, s10, s11, s12]
+SLIDES = [s01, s03, s04, s05, s06, s07, s08, s09, s10, s11, s12]
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)

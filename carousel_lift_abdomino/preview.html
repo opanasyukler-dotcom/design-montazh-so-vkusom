@@ -42,7 +42,7 @@ body{font-family:var(--body);padding-inline:16px;padding-block:24px 40px}
   </header>
   <div class="viewport">
     <div class="track" id="track"></div>
-    <span class="count" id="count">1/12</span>
+    <span class="count" id="count">1/11</span>
     <button class="nav prev" id="prev" aria-label="Предыдущий слайд">‹</button>
     <button class="nav next" id="next" aria-label="Следующий слайд">›</button>
   </div>
@@ -52,8 +52,8 @@ body{font-family:var(--body);padding-inline:16px;padding-block:24px 40px}
 <p class="hint">Листайте свайпом или стрелками. Видео в слайдах без звука, музыку добавляют при публикации.</p>
 
 <script>
-const S=["01_cover.mp4","02_before.mp4","03_before_arrows.jpg","04_why.mp4","05_bend.mp4","06_plan.jpg",
-"07_surgery.mp4","08_transition.mp4","09_before_after_front.jpg","10_before_after_side.jpg","11_result.mp4","12_cta.jpg"];
+const S=["01_cover.mp4","02_before_arrows.jpg","03_why.mp4","04_bend.mp4","05_plan.jpg",
+"06_surgery.mp4","07_transition.mp4","08_before_after_front.jpg","09_before_after_side.jpg","10_result.mp4","11_cta.jpg"];
 const track=document.getElementById("track"),dots=document.getElementById("dots"),count=document.getElementById("count");
 S.forEach((f,i)=>{
   const s=document.createElement("div");s.className="slide";
