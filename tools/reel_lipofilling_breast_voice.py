@@ -57,6 +57,22 @@ def dark_grad(img, y0, y1):
     img[:] = (img * (1 - a)).astype(np.uint8)
 dark_grad(PO, 1760, 1960)                      # soft black over the lowered jeans
 top = COL[:1250]; dark_grad(top, 840, 980)    # same on the "after" half of the collage
+# --- even out the grade: same skin brightness/tone for every before/after source (black stays black) ---
+TGT = np.array([148.0, 140.5, 146.5])
+def cm_params(rgb_u8):
+    lab = cv2.cvtColor(rgb_u8, cv2.COLOR_RGB2LAB).reshape(-1, 3).astype(np.float32); m = lab[:, 0] > 60
+    mu = lab[m].mean(0); return TGT[0] / mu[0], TGT[1:] - mu[1:]
+def cm_apply(rgb_u8, prm):
+    g, d = prm; lab = cv2.cvtColor(rgb_u8, cv2.COLOR_RGB2LAB).astype(np.float32)
+    w = np.clip(lab[..., :1] / 60, 0, 1)
+    lab[..., 0] *= g; lab[..., 1:] += d * w
+    return cv2.cvtColor(np.clip(lab, 0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB)
+PO[:] = cm_apply(PO, cm_params(PO)); DO[:] = cm_apply(DO, cm_params(DO))
+COL[:1250] = cm_apply(np.ascontiguousarray(COL[:1250]), cm_params(np.ascontiguousarray(COL[:1060])))
+COL[1250:] = cm_apply(np.ascontiguousarray(COL[1250:]), cm_params(np.ascontiguousarray(COL[1260:])))
+_VPRM = cm_params(V[500]); _vframe = vframe
+def vframe(*a, **k):
+    f = _vframe(*a, **k); return cm_apply((np.clip(f, 0, 1) * 255).astype(np.uint8), _VPRM).astype(np.float32) / 255
 T_NOIMP = Txt([("ВЫПОЛНИМ УВЕЛИЧЕНИЕ ГРУДИ", "H"), ("БЕЗ ИМПЛАНТОВ", "HB")], size=64)
 T_NAME = Txt([("ИРИНА", "H"), ("пациентка, мама двоих детей", "S")], size=50, align="L", x=70)
 
@@ -86,10 +102,18 @@ def render(t):
         fr = grade(mblur(vframe(src + (t - s0) * 0.8, z * tz), t - s0))
         bracket(fr, t, t0 + 0.3, ["И ДАЛЬШЕ РЕШЕНИЕ", "ПРИШЛО БЫСТРО"], 1250, 62, t1 - 0.15)
     elif n == "after":
-        tz, flash = trans(t, t0, True)
-        fr = grade(photo(PO, MPO, (1.12 - 0.08 * ease(lt / 3.3)) * tz))
-        slide_chip(fr, CH_PO, 60, 228, t, t0 + 1.0)
-        T_AFT.draw(fr, 1215, t, t0 + 1.0, t1 - 0.1, cps=32)
+        # smooth before -> after: both photos aligned on the stickers, a soft wipe sweeps ДО into ПОСЛЕ
+        z = 1.12 - 0.08 * ease(lt / 3.3)
+        a_ = photo(DO, MDO, z); b_ = photo(PO, MPO, z)
+        p = ease((lt - 0.35) / 1.0); f = 0.35
+        m = np.clip((p * (1 + f) - np.arange(W)[None, :, None] / W) / f, 0, 1)
+        fr = grade(a_ * (1 - m) + b_ * m)
+        if 0 < p < 1:
+            ex = int((p * (1 + f) - f / 2) * W)
+            if 0 < ex < W: fr[:, max(0, ex - 2):ex + 2] = fr[:, max(0, ex - 2):ex + 2] * 0.5 + 0.5
+        slide_chip(fr, CH_DO, 60, 228, t, t0 - 0.2, t0 + 0.7)
+        slide_chip(fr, CH_PO, 60, 228, t, t0 + 1.05)
+        T_AFT.draw(fr, 1215, t, t0 + 1.35, t1 - 0.1, cps=40)
     elif n == "split":
         fr = np.zeros((H, W, 3), np.float32); z = 1.0 + 0.03 * lt / 4
         top = np.ascontiguousarray(vframe(16.0 + lt, 1.3 * z, fyo=-60)[400:1360]); bot = photo(PO, MPO, z, dy=-330, size=(W, 960))
