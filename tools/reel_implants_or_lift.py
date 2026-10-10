@@ -7,12 +7,12 @@ SP = "/tmp/claude-0/-home-user-design-montazh-so-vkusom/b26b20a4-6ac5-50f8-8404-
 BLUE = (16, 46, 70); WHITE = (255, 255, 255); POWDER = (228, 210, 210)
 def osw(s): return ImageFont.truetype(SP + "v14/fonts/BN-Bold.ttf", s)          # Bebas Neue (Cyrillic)
 def mont(w, s): return ImageFont.truetype(SP + f"fonts2/M{w}.ttf", s)
-SUBS = []; DUR = 26.0
+SUBS = []; DUR = 32.5
 exec(open("helpers_src.py").read())
 
 # ---------------- timeline (music: "One more", offset 17.44s; hits at 0, 3.27, 7.43, 10.54, drop 13.91) ----------------
-BL = [("hook", 0, 3.27), ("mark", 3.27, 7.43), ("task", 7.43, 10.54), ("or", 10.54, 13.91),
-      ("reveal", 13.91, 17.94), ("compare", 17.94, 22.45), ("final", 22.45, DUR)]
+BL = [("hook", 0, 3.27), ("mark", 3.27, 7.43), ("task", 7.43, 10.54), ("or", 10.54, 15.42), ("after", 15.42, 19.44),
+      ("compare", 19.44, 23.45), ("final", 23.45, 26.96), ("col1", 26.96, 29.72), ("col2", 29.72, DUR)]
 HITS = [0.0, 3.27, 7.43, 10.54, 11.19]
 BEATS = 13.91 + 0.5017 * np.arange(30)
 def block(t):
@@ -134,8 +134,21 @@ def cmp_top(lt):
 def cmp_bot(lt):
     f = PO.get(int((7.2 + lt * 0.18) * 30)); return warp(f, 1.2, 620, 690, 540, 470, (W, 960))[0]
 
+PAFT = cv2.cvtColor(cv2.imread("dl/После"), cv2.COLOR_BGR2RGB)
+def short_arrow(fr, t, t0, src, tgt, al, L=125, bend=0.25):
+    d = np.asarray(src, float) - tgt; d /= max(np.linalg.norm(d), 1e-6)
+    arrow(fr, t, t0, tgt + d * L, tgt + d * 12, bend, al, dur=0.3)
+def brackets(fr, t, t0, c, hw, hh, al=1.0):
+    if t < t0: return
+    p = ease((t - t0) / 0.35); s = 1.18 - 0.18 * p; a = min(1, (t - t0) / 0.15) * al
+    x0, x1, y0, y1 = c[0] - hw * s, c[0] + hw * s, c[1] - hh * s, c[1] + hh * s; L = 80
+    for (x, y, dx, dy) in [(x0, y0, 1, 1), (x1, y0, -1, 1), (x0, y1, 1, -1), (x1, y1, -1, -1)]:
+        stroke(fr, np.array([[x, y + dy * L], [x, y], [x + dx * L, y]], float), a, th=6)
+def column(img, z, cx, cy, oy=500):
+    return warp(img, z, cx, cy, 270, oy, (540, H))[0]
+
 def render(t):
-    n, t0, t1 = block(t); lt = t - t0
+    n, t0, t1 = block(t); lt = t - t0; flash = 0
     if n == "hook":
         if t < 1.95:
             fr, _ = warp(do_frame(6.6 + t * 0.9), 1.55 + 0.04 * t, 560, 560, 540, 700)
@@ -149,53 +162,54 @@ def render(t):
         fr, M = warp(MK.get(int(st * 30)), 1.0 * trans(t, t0), 540, 960); fr = mblur(fr, lt)
         chip(fr, CH_DO, 60, 228, t, t0 + 0.05)
         s = mp(M, (cx, cy)); rr = r * M[0, 0]
-        tgt = [s + np.array([-1.3 * rr, 1.2 * rr]), s + np.array([-0.3 * rr, -2.6 * rr]), s + np.array([5.8 * rr, -0.6 * rr])]
+        tgt = [s + np.array([-1.2 * rr, 1.25 * rr]), s + np.array([-0.4 * rr, -2.3 * rr]), s + np.array([5.6 * rr, -0.4 * rr])]
+        frm = [s + np.array([-4 * rr, 3 * rr]), s + np.array([-3.5 * rr, -4 * rr]), s + np.array([6.5 * rr, 3 * rr])]
         tb = 6.0
         if t < tb + 0.25:
             T_SEE.draw(fr, 1130, t, t0 + 0.1, tb, cps=34)
             for k, (txt, d0) in enumerate([("небольшой объём", 1.0), ("недостаточная наполненность сверху", 1.6), ("лёгкая асимметрия", 2.2)]):
                 res = bullet(fr, t, t0 + d0, txt, 70, 1260 + k * 70, size=36, t1=tb)
-                if res is not None and t < tb:
-                    a, al = res; arrow(fr, t, t0 + d0 + 0.15, a if k != 1 else a + np.array([0, -20]), tgt[k], 0.22 if k != 2 else -0.25, al)
+                if res is not None and t < tb: short_arrow(fr, t, t0 + d0 + 0.1, frm[k], tgt[k], res[1], bend=0.2 if k != 2 else -0.2)
         T_NOLIFT.draw(fr, 1120, t, tb + 0.05, t1 - 0.05, cps=32)
     elif n == "task":
         st = 8.6 + lt; cx, cy, r = TRK[int(st * 30)]
         z = 1.3 * trans(t, t0)
         fr, M = warp(MK.get(int(st * 30)), z, cx - 60, cy - 40, 540, 760); fr = mblur(fr, lt)
         s = mp(M, (cx, cy)); rr = r * z
-        tgt = [s + np.array([-1.4 * rr, 0.9 * rr]), s + np.array([-0.2 * rr, -2.4 * rr]), s + np.array([-3.4 * rr, 0.2 * rr])]
+        tgt = [s + np.array([-1.3 * rr, 1.0 * rr]), s + np.array([-0.3 * rr, -2.2 * rr]), s + np.array([-3.0 * rr, 0.3 * rr])]
+        frm = [s + np.array([-3 * rr, 3.5 * rr]), s + np.array([-3 * rr, -4 * rr]), s + np.array([-6 * rr, 1.5 * rr])]
         T_TASK.draw(fr, 1150, t, t0 + 0.08, t1 - 0.05, cps=30)
         for k, (txt, d0) in enumerate([("добавить объём", 0.55), ("сделать грудь более наполненной", 1.15), ("сохранить естественные пропорции", 1.75)]):
             res = bullet(fr, t, t0 + d0, txt, 70, 1300 + k * 72, size=36, t1=t1 - 0.05)
-            if res is not None:
-                a, al = res; arrow(fr, t, t0 + d0 + 0.15, a, tgt[k], 0.25 if k != 2 else -0.3, al)
+            if res is not None: short_arrow(fr, t, t0 + d0 + 0.1, frm[k], tgt[k], res[1], bend=0.2)
     elif n == "or":
-        if t < 12.2:
-            fr, _ = warp(OR.get(int((1.0 + lt) * 30)), 1.08 * trans(t, t0), 540, 900, 540, 900)
-            fr = np.clip((fr - 0.04) * 1.18, 0, 1)
-        elif t < 13.05:
-            fr = mblur(photo(P7446, 1.06 * trans(t, 12.2) + 0.03 * (t - 12.2)), t - 12.2); fr = np.clip(fr * 1.12, 0, 1)
+        if t < 12.9:
+            c0 = 11.19 if t >= 11.19 else t0
+            fr, _ = warp(OR.get(int((1.0 + lt) * 30)), (1.06 + 0.04 * lt) * trans(t, c0, 0.1), 540, 880, 540, 880)
+            fr = np.clip((fr - 0.04) * 1.2, 0, 1); bc = (540, 870)
+        elif t < 13.91:
+            fr = mblur(photo(P7446, 1.06 * trans(t, 12.9, 0.1) + 0.03 * (t - 12.9)), t - 12.9); fr = np.clip(fr * 1.12, 0, 1); bc = (560, 820)
         else:
-            fr = mblur(photo(P7444, 1.04 * trans(t, 13.05) + 0.03 * (t - 13.05)), t - 13.05); fr = np.clip(fr * 1.12, 0, 1)
-        T_OR.draw(fr, 1330, t, 12.22, t1 - 0.05, cps=34)
-    elif n == "reveal":
-        tw = 14.9
-        a_ = warp(do_frame(8.0 + lt * 0.6), 1.55, 562, 560, 540, 700)[0] if t < tw + 0.45 else None
-        b_ = warp(PO.get(int((6.4 + max(0, t - tw) * 0.9) * 30)), 1.0, 600, 860, 540, 760)[0] if t > tw else None
-        if t >= 16.42:
-            b_ = warp(PO.get(int((3.25 + (t - 16.42) * 0.8) * 30)), 1.05 * trans(t, 16.42), 470, 860, 540, 760)[0]; b_ = mblur(b_, t - 16.42)
-        if b_ is None: fr = a_
-        elif a_ is None: fr = b_
-        else:
-            # light-sweep transition: diagonal wipe with a soft dark edge + zoom blur on the outgoing frame
-            p = ease((t - tw) / 0.45); edge = (xx_ * 0.55 + yy_) / (W * 0.55 + H)
+            fr = photo(P7444, 1.08 * trans(t, 13.91, 0.14) + 0.025 * (t - 13.91)); fr = np.clip(fr * 1.12, 0, 1); bc = (540, 860)
+            flash = 0.6 * max(0, 1 - (t - 13.91) / 0.2)
+        fr *= 1 - 0.38 * EDGE                                         # spotlight on the result
+        brackets(fr, t, 10.75 if t < 12.9 else (12.9 if t < 13.91 else 13.91), bc, 400, 340, 0.95)
+        T_OR.draw(fr, 1350, t, 12.05, t1 - 0.05, cps=34)
+    elif n == "after":
+        tw = t0
+        b_ = warp(PO.get(int((6.4 + lt * 0.9) * 30)), 1.0, 600, 860, 540, 760)[0]
+        if t >= 17.94:
+            b_ = warp(PO.get(int((3.25 + (t - 17.94) * 0.8) * 30)), 1.05 * trans(t, 17.94), 470, 860, 540, 760)[0]; b_ = mblur(b_, t - 17.94)
+        if lt < 0.45:
+            a_ = photo(P7444, 1.08 + 0.025 * (t - 13.91)); a_ = np.clip(a_ * 1.12, 0, 1) * (1 - 0.38 * EDGE)
+            p = ease(lt / 0.45); edge = (xx_ * 0.55 + yy_) / (W * 0.55 + H)
             m = np.clip((p * 1.25 - edge) / 0.12, 0, 1)[..., None]
             a_ = cv2.resize(a_[int(H * 0.04 * p):H - int(H * 0.04 * p), int(W * 0.04 * p):W - int(W * 0.04 * p)], (W, H))
             fr = a_ * (1 - m) + b_ * m
             band = np.exp(-((p * 1.25 - edge - 0.06) / 0.05) ** 2)[..., None]; fr = fr * (1 - 0.6 * band)
-        if t < tw + 0.2: chip(fr, CH_DO, 60, 228, t, t0, tw)
-        chip(fr, CH_PO, 60, 228, t, tw + 0.35)
-        for k, (txt, d0) in enumerate([("больше объёма", 15.42), ("больше наполненности", 15.92), ("без подтяжки", 16.43)]):
+        else: fr = b_
+        chip(fr, CH_PO, 60, 228, t, t0 + 0.4)
+        for k, (txt, d0) in enumerate([("больше объёма", 16.42), ("больше наполненности", 16.92), ("без подтяжки", 17.42)]):
             bullet(fr, t, d0, txt, 70, 1240 + k * 82, mark="plus", size=44)
     elif n == "compare":
         fr = np.zeros((H, W, 3), np.float32)
@@ -207,18 +221,31 @@ def render(t):
         if pb > 0:
             r_ = np.zeros((190, int(W * pb), 4), np.float32); r_[..., :3] = np.float32(BLUE) / 255; r_[..., 3] = 0.93; blend(fr, r_, 0, 865, 1)
         T_CMP.draw(fr, 870, t, t0 + 0.6, t1 - 0.05, cps=34)
-    else:
+    elif n == "final":
         st = 1.55 + lt * 0.55
         fr, _ = warp(PO.get(int(st * 30)), 1.0 * trans(t, t0) + 0.02 * lt, 540, 900, 540, 820); fr = mblur(fr, lt)
         chip(fr, CH_PO, 60, 228, t, t0 + 0.1)
-        T_FIN.draw(fr, 1160, t, t0 + 0.2, 1e9, cps=30)
-    fr = dark_fx(fr, t)
+        T_FIN.draw(fr, 1160, t, t0 + 0.2, t1 - 0.05, cps=30)
+    else:
+        # result collages: ДО | ПОСЛЕ side by side, held so the result can be examined
+        z = (1 + 0.025 * lt) * trans(t, t0, 0.08)
+        if n == "col1":
+            L = column(do_frame(7.9 + lt * 0.12), 1.56 * z, 562, 483); R = column(PAFT, 0.94 * z, 757, 532)
+        else:
+            L = column(do_frame(1.0 + lt * 0.1), 3.0 * z, 700, 430, 640); R = column(PO.get(int((3.45 + lt * 0.1) * 30)), 1.0 * z, 360, 860, 640)
+        fr = np.zeros((H, W, 3), np.float32)
+        o1 = -140 * (1 - ease(lt / 0.3)); o2 = 140 * (1 - ease(lt / 0.3))
+        fr[:, :540] = cv2.warpAffine(L, np.float32([[1, 0, o1], [0, 1, 0]]), (540, H)); fr[:, 540:] = cv2.warpAffine(R, np.float32([[1, 0, o2], [0, 1, 0]]), (540, H))
+        fr[:, 537:543] = 1.0 * min(1, lt / 0.4)
+        chip(fr, CH_DO, 40, 228, t, t0 + 0.3); chip(fr, CH_PO, 580, 228, t, t0 + 0.4)
+    fr = dark_fx(fr, t) if n not in ("col1", "col2") else fr * (1 - 0.15 * EDGE)
     blend(fr, LOGO, 540 - LOGO.shape[1] / 2, 120, 0.9)
+    if flash > 0: fr = fr * (1 - flash) + flash
     if t > DUR - 0.7: fr *= 1 - 0.9 * (t - (DUR - 0.7)) / 0.7
     return np.clip(fr, 0, 1)
 
 # typed lines for the keyboard SFX: (start, cps, text)
-TYPED = [(0.12, 30, T_HOOK), (3.37, 34, T_SEE), (6.05, 32, T_NOLIFT), (7.51, 30, T_TASK), (12.22, 34, T_OR), (18.54, 34, T_CMP), (22.65, 30, T_FIN)]
+TYPED = [(0.12, 30, T_HOOK), (3.37, 34, T_SEE), (6.05, 32, T_NOLIFT), (7.51, 30, T_TASK), (12.05, 34, T_OR), (20.04, 34, T_CMP), (23.65, 30, T_FIN)]
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
