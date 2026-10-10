@@ -23,66 +23,71 @@ BEAT = 0.5
 
 # ---------------------------------------------------------------- edit decision list (cut to the narration)
 # tile: (src_start, speed, kind, cx, zoom, delay)  kind c = full frame, l = collage tile; speed None = fit to the shot
-def C(src, sp=None, z=1.0, cx=.5): return (src, sp, "c", cx, z, 0.0)
-def Lt(src, delay=0.0, sp=None): return (src, sp, "l", .5, 1.0, delay)
+def C(src, sp=None, z=1.0, cx=.5, f=None): return (src, sp, "c", cx, z, 0.0, f)
+def Lt(src, delay=0.0, sp=None, f=None): return (src, sp, "l", .5, 1.0, delay, f)
+# extra camera originals (single continuous takes, 25 fps, Sony warm white balance → matched to the vlog in build_tiles)
+def X(name, src, **kw): return C(src, f=name, **kw)
+def XL(name, src, delay=0.0): return Lt(src, delay, f=name)
 EDL = [  # (t0, layout, tiles); a segment lasts until the next one starts
     (0.00, "crop", [C(4.92)]),                                   # window — title, «Каждое утро она надеялась»
     (3.50, "crop", [C(4.12)]),                                   # «что сегодня всё пойдёт
-    (4.80, "crop", [C(5.88)]),                                   #   по плану»
+    (4.80, "crop", [X("C0368", 0.5)]),                           #   по плану» — baby gym
     (6.20, "crop", [C(31.96)]),                                  # «Но, как известно, в доме, где есть маленький ребёнок»
-    (9.50, "crop", [C(28.16)]),                                  # «планы строит
-    (10.60, "crop", [C(29.20)]),                                 #   только один человек»
-    (11.80, "crop", [C(19.30, 1.0)]),                            # «И это не мама»
-    (13.30, "crop", [C(6.88)]),                                  # «Поэтому утро начиналось
+    (9.50, "crop", [X("C0369", 2.6)]),                           # «планы строит только один человек» — little feet
+    (11.80, "crop", [X("C0372", 9.2)]),                          # «И это не мама» — tired face
+    (13.30, "crop", [X("C0381", 1.6)]),                          # «Поэтому утро начиналось — kettle on
     (14.60, "crop", [C(7.88)]),                                  #   с кофе»
     (15.80, "crop", [C(11.20)]),                                 # «Единственного, что ещё связывало её
     (17.20, "crop", [C(12.24)]),                                 #   с прежней жизнью»
     (19.60, "crop", [C(25.00)]),                                 # «Затем наступало время бутылочек»
-    (21.40, "col2", [Lt(25.30), Lt(36.48, .5)]),                 # «Иногда ей казалось, что она моет их гораздо чаще,
-    (24.00, "crop", [C(0.30, 1.0)]),                             #   чем моется сама»
+    (21.40, "crop", [X("C0376", 6.6)]),                          # «Иногда ей казалось, что она моет их гораздо чаще,
+    (24.00, "crop", [X("C0376", 14.2)]),                         #   чем моется сама»
     (26.80, "crop", [C(8.68)]),                                  # «Дальше был завтрак»
     (29.00, "crop", [C(21.32)]),                                 # «Она уже давно перестала надеяться,
     (31.00, "crop", [C(13.92)]),                                 #   что когда-нибудь
     (32.30, "crop", [C(26.16)]),                                 #   съест его горячим»
-    (33.90, "col2", [Lt(28.16), Lt(29.20, .5)]),                 # «А у маленькой хозяйки дома
+    (33.90, "crop", [X("C0369", 10.0)]),                         # «А у маленькой хозяйки дома
     (35.90, "crop", [C(27.16)]),                                 #   тем временем было полно дел»
     (37.80, "crop", [C(5.88)]),                                  # «Игрушки,
     (39.00, "crop", [C(29.30)]),                                 #   погремушки»
     (40.40, "crop", [C(28.16)]),                                 # «и первые попытки исследовать этот огромный мир»
     (42.60, "crop", [C(24.08)]),                                 # «И пока малышка была занята,
-    (44.20, "crop", [C(14.76, 1.0)]),                            #   её мама совершила практически невозможное»
+    (44.20, "crop", [X("C0372", 0.2)]),                          #   её мама совершила практически невозможное»
     (47.60, "crop", [C(30.04)]),                                 # «Она умылась»
     (49.35, "crop", [C(30.96)]),                                 # «Вскоре ребёнок уснул»
-    (51.00, "crop", [C(4.92)]),                                  # «В квартире наконец наступила тишина»
-    (53.60, "crop", [C(16.00, 1.0)]),                            # «Но опыт подсказывал ей,
+    (51.00, "crop", [X("C0385", 22.6)]),                         # «В квартире наконец наступила тишина» — empty bedroom
+    (53.60, "crop", [X("C0366", 19.6)]),                         # «Но опыт подсказывал ей,
     (56.40, "crop", [C(22.72)]),                                 #   что радоваться раньше времени не стоит»
-    (58.80, "col3", [Lt(6.88), Lt(25.00, .8), Lt(27.16, 1.6)]),  # «Потому что совсем скоро всё начнётся заново»
-    (62.15, "crop", [C(35.68)]),                                 # «Бутылочки,
+    (58.80, "col3", [XL("C0387", 4.6), XL("C0380", 0.4, .8), XL("C0376", 7.6, 1.6)]),  # «Потому что совсем скоро всё начнётся заново»
+    (62.15, "crop", [X("C0379", 3.4)]),                          # «Бутылочки,
     (63.00, "crop", [C(36.48)]),                                 #   смесь,
     (63.65, "crop", [C(37.20)]),                                 #   кормление»
-    (64.95, "crop", [C(38.00)]),                                 # «И вот наконец они вышли на прогулку»
+    (64.95, "crop", [X("C0366", 2.6)]),                          # «И вот наконец они вышли
+    (66.55, "crop", [C(38.00)]),                                 #   на прогулку»
     (68.10, "crop", [C(41.60)]),                                 # «Она купила себе второй кофе
     (69.50, "crop", [C(40.04)]),                                 #   и на несколько минут почувствовала,
     (71.60, "crop", [C(44.76)]),                                 #   что снова контролирует свою жизнь»
     (75.50, "col2", [Lt(42.60), Lt(43.72, .6)]),                 # «Разумеется, это была лишь иллюзия»
     (77.90, "crop", [C(47.60)]),                                 # «Ведь настоящей хозяйке этого дома
-    (80.20, "col3", [Lt(28.16), Lt(24.08, .6), Lt(30.96, 1.2)]), #   ещё даже не исполнился год»
+    (80.20, "col3", [XL("C0369", 13.2), XL("C0368", 2.5, .6), Lt(30.96, 1.2)]),  #   ещё даже не исполнился год»
 ]
 DUR = 84.6
 SEGS = [dict(t0=a, t1=(EDL[k + 1][0] if k + 1 < len(EDL) else DUR), lay=lay, tiles=t) for k, (a, lay, t) in enumerate(EDL)]
 NFR = int(round(DUR * FPS))
 # every tile stays inside its source shot (shot boundaries from histogram cut detection, 25 fps proxy):
 # speed = what the shot can give (≤1, ≥0.3); anything still missing is a freeze on the last frame
+XDUR = {f: float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f"add/{f}.MP4"],
+                                capture_output=True, text=True).stdout) for f in sorted({t[6] for _, _, ts in EDL for t in ts if t[6]})}
 SHOTS = [0.0, 3.64, 4.12, 4.92, 5.88, 6.88, 7.88, 8.68, 10.48, 11.2, 12.24, 13.92, 14.76, 21.32, 22.72, 24.08, 25.0, 26.16, 27.16, 28.16,
          29.2, 30.04, 30.96, 31.96, 35.08, 35.68, 36.48, 37.2, 38.0, 40.04, 41.6, 42.6, 43.72, 44.76, 47.6, 48.64, 49.9]
 for s_ in SEGS:
     nt = []
-    for (src, sp, kind, cx, z, delay) in s_["tiles"]:
+    for (src, sp, kind, cx, z, delay, f) in s_["tiles"]:
         vis = (s_["t1"] - s_["t0"]) - delay
-        end = min(b for b in SHOTS if b > src + 0.01) - 0.08
+        end = (XDUR[f] - 0.1) if f else min(b for b in SHOTS if b > src + 0.01) - 0.08
         fit = min(1.0, max(0.3, (end - src) / vis))
         sp = fit if sp is None else min(sp, max(0.3, (end - src) / vis))
-        nt.append((src, round(sp, 3), kind, cx, z, delay, end))
+        nt.append((src, round(sp, 3), kind, cx, z, delay, end, f))
     s_["tiles"] = nt
 for i, s in enumerate(SEGS):
     s["f0"], s["f1"] = int(round(s["t0"] * FPS)), int(round(s["t1"] * FPS)); s["i"] = i
@@ -93,12 +98,27 @@ def tsize(s, ti):
     if s["lay"] == "crop": return W, H
     if s["lay"] == "col2": return 880, 495
     return (1120, 630) if ti == 0 else (660, 371)
+_grade = {}
+def match_grade(f):
+    """camera originals are much warmer/more saturated than the vlog: pull white balance ~70% toward the vlog's near-neutral
+    grey, keep luminance, trim saturation"""
+    if f not in _grade:
+        acc = []
+        for t in np.linspace(0.5, XDUR[f] - 0.5, 5):
+            b = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{t:.2f}", "-i", f"add/{f}.MP4", "-frames:v", "1", "-vf", "scale=320:180",
+                                "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True).stdout
+            acc.append(np.frombuffer(b, np.uint8).reshape(-1, 3).astype(np.float64).mean(0))
+        m = np.mean(acc, 0); tgt = m.mean() * np.array([1.03, 1.0, 0.98])
+        g = (tgt / m) ** 0.7; g /= (g * m * [0.2126, 0.7152, 0.0722]).sum() / (m * [0.2126, 0.7152, 0.0722]).sum()
+        _grade[f] = f"colorchannelmixer=rr={g[0]:.4f}:gg={g[1]:.4f}:bb={g[2]:.4f},eq=saturation=0.8"
+        print("grade", f, m.round(1), _grade[f], flush=True)
+    return _grade[f]
 def tile_path(si, ti): return f"tiles/s{si:02d}_{ti}.mkv"
 def build_tiles(only=None):
     os.makedirs("tiles", exist_ok=True)
     for s in SEGS:
         if only is not None and s["i"] not in only: continue
-        for ti, (src, sp, kind, cx, z, delay, end) in enumerate(s["tiles"]):
+        for ti, (src, sp, kind, cx, z, delay, end, f) in enumerate(s["tiles"]):
             n = s["f1"] - s["f0"] - int(round(delay * FPS))
             if kind == "c" and z == 1.0:
                 geo = "null"                                         # native 3840x2160: no crop, no scale
@@ -110,8 +130,9 @@ def build_tiles(only=None):
             # slow motion: blend neighbouring source frames instead of duplicating them (smooth, no stutter)
             rate = f"framerate=fps={FPS}:interp_start=0:interp_end=255:scene=100" if sp < 0.95 else f"fps={FPS}"
             vf = f"{geo},setpts=(PTS-STARTPTS)/{sp},{rate}"
-            subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{src:.3f}", "-t", f"{min(n / FPS * sp + 0.3, end - src):.3f}", "-i", SRC, "-an",
-                            "-vf", vf, "-frames:v", str(n), "-c:v", "ffv1", "-level", "3", "-pix_fmt", "yuv420p", tile_path(s["i"], ti)], check=True)
+            if f: vf = f"{match_grade(f)},{vf}"
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{src:.3f}", "-t", f"{min(n / FPS * sp + 0.3, end - src):.3f}", "-i", f"add/{f}.MP4" if f else SRC, "-an",
+                            "-vf", vf, "-frames:v", str(n), "-c:v", "libx264", "-preset", "fast", "-crf", "6", "-pix_fmt", "yuv420p", tile_path(s["i"], ti)], check=True)
         print("tiles", s["i"], [t[1] for t in s["tiles"]], flush=True)
 
 # ---------------------------------------------------------------- drawing helpers
@@ -425,16 +446,22 @@ def audio(out_path):
     def whoosh(d=0.35, lo=600, hi=6000):
         m = int(d * SR); t = np.linspace(0, 1, m); x = rng.standard_normal(m); return norm(bp(x, lo, hi) * np.sin(np.pi * t) ** 2)
     fol = np.zeros(n)
-    put(fol, pour(1.1, 450, 1250), 13.35, 0.30); put(fol, pour(1.0, 350, 900), 14.65, 0.22)
+    put(fol, pour(1.0, 350, 900), 14.65, 0.22)
     put(fol, clink(), 16.9, 0.12); put(fol, sip(), 18.2, 0.10)
-    put(fol, tap(1.6), 19.65, 0.20)
+    put(fol, tap(1.6), 19.65, 0.16); put(fol, tap(5.2), 21.45, 0.18)
     put(fol, sizzle(2.1), 26.85, 0.16); put(fol, clink(3000), 32.6, 0.13)
     put(fol, rattle(1.3), 39.05, 0.16)
     for k in range(3): put(fol, splash(), 47.7 + k * 0.42, 0.22)
     m_ = int(1.3 * SR); tt_ = np.arange(m_) / SR
     machine = norm(bp(rng.standard_normal(m_), 140, 520) * (0.7 + 0.3 * np.sin(2 * np.pi * 50 * tt_))) * env(m_, 0.15, 0.3)
-    put(fol, machine, 62.2, 0.09); put(fol, pour(0.6, 700, 1600), 63.0, 0.16)
+    put(fol, pour(0.6, 700, 1600), 63.0, 0.16)
     put(fol, outdoor(DUR - 64.95), 64.95, 0.09); put(fol, birds(DUR - 64.95), 64.95, 0.07)
+    # natural sound of the new camera originals where it carries the action (kettle switch, formula machine)
+    for s in SEGS:
+        src, sp, kind, cx, z, delay, end, f = s["tiles"][0]
+        if f in ("C0381", "C0379") and kind == "c":
+            d = s["t1"] - s["t0"]; c = decode(f"add/{f}.MP4", ["-af", "highpass=f=80"], ss=src, t=d)
+            c *= 10 ** ((-30.0 - lufs(c)) / 20); m = len(c); put(fol, c * env(m, 0.05, 0.12), s["t0"], 1.0)
     for s in SEGS[1:]:
         if s["lay"] != "crop" or SEGS[s["i"] - 1]["lay"] != "crop": put(fol, whoosh(), s["t0"] - 0.18, 0.05)
     # narration: the user's clips in story order, light corrective EQ only (they are already clean)
