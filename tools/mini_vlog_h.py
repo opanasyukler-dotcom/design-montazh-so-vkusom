@@ -267,6 +267,10 @@ for k in range(len(OVER) - 1):
     if isinstance(l_, Label) and isinstance(i_, Icon) and abs(l_.t0 - i_.t0) < 0.3 and l_.t1 < DUR and l_.base_y > 300:
         i_.x = l_.right + i_.size * 0.62 + 40; i_.y = l_.base_y - 55
 
+# requested: no stickers/icons, no music (ICONS=1 / MUSIC=1 bring them back)
+if os.environ.get("ICONS", "0") != "1": OVER = [o for o in OVER if not isinstance(o, Icon)]
+USE_MUSIC = os.environ.get("MUSIC", "0") == "1"
+
 # ---------------------------------------------------------------- compositor
 class Tiles:
     def __init__(self): self.si = None; self.decs = []; self.last = []
@@ -447,6 +451,7 @@ def audio(voice_path, out_path):
             for hh in (0, 0.5):
                 th = int(0.04 * SR); put(mus, norm(bp(rng.standard_normal(th), 6000, 14000)) * np.exp(-np.arange(th) / SR * 90), tb + hh * BEAT, 0.035)
     mus = norm(mus) * np.where(tA < 21.0, 0.10, 0.30)
+    if not USE_MUSIC: mus[:] = 0
     fol = np.zeros(n); ui = np.zeros(n)
     put(fol, pour(1.0, 450, 1250), 6.9, 0.30); put(fol, pour(0.8, 350, 900), 7.9, 0.22)
     put(fol, sizzle(1.8), 8.7, 0.18); put(fol, clink(), 10.55, 0.18); put(fol, clink(2600), 10.85, 0.14); put(fol, clink(2300), 11.05, 0.12)
