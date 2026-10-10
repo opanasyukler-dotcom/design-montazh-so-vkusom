@@ -168,7 +168,7 @@ class Word:
                 ww = img.shape[1]; ramp = np.clip((np.arange(ww) - p * ww * 1.15) / (-0.15 * ww), 0, 1)[None, :, None].astype(np.float32)
                 img, sh = img * ramp, sh * ramp
             blend(dst, sh, self.x, self.y + 4); blend(dst, img, self.x, self.y); return
-        sc = 0.86 + 0.14 * back(age / 0.16); al = min(1, age / 0.06)
+        sc = 1.0; al = min(1, age / 0.08)              # plain fade-in, no scale pulse
         if abs(sc - 1) > 0.005:
             hh, ww = img.shape[:2]; nw, nh = int(ww * sc), int(hh * sc)
             img, sh = cv2.resize(img, (nw, nh)), cv2.resize(sh, (nw, nh)); dx, dy = (ww - nw) / 2 / K, (hh - nh) / 2 / K
@@ -335,9 +335,7 @@ def render_frame(fo):
             if img is None: continue
             place_tile(fr, img, xs[ti], ys[ti], d - s["tiles"][ti][5])
     # cut accents: quick punch-in for crops, white flash on layout changes, whip blur into collages
-    if lay == "crop" and si > 0 and d < 0.16:
-        z = 1 + 0.05 * (1 - ease(d / 0.16)); M = np.float32([[z, 0, (1 - z) * OW / 2], [0, z, (1 - z) * OH / 2]])
-        fr = cv2.warpAffine(fr, M, (OW, OH), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REFLECT)
+    # (no punch-in zoom on cuts — removed on request)
     if si > 0 and SEGS[si - 1]["lay"] != lay and d < 0.14:
         a = 0.35 * (1 - d / 0.14); fr = cv2.addWeighted(fr, 1 - a, np.full_like(fr, 255), a, 0)
     if si >= B0 and lay.startswith("col") and d < 0.1:
