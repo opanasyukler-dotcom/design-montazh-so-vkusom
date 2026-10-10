@@ -70,6 +70,9 @@ def cm_apply(rgb_u8, prm):
 PO[:] = cm_apply(PO, cm_params(PO)); DO[:] = cm_apply(DO, cm_params(DO))
 COL[:1250] = cm_apply(np.ascontiguousarray(COL[:1250]), cm_params(np.ascontiguousarray(COL[:1060])))
 COL[1250:] = cm_apply(np.ascontiguousarray(COL[1250:]), cm_params(np.ascontiguousarray(COL[1260:])))
+# extra warmth on the "after" result only (photo + after half of the collage)
+WARM = (1.04, np.array([4.0, 11.0]))
+PO[:] = cm_apply(PO, WARM); COL[:1250] = cm_apply(np.ascontiguousarray(COL[:1250]), WARM)
 _VPRM = cm_params(V[500]); _vframe = vframe
 def vframe(*a, **k):
     f = _vframe(*a, **k); return cm_apply((np.clip(f, 0, 1) * 255).astype(np.uint8), _VPRM).astype(np.float32) / 255
