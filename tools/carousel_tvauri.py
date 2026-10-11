@@ -418,14 +418,10 @@ def card_for(w, frac, x=None, y=None):
 
 # ---- 1. cover on the "before" footage
 def s01():
-    card = card_for(580, 0.88, y=104)
-    ov = frame_canvas(card); put_logo(ov, y=62)
-    b = (Block(W - 2 * MARGIN, "center").head("Восстановление тела после родов\nза одну операцию", 62, 12).rule(0.22, 14)
-         .ital("История комплексной коррекции груди и живота", 26, 0))
-    b.draw(ov, MARGIN, card[1] + card[3] + 30)
-    f3 = mont(30, 700); shadow_text(ov, ((W - f3.getlength(">>>")) / 2, card[1] + card[3] + 30 + b.height() + 12), ">>>", f3, WHITE)
-    framed_video("01", [("IMG_3357.MOV", 0, None)], ov, f"{OUT}/01_cover.mp4", card, grade=GRADE_WALL)
-
+    b = (Block().head("Восстановление тела после родов\nза одну операцию", 62, 14).rule(0.22, 14)
+         .ital("История комплексной коррекции груди и живота", 26, 10).arrows())
+    render_video("01", [("IMG_3357.MOV", 0, None)], caption_overlay(b, 1290), f"{OUT}/01_cover.mp4",
+                 crop_y=0.55, grade=GRADE_WALL)
 
 # ---- 2. not about weight: text panel + pinch footage
 def s02():
