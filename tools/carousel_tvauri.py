@@ -423,7 +423,7 @@ def s01():
     b = (Block().head("Восстановление тела после родов\nза одну операцию", 62, 14).rule(0.22, 14)
          .ital("История комплексной коррекции груди и живота", 26, 10).arrows())
     render_video("01", [("IMG_3357.MOV", 0, None)], caption_overlay(b, 1290), f"{OUT}/01_cover.mp4",
-                 crop_y=0.0, zoom=0.84, sides="graphite", grade=GRADE_WALL)
+                 crop_y=0.0, zoom=0.72, sides="graphite", grade=GRADE_WALL)
 
 # ---- 2. not about weight: text panel + pinch footage
 def s02():
