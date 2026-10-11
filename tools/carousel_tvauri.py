@@ -229,7 +229,7 @@ def text_overlay(block, bottom=1240, top=None, grad_top=0.30, grad_bottom=0.86, 
 def run(cmd): subprocess.run(cmd, check=True)
 
 
-def render_video(name, srcs, ov, out, crop_y=0.5, zoom=1.0, grade="", trim=None):
+def render_video(name, srcs, ov, out, crop_y=0.5, zoom=1.0, grade="", trim=None, sides="blur"):
     """srcs: list of (file, start, end|None); fit-cover to 1080x1350, overlay PNG"""
     ovp = os.path.join(OUT, f"_{name}_overlay.png"); ov.save(ovp)
     ins, fl, dur = [], [], 0.0
@@ -241,8 +241,10 @@ def render_video(name, srcs, ov, out, crop_y=0.5, zoom=1.0, grade="", trim=None)
             fl.append(f"[{i}:v]scale={sw}:-2:flags=lanczos,crop={W}:{H}:(iw-{W})/2:(ih-{H})*{crop_y},setsar=1,fps=30,format=yuv420p[v{i}]")
         else:  # whole body in frame: shrunk footage over a blurred, dimmed copy of itself
             sw = int(W * zoom) // 2 * 2
-            fl.append(f"[{i}:v]split[a{i}][b{i}];"
-                      f"[a{i}]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},boxblur=40:2,eq=brightness=-0.10:saturation=0.8[bg{i}];"
+            fl.append(f"[{i}:v]split[a{i}][b{i}];" +
+                      (f"[a{i}]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},boxblur=40:2,eq=brightness=-0.10:saturation=0.8[bg{i}];"
+                       if sides == "blur" else
+                       f"[a{i}]scale={W}:{H},drawbox=0:0:{W}:{H}:color=0x{GRAPHITE[0]:02x}{GRAPHITE[1]:02x}{GRAPHITE[2]:02x}:t=fill[bg{i}];") +
                       f"[b{i}]scale={sw}:-2:flags=lanczos,crop={sw}:'min(ih,{H})':0:'(ih-min(ih,{H}))*{crop_y}'[fg{i}];"
                       f"[bg{i}][fg{i}]overlay=({W}-w)/2:0,setsar=1,fps=30,format=yuv420p[v{i}]")
     n = len(srcs)
@@ -421,7 +423,7 @@ def s01():
     b = (Block().head("Восстановление тела после родов\nза одну операцию", 62, 14).rule(0.22, 14)
          .ital("История комплексной коррекции груди и живота", 26, 10).arrows())
     render_video("01", [("IMG_3357.MOV", 0, None)], caption_overlay(b, 1290), f"{OUT}/01_cover.mp4",
-                 crop_y=0.55, grade=GRADE_WALL)
+                 crop_y=0.0, zoom=0.84, sides="graphite", grade=GRADE_WALL)
 
 # ---- 2. not about weight: text panel + pinch footage
 def s02():
