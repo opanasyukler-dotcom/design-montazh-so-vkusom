@@ -80,6 +80,7 @@ def iframe(t, z=1.0, cy=900):
 
 # ---------------- look ----------------
 yy_, xx_ = np.mgrid[0:H, 0:W].astype(np.float32)
+_r = np.clip((np.arange(H) - 820) / 700, 0, 1); HAZE = (0.78 * _r ** 1.3)[:, None, None].astype(np.float32)
 EDGE = np.clip((((xx_ - 540) / 560) ** 2 + ((yy_ - 900) / 1050) ** 2) ** 0.9, 0, 1)[..., None]
 VIG = 1 - 0.28 * EDGE
 def look(fr, t):
@@ -140,8 +141,10 @@ def bullet(fr, t, t0, txt, x, y, size=38, t1=1e9):
     im = TC[key]; p = ease((t - t0) / 0.3); al = min(1, (t - t0) / 0.1) * (1 - min(1, max(0, (t - t1) / 0.25)))
     ablend(fr, im, x - 70 * (1 - p), y, al, WHITE, BLUE)
 
+DEFER = [False]; PENDING = []
 def ablend(fr, img, x, y, al, c_dark, c_light):
-    """draw text alpha with a colour picked per pixel from what is behind it: c_dark over dark areas, c_light over light skin"""
+    """text layer: deferred so it is drawn on top of the grade and the dark haze"""
+    if DEFER[0]: PENDING.append((img, x, y, al, c_dark, c_light)); return
     if al <= 0.003: return
     h, w = img.shape[:2]; x, y = int(round(x)), int(round(y))
     x0, y0 = max(x, 0), max(y, 0); x1, y1 = min(x + w, W), min(y + h, H)
@@ -149,7 +152,7 @@ def ablend(fr, img, x, y, al, c_dark, c_light):
     a = img[y0 - y:y1 - y, x0 - x:x1 - x, 3:4] * al; d = fr[y0:y1, x0:x1]
     lum = d @ np.float32([0.299, 0.587, 0.114]); wa = a[..., 0]
     light = (lum * wa).sum() / max(wa.sum(), 1e-3) > 0.5                 # one colour per line, chosen by what is mostly behind it
-    col = np.float32(c_light if light else c_dark) / 255
+    col = np.float32(c_dark) / 255                                        # always white / powder
     d *= 1 - a; d += col * a
 class Title:
     """lines rise out of a mask with a blur-in; the key line sits on a pink plate that wipes in (navy text)"""
@@ -234,7 +237,7 @@ def collage(img, t, t0):
     chip(fr, CH_PO, 40, 228, t, t0 + 0.25); chip(fr, CH_DO, 40, 990, t, t0 + 0.4); return fr
 
 def render(t):
-    n, t0, t1 = block(t); lt = t - t0; flash = 0
+    n, t0, t1 = block(t); lt = t - t0; flash = 0; DEFER[0] = True; PENDING.clear()
     if n == "hook":
         fr = fitp(B80, 1.0 + 0.03 * t); chip(fr, CH_DO, 60, 228, t, 0.1)
     elif n == "hook2":
@@ -265,7 +268,7 @@ def render(t):
         T_RES.draw(fr, 1240, t, 27.8, t1 - 0.05, cps=40)
     elif n == "surgeon":
         fr = mblur(fillp(SURG, (1.12 + 0.07 * lt / 2.3) * trans(t, t0), 0.5, 0.38), lt)
-        T_OP.draw(fr, 250, t, t0 + 0.3, t1 - 0.05, cps=34)
+        T_OP.draw(fr, 1210, t, t0 + 0.3, t1 - 0.05, cps=34)
     elif n in ("aft1", "aft2"):
         img = A84 if n == "aft1" else A85
         fr = mblur(fillp(img, (1.35 + 0.05 * lt / 2) * trans(t, t0), 0.5, 0.44), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.1)
@@ -275,7 +278,10 @@ def render(t):
         fr = collage({"c1": C1, "c2": C2, "c3": C3}[n], t, t0)
     if t < 2.75: T_HOOK.draw(fr, 1150, t, 0.2, 2.7, cps=24)
     fr = look(fr, t)
+    if n not in ("c1", "c2", "c3"): fr = fr * (1 - HAZE)
     if n not in ("c1", "c2", "c3"): subs(fr, t)
+    DEFER[0] = False
+    for args in PENDING: ablend(fr, *args)
     blend(fr, LOGO, 540 - LOGO.shape[1] / 2, 120, 0.9)
     if flash > 0: fr = fr * (1 - flash) + flash
     if t > DUR - 0.8: fr *= 1 - 0.95 * (t - (DUR - 0.8)) / 0.8
