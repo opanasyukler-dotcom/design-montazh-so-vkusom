@@ -4,7 +4,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 W, H, FPS = 1080, 1920, 30
 SP = "/tmp/claude-0/-home-user-design-montazh-so-vkusom/b26b20a4-6ac5-50f8-8404-dcbad88c88d3/scratchpad/"
-BLUE = (16, 46, 70); WHITE = (255, 255, 255); LIME = (214, 236, 46); PINK = (236, 170, 190)
+BLUE = (16, 46, 70); WHITE = (255, 255, 255); LIME = (214, 236, 46); PINK = (243, 182, 202); SKY = (150, 182, 232)
 from retouch import retouch
 def osw(s): return ImageFont.truetype(SP + "v14/fonts/BN-Bold.ttf", s)          # Bebas Neue (Cyrillic)
 def mont(w, s): return ImageFont.truetype(SP + f"fonts2/M{w}.ttf", s)
@@ -96,7 +96,11 @@ def mblur(fr, lt):
     return cv2.blur(fr, (k, 1)) if k > 2 else fr
 
 # ---------------- text ----------------
-CH_DO, CH_PO = tag("ДО", 40, BLUE), tag("ПОСЛЕ", 40, PINK, BLUE)
+def label(txt, col):
+    f = osw(54); asc, desc = f.getmetrics(); im = Image.new("RGBA", (int(f.getlength(txt)) + 10, asc + desc + 6), (0, 0, 0, 0))
+    ImageDraw.Draw(im).text((5, 3 + asc), txt, font=f, fill=col + (255,), anchor="ls"); a = to_np(im)
+    sh = shadow_of(a, 7, 0.8); o = sh.copy(); blend_local = a; o[..., :3] = o[..., :3] * (1 - a[..., 3:4]) + a[..., :3]; o[..., 3:] = np.maximum(sh[..., 3:], a[..., 3:]); return o
+CH_DO, CH_PO = label("ДО", WHITE), label("ПОСЛЕ", PINK)
 def chip(fr, im, x, y, t, t0, t1=1e9):
     if t < t0 or t > t1 + 0.25: return
     p = ease((t - t0) / 0.35); al = min(1, (t - t0) / 0.1) * (1 - min(1, max(0, (t - t1) / 0.25)))
@@ -130,8 +134,8 @@ def bullet(fr, t, t0, txt, x, y, size=38, t1=1e9):
     if key not in TC:
         f = mont(600, size); asc, desc = f.getmetrics(); tw = int(f.getlength(txt)); hh = asc + desc
         im = Image.new("RGBA", (tw + 80, hh + 16), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
-        d.rounded_rectangle((0, 8, hh, hh + 8), 8, fill=PINK + (255,)); c = hh // 2
-        d.polygon([(c - 9, c + 1), (c - 9, c + 15), (c + 10, c + 8)], fill=BLUE + (255,))
+        c = hh // 2
+        d.polygon([(c - 10, c - 1), (c - 10, c + 17), (c + 12, c + 8)], fill=PINK + (255,))
         d.text((hh + 18, 8 + asc), txt, font=f, fill=WHITE + (255,), anchor="ls"); TC[key] = to_np(im)
     im = TC[key]; p = ease((t - t0) / 0.3); al = min(1, (t - t0) / 0.1) * (1 - min(1, max(0, (t - t1) / 0.25)))
     blend(fr, shadow_of(im, 9, 0.75), x - 70 * (1 - p), y + 4, al); blend(fr, im, x - 70 * (1 - p), y, al)
@@ -141,10 +145,10 @@ class Title:
     def __init__(s, lines, size=78):
         s.items = []
         for txt, kind in lines:
-            f = osw(size) if kind in ("H", "P") else mont(500, 34); asc, desc = f.getmetrics(); tw = int(f.getlength(txt))
-            pad = 18 if kind == "P" else 0; hh = asc + desc + (10 if kind == "P" else 4)
-            im = Image.new("RGBA", (tw + 2 * pad + 8, hh), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
-            d.text((pad + 4, (5 if kind == "P" else 2) + asc), txt, font=f, fill=(BLUE if kind == "P" else WHITE) + (255,), anchor="ls")
+            f = osw(size) if kind in ("H", "P", "B") else mont(500, 34); asc, desc = f.getmetrics(); tw = int(f.getlength(txt))
+            hh = asc + desc + 4; col = {"P": PINK, "B": SKY}.get(kind, WHITE)
+            im = Image.new("RGBA", (tw + 8, hh), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+            d.text((4, 2 + asc), txt, font=f, fill=col + (255,), anchor="ls")
             s.items.append(dict(kind=kind, im=to_np(im), w=im.size[0], h=hh))
     def draw(s, fr, y, t, t0, t1=1e9, cps=None):
         if t < t0 or t > t1 + 0.3: return
@@ -153,27 +157,20 @@ class Title:
             ti = t0 + k * 0.16; p = ease((t - ti) / 0.45)
             if p <= 0: yy += it["h"] + 6; continue
             x = 540 - it["w"] / 2; im = it["im"]
-            if it["kind"] == "P":
-                bw = int(it["w"] * ease((t - ti) / 0.35))
-                if bw > 0:
-                    r = np.zeros((it["h"], bw, 4), np.float32); r[..., :3] = np.float32(PINK) / 255; r[..., 3] = 1
-                    blend(fr, shadow_of(r, 10, 0.35), x, yy + 5, out); blend(fr, r, x, yy, out)
-                p = ease((t - ti - 0.12) / 0.4)
-                if p <= 0: yy += it["h"] + 6; continue
             sig = (1 - p) * 7
             imb = cv2.GaussianBlur(im, (0, 0), sig) if sig > 0.4 else im
             dy = int((1 - p) * it["h"] * 0.7); vis = imb[:it["h"] - dy] if dy > 0 else imb      # rise from the line's own mask
-            if it["kind"] != "P": blend(fr, shadow_of(vis, 8, 0.7), x, yy + dy + 3, out * p)
+            sh = shadow_of(vis, 12, 1.0); blend(fr, sh, x, yy + dy + 3, out * p); blend(fr, sh, x, yy + dy + 2, out * p * 0.6)
             blend(fr, vis, x, yy + dy, out * p)
             yy += it["h"] + 6
 
 T_HOOK = Title([("ЖИЗНЬ РАЗДЕЛИЛАСЬ", "H"), ("НА ДО И ПОСЛЕ", "P")], 92)
-T_CONF = Title([("УВЕРЕННОСТЬ В СЕБЕ", "P"), ("это дорогого стоит", "S")], 76)
-T_COVER = Title([("ВСЁ ВРЕМЯ", "H"), ("ПРИКРЫВАЛАСЬ ОДЕЖДОЙ", "P")], 76)
+T_CONF = Title([("УВЕРЕННОСТЬ В СЕБЕ", "B"), ("это дорогого стоит", "S")], 76)
+T_COVER = Title([("ВСЁ ВРЕМЯ", "H"), ("ПРИКРЫВАЛАСЬ ОДЕЖДОЙ", "B")], 76)
 T_LIKE = Title([("НРАВИШЬСЯ СЕБЕ РАЗДЕТОЙ", "H"), ("БОЛЬШЕ, ЧЕМ ОДЕТОЙ", "P")], 72)
 T_JOY = Title([("УДОВОЛЬСТВИЕ", "H"), ("ОТ СВОЕГО ТЕЛА", "P")], 86)
-T_TRIP = Title([("ПРИЕХАЛА ИЗДАЛЕКА", "P"), ("из Саратовской области", "S")], 76)
-T_OP = Title([("ОЧЕНЬ СЛОЖНАЯ", "H"), ("И ДЛИННАЯ ОПЕРАЦИЯ", "P")], 78)
+T_TRIP = Title([("ПРИЕХАЛА ИЗДАЛЕКА", "B"), ("из Саратовской области", "S")], 76)
+T_OP = Title([("ОЧЕНЬ СЛОЖНАЯ", "H"), ("И ДЛИННАЯ ОПЕРАЦИЯ", "B")], 78)
 T_RES = Title([("РЕЗУЛЬТАТ", "H"), ("ПОТРЯСАЮЩИЙ", "P")], 92)
 T_HAPPY = Title([("ОЧЕНЬ ДОВОЛЬНА", "P")], 84)
 
