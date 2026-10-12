@@ -4,7 +4,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 W, H, FPS = 1080, 1920, 30
 SP = "/tmp/claude-0/-home-user-design-montazh-so-vkusom/b26b20a4-6ac5-50f8-8404-dcbad88c88d3/scratchpad/"
-BLUE = (16, 46, 70); WHITE = (255, 255, 255); LIME = (214, 236, 46); PINK = (243, 182, 202); SKY = (150, 182, 232)
+BLUE = (16, 46, 70); WHITE = (255, 255, 255); LIME = (214, 236, 46); PINK = (228, 210, 210); SKY = (228, 210, 210); GRAPH = (103, 96, 104)   # surgeon palette: powder / navy / graphite
 from retouch import retouch
 def osw(s): return ImageFont.truetype(SP + "v14/fonts/BN-Bold.ttf", s)          # Bebas Neue (Cyrillic)
 def mont(w, s): return ImageFont.truetype(SP + f"fonts2/M{w}.ttf", s)
@@ -104,7 +104,7 @@ CH_DO, CH_PO = label("ДО", WHITE), label("ПОСЛЕ", PINK)
 def chip(fr, im, x, y, t, t0, t1=1e9):
     if t < t0 or t > t1 + 0.25: return
     p = ease((t - t0) / 0.35); al = min(1, (t - t0) / 0.1) * (1 - min(1, max(0, (t - t1) / 0.25)))
-    blend(fr, im, x - (1 - p) * 140, y, al)
+    ablend(fr, im, x - (1 - p) * 140, y, al, *((PINK, GRAPH) if im is CH_PO else (WHITE, BLUE)))
 BRC = {}
 def bracket(frame, t, t0, lines, yc, size=78, t1=1e9):
     """two bars open from the centre and reveal the text, lime underline under the last line"""
@@ -138,29 +138,41 @@ def bullet(fr, t, t0, txt, x, y, size=38, t1=1e9):
         d.polygon([(c - 10, c - 1), (c - 10, c + 17), (c + 12, c + 8)], fill=PINK + (255,))
         d.text((hh + 18, 8 + asc), txt, font=f, fill=WHITE + (255,), anchor="ls"); TC[key] = to_np(im)
     im = TC[key]; p = ease((t - t0) / 0.3); al = min(1, (t - t0) / 0.1) * (1 - min(1, max(0, (t - t1) / 0.25)))
-    blend(fr, im, x - 70 * (1 - p), y, al)
+    ablend(fr, im, x - 70 * (1 - p), y, al, WHITE, BLUE)
 
+def ablend(fr, img, x, y, al, c_dark, c_light):
+    """draw text alpha with a colour picked per pixel from what is behind it: c_dark over dark areas, c_light over light skin"""
+    if al <= 0.003: return
+    h, w = img.shape[:2]; x, y = int(round(x)), int(round(y))
+    x0, y0 = max(x, 0), max(y, 0); x1, y1 = min(x + w, W), min(y + h, H)
+    if x1 <= x0 or y1 <= y0: return
+    a = img[y0 - y:y1 - y, x0 - x:x1 - x, 3:4] * al; d = fr[y0:y1, x0:x1]
+    lum = d @ np.float32([0.299, 0.587, 0.114]); wa = a[..., 0]
+    light = (lum * wa).sum() / max(wa.sum(), 1e-3) > 0.5                 # one colour per line, chosen by what is mostly behind it
+    col = np.float32(c_light if light else c_dark) / 255
+    d *= 1 - a; d += col * a
 class Title:
     """lines rise out of a mask with a blur-in; the key line sits on a pink plate that wipes in (navy text)"""
     def __init__(s, lines, size=78):
         s.items = []
         for txt, kind in lines:
             f = osw(size) if kind in ("H", "P", "B") else mont(500, 34); asc, desc = f.getmetrics(); tw = int(f.getlength(txt))
-            hh = asc + desc + 4; col = {"P": PINK, "B": SKY}.get(kind, WHITE)
-            im = Image.new("RGBA", (tw + 8, hh), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
-            d.text((4, 2 + asc), txt, font=f, fill=col + (255,), anchor="ls")
-            s.items.append(dict(kind=kind, im=to_np(im), w=im.size[0], h=hh))
+            hh = asc + desc + 4; ims = {}
+            for nm, col in (("w", WHITE), ("powder", PINK), ("navy", BLUE), ("graph", GRAPH)):
+                im = Image.new("RGBA", (tw + 8, hh), (0, 0, 0, 0)); ImageDraw.Draw(im).text((4, 2 + asc), txt, font=f, fill=col + (255,), anchor="ls"); ims[nm] = to_np(im)
+            s.items.append(dict(kind=kind, ims=ims, w=tw + 8, h=hh))
     def draw(s, fr, y, t, t0, t1=1e9, cps=None):
         if t < t0 or t > t1 + 0.3: return
         out = 1 - ease((t - t1) / 0.3) if t > t1 else 1.0; yy = y
         for k, it in enumerate(s.items):
             ti = t0 + k * 0.16; p = ease((t - ti) / 0.45)
             if p <= 0: yy += it["h"] + 6; continue
-            x = 540 - it["w"] / 2; im = it["im"]
+            x = 540 - it["w"] / 2
+            im = it["ims"]["w"]; cols = (PINK, GRAPH) if it["kind"] in ("P", "B") else (WHITE, BLUE)
             sig = (1 - p) * 7
             imb = cv2.GaussianBlur(im, (0, 0), sig) if sig > 0.4 else im
             dy = int((1 - p) * it["h"] * 0.7); vis = imb[:it["h"] - dy] if dy > 0 else imb      # rise from the line's own mask
-            blend(fr, vis, x, yy + dy, out * p)
+            ablend(fr, vis, x, yy + dy, out * p, *cols)
             yy += it["h"] + 6
 
 T_HOOK = Title([("ЖИЗНЬ РАЗДЕЛИЛАСЬ", "H"), ("НА ДО И ПОСЛЕ", "P")], 92)
@@ -197,9 +209,10 @@ def subs(frame, t, y=1530):
             if w not in SC:
                 f = mont(500, 46); asc, desc = f.getmetrics(); tw = int(f.getlength(w))
                 im = Image.new("RGBA", (tw + 20, asc + desc + 10), (0, 0, 0, 0)); ImageDraw.Draw(im).text((10, 5 + asc), w, font=f, fill=WHITE + (255,), anchor="ls")
-                a = to_np(im); SC[w] = (a, shadow_of(a, 7, 0.9))
-            im, sh = SC[w]; p = ease((t - t0) / 0.12); al = min(1, (t - t0) / 0.06)
-            blend(frame, im, 540 - im.shape[1] / 2, y - im.shape[0] / 2 + 12 * (1 - p), al)
+                a = to_np(im); b = a.copy(); b[..., :3] = a[..., 3:4] * (np.float32(BLUE) / 255); SC[w] = (a, b)
+            im, imn = SC[w]
+            p = ease((t - t0) / 0.12); al = min(1, (t - t0) / 0.06)
+            ablend(frame, im, 540 - im.shape[1] / 2, y - im.shape[0] / 2 + 12 * (1 - p), al, WHITE, BLUE)
 
 # front collage halves aligned on the stickers (ПОСЛЕ top half, ДО bottom half)
 AFT_H, BEF_H = C1[:955], C1[965:]
@@ -252,7 +265,7 @@ def render(t):
         T_RES.draw(fr, 1240, t, 27.8, t1 - 0.05, cps=40)
     elif n == "surgeon":
         fr = mblur(fillp(SURG, (1.12 + 0.07 * lt / 2.3) * trans(t, t0), 0.5, 0.38), lt)
-        T_OP.draw(fr, 1240, t, t0 + 0.3, t1 - 0.05, cps=34)
+        T_OP.draw(fr, 250, t, t0 + 0.3, t1 - 0.05, cps=34)
     elif n in ("aft1", "aft2"):
         img = A84 if n == "aft1" else A85
         fr = mblur(fillp(img, (1.35 + 0.05 * lt / 2) * trans(t, t0), 0.5, 0.44), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.1)
