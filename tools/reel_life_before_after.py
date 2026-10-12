@@ -99,12 +99,12 @@ def mblur(fr, lt):
 def label(txt, col):
     f = osw(54); asc, desc = f.getmetrics(); im = Image.new("RGBA", (int(f.getlength(txt)) + 10, asc + desc + 6), (0, 0, 0, 0))
     ImageDraw.Draw(im).text((5, 3 + asc), txt, font=f, fill=col + (255,), anchor="ls"); a = to_np(im)
-    sh = shadow_of(a, 7, 0.8); o = sh.copy(); blend_local = a; o[..., :3] = o[..., :3] * (1 - a[..., 3:4]) + a[..., :3]; o[..., 3:] = np.maximum(sh[..., 3:], a[..., 3:]); return o
+    return a
 CH_DO, CH_PO = label("ДО", WHITE), label("ПОСЛЕ", PINK)
 def chip(fr, im, x, y, t, t0, t1=1e9):
     if t < t0 or t > t1 + 0.25: return
     p = ease((t - t0) / 0.35); al = min(1, (t - t0) / 0.1) * (1 - min(1, max(0, (t - t1) / 0.25)))
-    blend(fr, shadow_of(im, 8, 0.4), x - (1 - p) * 140, y + 5, al); blend(fr, im, x - (1 - p) * 140, y, al)
+    blend(fr, im, x - (1 - p) * 140, y, al)
 BRC = {}
 def bracket(frame, t, t0, lines, yc, size=78, t1=1e9):
     """two bars open from the centre and reveal the text, lime underline under the last line"""
@@ -138,7 +138,7 @@ def bullet(fr, t, t0, txt, x, y, size=38, t1=1e9):
         d.polygon([(c - 10, c - 1), (c - 10, c + 17), (c + 12, c + 8)], fill=PINK + (255,))
         d.text((hh + 18, 8 + asc), txt, font=f, fill=WHITE + (255,), anchor="ls"); TC[key] = to_np(im)
     im = TC[key]; p = ease((t - t0) / 0.3); al = min(1, (t - t0) / 0.1) * (1 - min(1, max(0, (t - t1) / 0.25)))
-    blend(fr, shadow_of(im, 9, 0.75), x - 70 * (1 - p), y + 4, al); blend(fr, im, x - 70 * (1 - p), y, al)
+    blend(fr, im, x - 70 * (1 - p), y, al)
 
 class Title:
     """lines rise out of a mask with a blur-in; the key line sits on a pink plate that wipes in (navy text)"""
@@ -160,7 +160,6 @@ class Title:
             sig = (1 - p) * 7
             imb = cv2.GaussianBlur(im, (0, 0), sig) if sig > 0.4 else im
             dy = int((1 - p) * it["h"] * 0.7); vis = imb[:it["h"] - dy] if dy > 0 else imb      # rise from the line's own mask
-            sh = shadow_of(vis, 12, 1.0); blend(fr, sh, x, yy + dy + 3, out * p); blend(fr, sh, x, yy + dy + 2, out * p * 0.6)
             blend(fr, vis, x, yy + dy, out * p)
             yy += it["h"] + 6
 
@@ -200,7 +199,6 @@ def subs(frame, t, y=1530):
                 im = Image.new("RGBA", (tw + 20, asc + desc + 10), (0, 0, 0, 0)); ImageDraw.Draw(im).text((10, 5 + asc), w, font=f, fill=WHITE + (255,), anchor="ls")
                 a = to_np(im); SC[w] = (a, shadow_of(a, 7, 0.9))
             im, sh = SC[w]; p = ease((t - t0) / 0.12); al = min(1, (t - t0) / 0.06)
-            blend(frame, sh, 540 - im.shape[1] / 2, y - im.shape[0] / 2 + 3 + 12 * (1 - p), al)
             blend(frame, im, 540 - im.shape[1] / 2, y - im.shape[0] / 2 + 12 * (1 - p), al)
 
 # front collage halves aligned on the stickers (ПОСЛЕ top half, ДО bottom half)
