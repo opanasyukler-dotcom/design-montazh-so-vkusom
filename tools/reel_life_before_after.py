@@ -4,7 +4,8 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 W, H, FPS = 1080, 1920, 30
 SP = "/tmp/claude-0/-home-user-design-montazh-so-vkusom/b26b20a4-6ac5-50f8-8404-dcbad88c88d3/scratchpad/"
-BLUE = (16, 46, 70); WHITE = (255, 255, 255); LIME = (214, 236, 46)
+BLUE = (16, 46, 70); WHITE = (255, 255, 255); LIME = (214, 236, 46); PINK = (236, 170, 190)
+from retouch import retouch
 def osw(s): return ImageFont.truetype(SP + "v14/fonts/BN-Bold.ttf", s)          # Bebas Neue (Cyrillic)
 def mont(w, s): return ImageFont.truetype(SP + f"fonts2/M{w}.ttf", s)
 SUBS = []; DUR = 44.0
@@ -43,10 +44,11 @@ def blur_ell(img, c, ax):
     m = cv2.GaussianBlur(m, (0, 0), max(ax) / 6)[..., None]
     img = img.copy(); img[y0:y1, x0:x1] = (crop * (1 - m) + bl * m).astype(np.uint8); return img
 B80, B81, B82 = load("dl/IMG_7580_edit.jpg"), load("dl/IMG_7581_edit.jpg"), load("dl/IMG_7582_edit.jpg")
-A84 = blur_ell(load("dl/IMG_7584.PNG"), (525, 160), (95, 125))          # patient face blurred
-A85 = blur_ell(load("dl/IMG_7585.PNG"), (520, 150), (95, 120))
+A84 = retouch(blur_ell(load("dl/IMG_7584.PNG"), (525, 160), (95, 125)))          # patient face blurred
+A85 = retouch(blur_ell(load("dl/IMG_7585.PNG"), (520, 150), (95, 120)))
 SURG = load("dl/DSC01189.JPG")
 C1, C2, C3 = load("dl/IMG_7595.JPG"), load("dl/collage_34.jpg"), load("dl/collage_side.jpg")
+for _c in (C1, C2, C3): _c[:958] = retouch(np.ascontiguousarray(_c[:958]))      # retouch the ПОСЛЕ halves
 
 class Src:
     def __init__(s, p): s.cap = cv2.VideoCapture(p); s.pos = -1; s.c = {}
@@ -65,6 +67,14 @@ def warp(img, z, cx, cy, ox=540, oy=960, size=(W, H)):
 def fillp(img, z=1.0, fx=0.5, fy=0.5):
     s = max(W / img.shape[1], H / img.shape[0]) * z
     return warp(img, s, img.shape[1] * fx, img.shape[0] * fy)
+def fitp(img, z=1.0, cy=0.5):
+    bg = fillp(img, 1.0) ; bg = cv2.GaussianBlur(bg, (0, 0), 30) * 0.35
+    s = W / img.shape[1] * z * 0.98
+    fg = warp(img, s, img.shape[1] / 2, img.shape[0] * cy, 540, 900)
+    m = warp(np.full(img.shape[:2], 255, np.uint8), s, img.shape[1] / 2, img.shape[0] * cy, 540, 900)[..., :1] if False else None
+    msk = cv2.warpAffine(cv2.GaussianBlur(cv2.copyMakeBorder(np.full((img.shape[0] - 40, img.shape[1] - 40), 255, np.uint8), 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=0), (0, 0), 10),
+                         np.float32([[s, 0, 540 - s * img.shape[1] / 2], [0, s, 900 - s * img.shape[0] * cy]]), (W, H)).astype(np.float32)[..., None] / 255
+    return fg * msk + bg * (1 - msk)
 def iframe(t, z=1.0, cy=900):
     f = IV.get(int(round(src_of(t) * 60))); return warp(f, z, 540, cy, 540, 960 if z <= 1.0 else 900)
 
@@ -86,7 +96,7 @@ def mblur(fr, lt):
     return cv2.blur(fr, (k, 1)) if k > 2 else fr
 
 # ---------------- text ----------------
-CH_DO, CH_PO = tag("ДО", 46), tag("ПОСЛЕ", 46)
+CH_DO, CH_PO = tag("ДО", 40, BLUE), tag("ПОСЛЕ", 40, PINK, BLUE)
 def chip(fr, im, x, y, t, t0, t1=1e9):
     if t < t0 or t > t1 + 0.25: return
     p = ease((t - t0) / 0.35); al = min(1, (t - t0) / 0.1) * (1 - min(1, max(0, (t - t1) / 0.25)))
@@ -114,26 +124,58 @@ def bracket(frame, t, t0, lines, yc, size=78, t1=1e9):
         r = np.zeros((7, int(max((u1 - u0) * up, 1)), 4), np.float32); r[..., :3] = np.float32(LIME) / 255; r[..., 3] = 1
         blend(frame, r, x0 + u0, y0 + uy, fade)
 TC = {}
-def bullet(fr, t, t0, txt, x, y, size=44, t1=1e9):
+def bullet(fr, t, t0, txt, x, y, size=38, t1=1e9):
     if t < t0 or t > t1 + 0.25: return
     key = (txt, size)
     if key not in TC:
         f = mont(600, size); asc, desc = f.getmetrics(); tw = int(f.getlength(txt)); hh = asc + desc
         im = Image.new("RGBA", (tw + 80, hh + 16), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
-        d.rounded_rectangle((0, 8, hh, hh + 8), 8, fill=BLUE + (255,)); c = hh // 2
-        d.polygon([(c - 9, c + 1), (c - 9, c + 15), (c + 10, c + 8)], fill=WHITE + (255,))
+        d.rounded_rectangle((0, 8, hh, hh + 8), 8, fill=PINK + (255,)); c = hh // 2
+        d.polygon([(c - 9, c + 1), (c - 9, c + 15), (c + 10, c + 8)], fill=BLUE + (255,))
         d.text((hh + 18, 8 + asc), txt, font=f, fill=WHITE + (255,), anchor="ls"); TC[key] = to_np(im)
     im = TC[key]; p = ease((t - t0) / 0.3); al = min(1, (t - t0) / 0.1) * (1 - min(1, max(0, (t - t1) / 0.25)))
     blend(fr, shadow_of(im, 9, 0.75), x - 70 * (1 - p), y + 4, al); blend(fr, im, x - 70 * (1 - p), y, al)
 
-T_HOOK = Txt([("ЖИЗНЬ РАЗДЕЛИЛАСЬ", "H"), ("НА ДО И ПОСЛЕ", "HB")], size=128)
-T_CONF = Txt([("УВЕРЕННОСТЬ В СЕБЕ", "HB"), ("это дорогого стоит", "SB")], size=104)
-T_COVER = Txt([("ВСЁ ВРЕМЯ", "H"), ("ПРИКРЫВАЛАСЬ ОДЕЖДОЙ", "HB")], size=100)
-T_JOY = Txt([("УДОВОЛЬСТВИЕ", "H"), ("ОТ СВОЕГО ТЕЛА", "HB")], size=118)
-T_TRIP = Txt([("ПРИЕХАЛА ИЗДАЛЕКА", "HB"), ("из Саратовской области", "SB")], size=96)
-T_OP = Txt([("ОЧЕНЬ СЛОЖНАЯ", "H"), ("И ДЛИННАЯ ОПЕРАЦИЯ", "HB")], size=104)
-T_RES = Txt([("РЕЗУЛЬТАТ", "H"), ("ПОТРЯСАЮЩИЙ", "HB")], size=130)
-T_HAPPY = Txt([("ОЧЕНЬ ДОВОЛЬНА", "HB")], size=110)
+class Title:
+    """lines rise out of a mask with a blur-in; the key line sits on a pink plate that wipes in (navy text)"""
+    def __init__(s, lines, size=78):
+        s.items = []
+        for txt, kind in lines:
+            f = osw(size) if kind in ("H", "P") else mont(500, 34); asc, desc = f.getmetrics(); tw = int(f.getlength(txt))
+            pad = 18 if kind == "P" else 0; hh = asc + desc + (10 if kind == "P" else 4)
+            im = Image.new("RGBA", (tw + 2 * pad + 8, hh), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+            d.text((pad + 4, (5 if kind == "P" else 2) + asc), txt, font=f, fill=(BLUE if kind == "P" else WHITE) + (255,), anchor="ls")
+            s.items.append(dict(kind=kind, im=to_np(im), w=im.size[0], h=hh))
+    def draw(s, fr, y, t, t0, t1=1e9, cps=None):
+        if t < t0 or t > t1 + 0.3: return
+        out = 1 - ease((t - t1) / 0.3) if t > t1 else 1.0; yy = y
+        for k, it in enumerate(s.items):
+            ti = t0 + k * 0.16; p = ease((t - ti) / 0.45)
+            if p <= 0: yy += it["h"] + 6; continue
+            x = 540 - it["w"] / 2; im = it["im"]
+            if it["kind"] == "P":
+                bw = int(it["w"] * ease((t - ti) / 0.35))
+                if bw > 0:
+                    r = np.zeros((it["h"], bw, 4), np.float32); r[..., :3] = np.float32(PINK) / 255; r[..., 3] = 1
+                    blend(fr, shadow_of(r, 10, 0.35), x, yy + 5, out); blend(fr, r, x, yy, out)
+                p = ease((t - ti - 0.12) / 0.4)
+                if p <= 0: yy += it["h"] + 6; continue
+            sig = (1 - p) * 7
+            imb = cv2.GaussianBlur(im, (0, 0), sig) if sig > 0.4 else im
+            dy = int((1 - p) * it["h"] * 0.7); vis = imb[:it["h"] - dy] if dy > 0 else imb      # rise from the line's own mask
+            if it["kind"] != "P": blend(fr, shadow_of(vis, 8, 0.7), x, yy + dy + 3, out * p)
+            blend(fr, vis, x, yy + dy, out * p)
+            yy += it["h"] + 6
+
+T_HOOK = Title([("ЖИЗНЬ РАЗДЕЛИЛАСЬ", "H"), ("НА ДО И ПОСЛЕ", "P")], 92)
+T_CONF = Title([("УВЕРЕННОСТЬ В СЕБЕ", "P"), ("это дорогого стоит", "S")], 76)
+T_COVER = Title([("ВСЁ ВРЕМЯ", "H"), ("ПРИКРЫВАЛАСЬ ОДЕЖДОЙ", "P")], 76)
+T_LIKE = Title([("НРАВИШЬСЯ СЕБЕ РАЗДЕТОЙ", "H"), ("БОЛЬШЕ, ЧЕМ ОДЕТОЙ", "P")], 72)
+T_JOY = Title([("УДОВОЛЬСТВИЕ", "H"), ("ОТ СВОЕГО ТЕЛА", "P")], 86)
+T_TRIP = Title([("ПРИЕХАЛА ИЗДАЛЕКА", "P"), ("из Саратовской области", "S")], 76)
+T_OP = Title([("ОЧЕНЬ СЛОЖНАЯ", "H"), ("И ДЛИННАЯ ОПЕРАЦИЯ", "P")], 78)
+T_RES = Title([("РЕЗУЛЬТАТ", "H"), ("ПОТРЯСАЮЩИЙ", "P")], 92)
+T_HAPPY = Title([("ОЧЕНЬ ДОВОЛЬНА", "P")], 84)
 
 # ---------------- word-by-word subtitles ----------------
 WR = json.load(open("words.json")); toks = []
@@ -186,20 +228,20 @@ def collage(img, t, t0):
 def render(t):
     n, t0, t1 = block(t); lt = t - t0; flash = 0
     if n == "hook":
-        fr = fillp(B80, 1.12 + 0.05 * t, 0.5, 0.42); chip(fr, CH_DO, 60, 228, t, 0.1)
+        fr = fitp(B80, 1.0 + 0.03 * t); chip(fr, CH_DO, 60, 228, t, 0.1)
     elif n == "hook2":
-        fr = mblur(fillp(B81, 1.15 * trans(t, t0, 0.1), 0.5, 0.42), lt); chip(fr, CH_DO, 60, 228, t, t0)
+        fr = mblur(fitp(B81, 1.0 * trans(t, t0, 0.06)), lt); chip(fr, CH_DO, 60, 228, t, t0)
     elif n.startswith("talk") or n == "happy":
         z = dict(talk1=1.0, talk2=1.32, talkq=1.12, talkj=1.38, talk3=1.15, happy=1.25)[n] * (1 + 0.03 * lt / 3) * trans(t, t0)
         fr = mblur(iframe(t, z, 820 if z > 1.2 else 900), lt)
         if n == "talk1": T_CONF.draw(fr, 1180, t, t0 + 0.7, t1 - 0.05, cps=30)
-        if n == "talkq": bracket(fr, t, t0 + 0.15, ["НРАВИШЬСЯ СЕБЕ РАЗДЕТОЙ", "БОЛЬШЕ, ЧЕМ ОДЕТОЙ"], 1230, 76, t1 - 0.1)
+        if n == "talkq": T_LIKE.draw(fr, 1200, t, t0 + 0.15, t1 - 0.1)
         if n == "talkj": T_JOY.draw(fr, 1240, t, 17.9, t1 - 0.05, cps=30)
         if n == "talk3": T_TRIP.draw(fr, 1180, t, 21.75, t1 - 0.05, cps=32)
         if n == "happy": T_HAPPY.draw(fr, 1250, t, t0 + 0.05, t1, cps=34)
     elif n == "before":
         img, s0 = (B80, t0) if t < 12.75 else ((B81, 12.75) if t < 13.7 else (B82, 13.7))
-        fr = mblur(fillp(img, (1.1 + 0.04 * (t - s0)) * trans(t, s0), 0.5, 0.42), t - s0); chip(fr, CH_DO, 60, 228, t, t0 + 0.05)
+        fr = mblur(fitp(img, (1.0 + 0.03 * (t - s0)) * trans(t, s0, 0.05)), t - s0); chip(fr, CH_DO, 60, 228, t, t0 + 0.05)
         T_COVER.draw(fr, 1170, t, t0 + 0.15, t1 - 0.05, cps=34)
     elif n == "morph":
         # first ПОСЛЕ: smooth ДО -> ПОСЛЕ on the front collage halves aligned on the stickers
