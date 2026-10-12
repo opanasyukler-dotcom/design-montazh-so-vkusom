@@ -22,9 +22,9 @@ def src_of(t):
         best = so
     return best
 
-BL = [("hook", 0, 2.0), ("hook2", 2.0, 2.75), ("talk1", 2.75, 6.45), ("talk2", 6.45, 8.85), ("side", 8.85, 11.85),
-      ("before", 11.85, 14.6), ("morph", 14.6, 19.6), ("talk3", 19.6, 23.9), ("surgeon", 23.9, 26.7), ("result", 26.7, 28.0),
-      ("talk4", 28.0, 31.2), ("talk5", 31.2, 34.3), ("happy", 34.3, 35.4),
+BL = [("hook", 0, 2.0), ("hook2", 2.0, 2.75), ("talk1", 2.75, 6.45), ("talk2", 6.45, 8.85), ("talkq", 8.85, 11.85),
+      ("before", 11.85, 14.6), ("talkj", 14.6, 19.6), ("talk3", 19.6, 23.9), ("surgeon", 23.9, 26.2), ("morph", 26.2, 30.2),
+      ("aft1", 30.2, 32.2), ("aft2", 32.2, 34.3), ("happy", 34.3, 35.4),
       ("c1", 35.4, 38.3), ("c2", 38.3, 41.2), ("c3", 41.2, DUR)]
 def block(t):
     for n, a, b in BL:
@@ -188,41 +188,39 @@ def render(t):
     if n == "hook":
         fr = fillp(B80, 1.12 + 0.05 * t, 0.5, 0.42); chip(fr, CH_DO, 60, 228, t, 0.1)
     elif n == "hook2":
-        fr = fillp(A84, 1.35 * trans(t, t0, 0.1), 0.52, 0.42); flash = 0.55 * max(0, 1 - lt / 0.2); chip(fr, CH_PO, 60, 228, t, t0 + 0.05)
+        fr = mblur(fillp(B81, 1.15 * trans(t, t0, 0.1), 0.5, 0.42), lt); chip(fr, CH_DO, 60, 228, t, t0)
     elif n.startswith("talk") or n == "happy":
-        z = dict(talk1=1.0, talk2=1.32, talk3=1.15, talk4=1.0, talk5=1.38, happy=1.25)[n] * (1 + 0.03 * lt / 3) * trans(t, t0)
+        z = dict(talk1=1.0, talk2=1.32, talkq=1.12, talkj=1.38, talk3=1.15, happy=1.25)[n] * (1 + 0.03 * lt / 3) * trans(t, t0)
         fr = mblur(iframe(t, z, 820 if z > 1.2 else 900), lt)
         if n == "talk1": T_CONF.draw(fr, 1180, t, t0 + 0.7, t1 - 0.05, cps=30)
+        if n == "talkq": bracket(fr, t, t0 + 0.15, ["НРАВИШЬСЯ СЕБЕ РАЗДЕТОЙ", "БОЛЬШЕ, ЧЕМ ОДЕТОЙ"], 1230, 76, t1 - 0.1)
+        if n == "talkj": T_JOY.draw(fr, 1240, t, 17.9, t1 - 0.05, cps=30)
         if n == "talk3": T_TRIP.draw(fr, 1180, t, 21.75, t1 - 0.05, cps=32)
-        if n in ("talk4", "talk5"):
-            bullet(fr, t, 28.35, "через неделю — уже дома", 70, 1230)
-            bullet(fr, t, 30.6, "через 3 дня — снова на работе", 70, 1310)
         if n == "happy": T_HAPPY.draw(fr, 1250, t, t0 + 0.05, t1, cps=34)
-    elif n == "side":
-        fr = mblur(fillp(A85, (1.45 + 0.06 * lt / 3) * trans(t, t0), 0.48, 0.44), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.1)
-        bracket(fr, t, t0 + 0.15, ["НРАВИШЬСЯ СЕБЕ РАЗДЕТОЙ", "БОЛЬШЕ, ЧЕМ ОДЕТОЙ"], 1230, 76, t1 - 0.1)
     elif n == "before":
         img, s0 = (B80, t0) if t < 12.75 else ((B81, 12.75) if t < 13.7 else (B82, 13.7))
         fr = mblur(fillp(img, (1.1 + 0.04 * (t - s0)) * trans(t, s0), 0.5, 0.42), t - s0); chip(fr, CH_DO, 60, 228, t, t0 + 0.05)
         T_COVER.draw(fr, 1170, t, t0 + 0.15, t1 - 0.05, cps=34)
     elif n == "morph":
-        # smooth ДО -> ПОСЛЕ: same framing (front collage halves aligned on the stickers), soft diagonal wipe
-        z = 1.0 + 0.05 * lt / 5
+        # first ПОСЛЕ: smooth ДО -> ПОСЛЕ on the front collage halves aligned on the stickers
+        z = 1.0 + 0.05 * lt / 4
         a_ = warp(BEF_H, 620 / np.hypot(SB[1][0] - SB[0][0], SB[1][1] - SB[0][1]) * z, (SB[0][0] + SB[1][0]) / 2, (SB[0][1] + SB[1][1]) / 2, 540, 760)
         b_ = warp(AFT_H, 620 / np.hypot(SA[1][0] - SA[0][0], SA[1][1] - SA[0][1]) * z, (SA[0][0] + SA[1][0]) / 2, (SA[0][1] + SA[1][1]) / 2, 540, 760)
         ma, mb = feather_mask(BEF_H.shape[:2], *SB, z), feather_mask(AFT_H.shape[:2], *SA, z)
         bg = np.float32([16, 16, 18]) / 255
         a_ = a_ * ma + bg * (1 - ma); b_ = b_ * mb + bg * (1 - mb)
-        p = ease((t - 15.7) / 1.1); f = 0.35; edge = (xx_ / W * 0.6 + yy_ / H * 0.4)[..., None]
+        p = ease((t - 26.7) / 1.1); f = 0.35; edge = (xx_ / W * 0.6 + yy_ / H * 0.4)[..., None]
         m = np.clip((p * (1 + f) - edge) / f, 0, 1); fr = a_ * (1 - m) + b_ * m
-        chip(fr, CH_DO, 60, 228, t, t0 + 0.05, 16.2); chip(fr, CH_PO, 60, 228, t, 16.6)
-        T_JOY.draw(fr, 1240, t, 17.9, t1 - 0.05, cps=30)
+        chip(fr, CH_DO, 60, 228, t, t0 + 0.05, 27.2); chip(fr, CH_PO, 60, 228, t, 27.6)
+        T_RES.draw(fr, 1240, t, 27.8, t1 - 0.05, cps=40)
     elif n == "surgeon":
-        fr = mblur(fillp(SURG, (1.12 + 0.07 * lt / 2.8) * trans(t, t0), 0.5, 0.38), lt)
-        T_OP.draw(fr, 1240, t, t0 + 0.4, t1 - 0.05, cps=34)
-    elif n == "result":
-        fr = fillp(A84, 1.5 * trans(t, t0, 0.12), 0.5, 0.44); flash = 0.5 * max(0, 1 - lt / 0.2); chip(fr, CH_PO, 60, 228, t, t0 + 0.1)
-        T_RES.draw(fr, 1180, t, t0 + 0.05, t1, cps=40)
+        fr = mblur(fillp(SURG, (1.12 + 0.07 * lt / 2.3) * trans(t, t0), 0.5, 0.38), lt)
+        T_OP.draw(fr, 1240, t, t0 + 0.3, t1 - 0.05, cps=34)
+    elif n in ("aft1", "aft2"):
+        img = A84 if n == "aft1" else A85
+        fr = mblur(fillp(img, (1.35 + 0.05 * lt / 2) * trans(t, t0), 0.5, 0.44), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.1)
+        bullet(fr, t, 30.45, "через неделю — уже дома", 70, 1230)
+        bullet(fr, t, 31.0, "через 3 дня — снова на работе", 70, 1310)
     else:
         fr = collage({"c1": C1, "c2": C2, "c3": C3}[n], t, t0)
     if t < 2.75: T_HOOK.draw(fr, 1150, t, 0.2, 2.7, cps=24)
@@ -235,7 +233,7 @@ def render(t):
 
 TYPED = [(0.2, 24, "ЖИЗНЬ РАЗДЕЛИЛАСЬНА ДО И ПОСЛЕ"), (3.45, 30, "УВЕРЕННОСТЬ В СЕБЕэто дорогого стоит"), (12.0, 34, "ВСЁ ВРЕМЯПРИКРЫВАЛАСЬ ОДЕЖДОЙ"),
          (17.9, 30, "УДОВОЛЬСТВИЕОТ СВОЕГО ТЕЛА"), (21.75, 32, "ПРИЕХАЛА ИЗДАЛЕКАиз Саратовской области"), (24.3, 34, "ОЧЕНЬ СЛОЖНАЯИ ДЛИННАЯ ОПЕРАЦИЯ"),
-         (26.75, 40, "РЕЗУЛЬТАТПОТРЯСАЮЩИЙ"), (34.35, 34, "ОЧЕНЬ ДОВОЛЬНА")]
+         (27.8, 40, "РЕЗУЛЬТАТПОТРЯСАЮЩИЙ"), (34.35, 34, "ОЧЕНЬ ДОВОЛЬНА")]
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
