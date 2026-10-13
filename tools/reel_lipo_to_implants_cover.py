@@ -2,7 +2,7 @@ exec(open("reel.py").read().split('if __name__ == "__main__":')[0])
 TCV = Title([("ГОД НАЗАД", "H"), ("Я БОЯЛАСЬ ИМПЛАНТОВ", "P"), ("а сейчас сама пришла за увеличением груди", "S")], 112)
 DEFER[0] = True; PENDING.clear(); LIGHT[0] = False
 a_ = body_view(BF["f"], SHO[("B", "f")], 520, 470, (540, H)); b_ = body_view(AF["f"], SHO[("A", "f")], 520, 470, (540, H))
-fr = np.concatenate([a_, b_], 1); fr = look(fr, 99); fr = fr * (1 - HAZE); fr[:, 537:543] = 1.0
+fr = np.concatenate([a_, b_], 1); fr = look(fr, 99); fr = fr * (1 - HAZE)
 chip(fr, CH_DO, 40, 228, 9, 0); chip(fr, CH_PO, 580, 228, 9, 0)
 TCV.draw(fr, 1180, 9, 0)
 DEFER[0] = False
