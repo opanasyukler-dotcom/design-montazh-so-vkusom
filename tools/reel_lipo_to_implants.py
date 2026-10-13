@@ -1,4 +1,4 @@
-exec(open("base.py").read())
+exec(open("base.py").read().replace("DUR = 41.0", "DUR = 39.5"))
 import json
 
 # ---------------- voice edit: (source, src_in, src_out, reel_start) ----------------
@@ -64,6 +64,10 @@ def body_view(img, sh, width_sh=600, y_sh=520, size=(W, H), z=1.0):
 def _icon(p):
     im = load(p); d = im.shape[1]; c = im[:d, :d]; m = np.zeros((d, d), np.uint8); cv2.circle(m, (d // 2, d // 2 + 2), d // 2 - 6, 255, -1, cv2.LINE_AA)
     return np.concatenate([c.astype(np.float32) / 255 * (m[..., None] / 255.0), m[..., None] / 255.0], -1).astype(np.float32)
+# collage framing: from the neck down to the fingertips (top, bottom, centre x in source pixels)
+SPAN = {("A", "f"): (202, 1671, 758), ("B", "f"): (416, 4432, 1583), ("A", "q"): (441, 1895, 900), ("B", "q"): (654, 4796, 1650)}
+def span_view(img, top, bot, cx, z=1.0):
+    s = 930 / (bot - top) * z; return warp(img, s, cx, (top + bot) / 2, 540, 480, (W, 960))
 ICONS = [_icon(f"dl/IMG_769{i}.PNG") for i in (2, 3, 4)]; ICON_LB = ["Липофилинг", "Тест", "Импланты"]
 
 # ---------------- text ----------------
@@ -165,25 +169,12 @@ def render(t):
     elif n in ("col1", "col2"):                                         # ДО/ПОСЛЕ collage: ПОСЛЕ top, ДО bottom
         k = "f" if n == "col1" else "q"; z = (1 + 0.02 * lt) * trans(t, t0, 0.05)
         fr = np.zeros((H, W, 3), np.float32)
-        wsh = 470 if k == "f" else 330
-        fr[:960] = body_view(AF[k], SHO[("A", k)], wsh, 250, (W, 960), z); fr[960:] = body_view(BF[k], SHO[("B", k)], wsh, 250, (W, 960), z)
+        fr[:960] = span_view(AF[k], *SPAN[("A", k)], z); fr[960:] = span_view(BF[k], *SPAN[("B", k)], z)
         fr[957:963] = min(1, lt / 0.4); fr = mblur(fr, lt)
         chip(fr, CH_PO, 40, 228, t, t0 + 0.2); chip(fr, CH_DO, 40, 990, t, t0 + 0.35)
     else:                                                               # final CTA on white
         fr = white_bg(t)
-        TC1.draw(fr, 300, t, t0 + 0.1, 1e9)
-        for k, ic in enumerate(ICONS):
-            tt = t0 + 0.7 + k * 0.18
-            if t >= tt:
-                s = max(back((t - tt) / 0.4), 0.02); w = max(int(230 * s), 1); im = cv2.resize(ic, (w, w))
-                cx = 200 + k * 340; blend(fr, shadow_of(im, 14, 0.35), cx - w / 2, 860 - w / 2 + 10, 1); blend(fr, im, cx - w / 2, 860 - w / 2, min(1, (t - tt) / 0.15))
-                ring(fr, cx, 860, w / 2 + 8, ease((t - tt) / 0.5), col=PINK, th=5)
-                if ("lb", k) not in TC:
-                    f = mont(600, 36); lbim = Image.new("RGBA", (int(f.getlength(ICON_LB[k])) + 10, 52), (0, 0, 0, 0))
-                    ImageDraw.Draw(lbim).text((5, 40), ICON_LB[k], font=f, fill=WHITE + (255,), anchor="ls"); TC[("lb", k)] = to_np(lbim)
-                lb = TC[("lb", k)]; ablend(fr, lb, cx - lb.shape[1] / 2, 1000, min(1, (t - tt - 0.2) / 0.2), WHITE, BLUE)
-        for k, (txt, d0) in enumerate([("тест — в актуальном «Тест»", 1.5), ("подробнее — «Импланты» и «Липофилинг»", 1.8), ("для консультации напишите «КОНСУЛЬТАЦИЯ»", 2.1)]):
-            bullet(fr, t, t0 + d0, txt, 60, 1180 + k * 80, size=33)
+        TC1.draw(fr, 760, t, t0 + 0.1, 1e9)
     if n == "do" or n == "iv1": T1.draw(fr, 1150, t, 0.2, 6.7)
     dark = not LIGHT[0] and n not in ("col1", "col2")
     if not LIGHT[0]: fr = look(fr, t)
