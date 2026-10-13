@@ -1,28 +1,37 @@
-exec(open("base.py").read().replace("DUR = 41.0", "DUR = 39.5"))
+_b = open("base.py").read()
+for a, b in [("DUR = 41.0", "DUR = 48.6"), ("ease((t - t0) / 0.3))\ndef mblur", "ease((t - t0) / 0.6))\ndef mblur"),
+             ("if lt > 0.1: return fr", "if lt > 0.18: return fr"), ("(1 - lt / 0.1)", "(1 - lt / 0.18)"),
+             ("ti = t0 + k * 0.16; p = ease((t - ti) / 0.45)", "ti = t0 + k * 0.24; p = ease((t - ti) / 0.65)"),
+             ("out = 1 - ease((t - t1) / 0.3) if t > t1 else 1.0", "out = 1 - ease((t - t1) / 0.4) if t > t1 else 1.0"),
+             ("p = ease(lt / 0.45); h = int(img.shape[0]", "p = ease(lt / 0.7); h = int(img.shape[0]"),
+             ("p = ease((t - t0) / 0.35); al = min(1, (t - t0) / 0.1)", "p = ease((t - t0) / 0.5); al = min(1, (t - t0) / 0.15)")]:
+    assert _b.count(a) == 1, a; _b = _b.replace(a, b)
+exec(_b)
 import json
 
 # ---------------- voice edit: (source, src_in, src_out, reel_start) ----------------
-SEGS = [("IMG_3119", 0.00, 3.16, 0.30), ("IMG_3119", 5.25, 8.58, 3.50),            # год назад… не готова к имплантам
-        ("IMG_3119", 8.81, 10.80, 6.95),                                              # что-то чужеродное
-        ("IMG_3116", 3.70, 5.40, 9.20), ("IMG_3116", 5.69, 9.05, 10.95),             # хирург: делали подтяжку… объёма не хватает
-        ("IMG_3119", 18.24, 20.75, 14.55),                                            # из-за объёма решилась на импланты
-        ("IMG_3144", 1.81, 2.36, 18.55), ("IMG_3144", 4.03, 5.17, 19.20),           # ну, хорошо. тогда поставим 325
-        ("IMG_3138", 5.33, 7.30, 22.30),                                              # как будто и было всегда
-        ("IMG_3138", 11.29, 13.69, 24.50), ("IMG_3138", 14.10, 15.92, 26.95),       # тот вид… в своих мечтах
-        ("IMG_1360", 2.50, 4.84, 29.00)]                                              # мечты сбываются. это точно
+SEGS = [("IMG_3119", 0.00, 3.35, 0.30), ("IMG_3119", 5.25, 8.62, 4.00),            # год назад… не готова к имплантам
+        ("IMG_3119", 8.81, 10.90, 7.85),                                              # что-то чужеродное
+        ("IMG_3116", 3.70, 5.50, 10.85), ("IMG_3116", 5.69, 9.15, 12.95),            # хирург: делали подтяжку… объёма не хватает
+        ("IMG_3119", 18.24, 20.80, 17.45),                                            # из-за объёма решилась на импланты
+        ("IMG_3144", 1.81, 2.40, 22.15), ("IMG_3144", 4.03, 6.72, 22.95),           # ну, хорошо. тогда поставим 325 (whole number)
+        ("IMG_3138", 5.33, 7.30, 29.05),                                              # как будто и было всегда
+        ("IMG_3138", 11.29, 13.69, 31.70), ("IMG_3138", 14.10, 16.00, 34.35),       # тот вид… в своих мечтах
+        ("IMG_1360", 2.50, 4.90, 36.85)]                                              # мечты сбываются. это точно
 VID = {"IMG_3119": "iv", "IMG_3116": "surg", "IMG_3144": "impl", "IMG_3138": "ward", "IMG_1360": "a60"}
 def src_of(t, name):
-    best = None
+    best = None                                                         # in the gaps the picture keeps playing (no freeze)
     for s, si, so, t0 in SEGS:
         if s != name: continue
         if t0 <= t <= t0 + so - si: return si + t - t0
-        if t < t0: return si if best is None else best
-        best = so
-    return best
+        if t < t0: return max(0.0, si - (t0 - t)) if best is None else min(best[0] + t - best[1], si)
+        best = (so, t0 + so - si)
+    return None if best is None else best[0] + t - best[1]
 
-BL = [("do", 0, 3.5), ("iv1", 3.5, 6.8), ("cards", 6.8, 9.1), ("surg", 9.1, 14.4), ("circ", 14.4, 17.06),
-      ("impl", 17.06, 20.6), ("or", 20.6, 22.3), ("after", 22.3, 24.4), ("cmp", 24.4, 28.9), ("dream", 28.9, 31.5),
-      ("col1", 31.5, 33.75), ("col2", 33.75, 36.0), ("cta", 36.0, DUR)]
+BL = [("do", 0, 3.9), ("iv1", 3.9, 7.6), ("cards", 7.6, 10.6), ("surg", 10.6, 17.0), ("circ", 17.0, 20.4),
+      ("impl", 20.4, 26.6), ("or", 26.6, 28.8), ("after", 28.8, 31.4), ("cmp", 31.4, 36.6), ("dream", 36.6, 39.8),
+      ("col1", 39.8, 42.6), ("col2", 42.6, 45.4), ("cta", 45.4, DUR)]
+XF = 0.35                                                               # soft dissolve between blocks
 def block(t):
     for n, a, b in BL:
         if t < b: return n, a, b
@@ -48,7 +57,7 @@ def vframe(k, ts, z=1.0, cx=540, cy=960, ox=540, oy=960):
     i = int(round(ts * 30)); f = V[k].get(i)
     if k in HEADS:                                                       # patient face blurred
         hx, hy, sw = HEADS[k][min(i, len(HEADS[k]) - 1)]; r = max(sw * 0.4, 80)
-        f = blur_ell(f, (hx, hy - 0.2 * r), (r * 0.95, r * 1.3))
+        f = blur_ell(f, (hx, hy - 0.2 * r), (r * 0.95, r * 1.3)) if k != "a60" else blur_ell(f, (hx, hy), (r * 1.25, r * 1.6))
     return warp(f, z, cx, cy, ox, oy)
 def vsync(name, t, z=1.0, cx=540, cy=960, oy=960): return vframe(VID[name], src_of(t, name), z, cx, cy, 540, oy)
 
@@ -126,8 +135,8 @@ def circle_iv(fr, t, t0, cx, cy, r):
     ring(fr, cx, cy, rr + 24 + 60 * pul, 1.0, col=tuple(int(c) for c in np.float32(PINK) * (1 - pul) + np.float32([250, 247, 246]) * pul), th=4)
 
 LIGHT_BLOCKS = ("cards", "circ", "cta")
-def render(t):
-    n, t0, t1 = block(t); lt = t - t0; flash = 0; DEFER[0] = True; PENDING.clear(); LIGHT[0] = n in LIGHT_BLOCKS
+def render_block(t, b=None):
+    n, t0, t1 = b or block(t); lt = t - t0; flash = 0; DEFER[0] = True; PENDING.clear(); LIGHT[0] = n in LIGHT_BLOCKS
     if n == "do":                                                       # ДО turnaround, front
         fr = vframe("do", 20.0 + t * 0.8, 1.25 + 0.05 * t / 3.5, 540, 820, 540, 900); chip(fr, CH_DO, 60, 228, t, 0.1)
     elif n == "iv1":
@@ -138,44 +147,44 @@ def render(t):
         T2.draw(fr, 1300, t, t0 + 0.2, t1 - 0.05)
     elif n == "surg":                                                   # surgeon with the patient, lips in sync
         fr = mblur(vsync("IMG_3116", t, 1.15 * (1 + 0.04 * lt / 5) * trans(t, t0), 540, 900, 900), lt)
-        T3.draw(fr, 1170, t, 10.0, 12.55); T3b.draw(fr, 1200, t, 12.7, t1 - 0.05)
+        T3.draw(fr, 1170, t, 11.3, 14.6); T3b.draw(fr, 1200, t, 14.9, t1 - 0.05)
     elif n == "circ":
         fr = white_bg(t); circle_iv(fr, t, t0, 540, 720, 300)
-        T4.draw(fr, 1150, t, t0 + 0.4, t1 - 0.05)
+        T4.draw(fr, 1150, t, t0 + 0.45, t1 - 0.05)
     elif n == "impl":                                                   # implant choice
-        if t < 18.5: fr = mblur(vframe("impl", 14.5 + lt, 1.15 * trans(t, t0), 540, 900), lt)
-        else: fr = mblur(vframe("impl", src_of(t, "IMG_3144") if src_of(t, "IMG_3144") else 2.0, 1.1 * trans(t, 18.5), 540, 900), t - 18.5)
-        T5.draw(fr, 1050, t, t0 + 0.15, 19.75)
-        for k, (txt, d0) in enumerate([("275", 0.55), ("300", 0.8), ("325", 1.05)]):
-            vchip(fr, txt + " мл", t, t0 + d0, 250 + k * 290, 1290, hi=(txt == "325" and t >= 19.75))
-        T5b.draw(fr, 1060, t, 19.85, t1 - 0.05)
+        if t < 22.0: fr = mblur(vframe("impl", 14.0 + lt, 1.15 * trans(t, t0), 540, 900), lt)
+        else: fr = mblur(vframe("impl", src_of(t, "IMG_3144") if src_of(t, "IMG_3144") else 1.6, 1.1 * trans(t, 22.0), 540, 900), t - 22.0)
+        T5.draw(fr, 1050, t, t0 + 0.2, 25.0)
+        for k, (txt, d0) in enumerate([("275", 0.8), ("300", 1.25), ("325", 1.7)]):
+            vchip(fr, txt + " мл", t, t0 + d0, 250 + k * 290, 1290, hi=(txt == "325" and t >= 25.05))
+        T5b.draw(fr, 1060, t, 25.2, t1 - 0.05)
     elif n == "or":                                                     # quick operating-room cuts
-        clips = [(20.6, "or3", 1.5, 1.1), (21.15, "or1", 0.5, 1.15), (21.7, "or3", 6.0, 1.3)]
+        clips = [(26.6, "or3", 1.5, 1.1), (27.3, "or1", 0.5, 1.15), (28.0, "or3", 6.0, 1.3)]
         s0, k, st, z = [c for c in clips if c[0] <= t][-1]
-        fr = mblur(vframe(k, st + (t - s0), z * trans(t, s0, 0.1), 540, 960), t - s0); flash = 0.35 * max(0, 1 - (t - s0) / 0.12)
+        fr = mblur(vframe(k, st + (t - s0), z * trans(t, s0, 0.1), 540, 960), t - s0); flash = 0.25 * max(0, 1 - (t - s0) / 0.25)
     elif n == "after":
-        fr = mblur(vframe("a59", 18.5 + lt * 0.7, 1.35 * trans(t, t0, 0.1), 540, 760, 540, 860), lt); flash = 0.4 * max(0, 1 - lt / 0.2)
+        fr = mblur(vframe("a59", 18.3 + lt * 0.6, 1.35 * trans(t, t0, 0.1), 540, 760, 540, 860), lt); flash = 0.3 * max(0, 1 - lt / 0.35)
         chip(fr, CH_PO, 60, 228, t, t0 + 0.1); T7.draw(fr, 1160, t, t0 + 0.2, t1 - 0.05)
     elif n == "cmp":                                                    # smooth ДО -> ПОСЛЕ (shoulders aligned)
-        z = 1.0 + 0.04 * lt / 4.5
+        z = 1.0 + 0.04 * lt / 5.2
         a_ = body_view(BF["f"], SHO[("B", "f")], z=z); b_ = body_view(AF["f"], SHO[("A", "f")], z=z)
-        p = ease((t - 24.9) / 1.1); f = 0.35; edge = (xx_ / W * 0.6 + yy_ / H * 0.4)[..., None]
+        p = ease((t - 32.2) / 1.6); f = 0.35; edge = (xx_ / W * 0.6 + yy_ / H * 0.4)[..., None]
         m = np.clip((p * (1 + f) - edge) / f, 0, 1); fr = a_ * (1 - m) + b_ * m
-        chip(fr, CH_DO, 60, 228, t, t0, 25.4); chip(fr, CH_PO, 60, 228, t, 25.8)
-        T8.draw(fr, 1180, t, 26.0, t1 - 0.05)
+        chip(fr, CH_DO, 60, 228, t, t0, 32.2); chip(fr, CH_PO, 60, 228, t, 33.1)
+        T8.draw(fr, 1180, t, 33.4, t1 - 0.05)
     elif n == "dream":
-        fr = mblur(vsync("IMG_1360", t, 1.3 * trans(t, t0), 540, 760, 860), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.1)
-        T9.draw(fr, 1200, t, 29.1, t1 - 0.05)
+        fr = mblur(vframe("a60", 8.2 + lt * 0.75, 1.3 * trans(t, t0), 540, 760, 540, 860), lt)     # side → ¾, never the back; chip(fr, CH_PO, 60, 228, t, t0 + 0.1)
+        T9.draw(fr, 1200, t, 36.85, t1 - 0.05)
     elif n in ("col1", "col2"):                                         # ДО/ПОСЛЕ collage: ПОСЛЕ top, ДО bottom
         k = "f" if n == "col1" else "q"; z = (1 + 0.02 * lt) * trans(t, t0, 0.05)
         fr = np.zeros((H, W, 3), np.float32)
         fr[:960] = span_view(AF[k], *SPAN[("A", k)], z); fr[960:] = span_view(BF[k], *SPAN[("B", k)], z)
-        fr[957:963] = min(1, lt / 0.4); fr = mblur(fr, lt)
-        chip(fr, CH_PO, 40, 228, t, t0 + 0.2); chip(fr, CH_DO, 40, 990, t, t0 + 0.35)
+        fr[957:963] = min(1, lt / 0.6); fr = mblur(fr, lt)
+        chip(fr, CH_PO, 40, 228, t, t0 + 0.3); chip(fr, CH_DO, 40, 990, t, t0 + 0.55)
     else:                                                               # final CTA on white
         fr = white_bg(t)
         TC1.draw(fr, 760, t, t0 + 0.1, 1e9)
-    if n == "do" or n == "iv1": T1.draw(fr, 1150, t, 0.2, 6.7)
+    if n == "do" or n == "iv1": T1.draw(fr, 1150, t, 0.3, 7.45)
     dark = not LIGHT[0] and n not in ("col1", "col2")
     if not LIGHT[0]: fr = look(fr, t)
     if dark: fr = fr * (1 - HAZE)
@@ -184,8 +193,13 @@ def render(t):
     for args in PENDING: ablend(fr, *args)
     blend(fr, LOGO_D if LIGHT[0] else LOGO, 540 - LOGO.shape[1] / 2, 120, 0.9)
     if flash > 0: fr = fr * (1 - flash) + flash
-    if t > DUR - 0.6: fr *= 1 - 0.9 * (t - (DUR - 0.6)) / 0.6
     return np.clip(fr, 0, 1)
+def render(t):
+    n, t0, t1 = block(t); i = BL.index((n, t0, t1)); fr = render_block(t)
+    if i > 0 and t < t0 + XF:                                           # dissolve from the previous block
+        a = ease((t - t0) / XF); fr = render_block(t, BL[i - 1]) * (1 - a) + fr * a
+    if t > DUR - 0.8: fr = fr * (1 - 0.9 * (t - (DUR - 0.8)) / 0.8)
+    return fr
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
