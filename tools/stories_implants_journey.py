@@ -436,7 +436,7 @@ def photos():
     asp = W / ((H - 6) // 2)
     A_front = crop_frac(load_img("IMG_7678.JPG"), 0.50, 0.265, 0.70, asp)    # shoulders..navel, no face
     B_front = crop_frac(load_img("IMG_7690.HEIC"), 0.50, 0.35, 1.00, asp)
-    A_side = crop_frac(load_img("IMG_7679.JPG"), 0.53, 0.285, 0.68, asp)
+    A_side = crop_frac(load_img("IMG_7679.JPG"), 0.53, 0.305, 0.68, asp)
     B_side = crop_frac(load_img("IMG_7691.HEIC"), 0.50, 0.35, 1.00, asp)
     return collage(A_front, B_front), collage(A_side, B_side)
 
