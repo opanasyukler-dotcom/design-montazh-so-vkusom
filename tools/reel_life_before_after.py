@@ -218,22 +218,23 @@ def subs(frame, t, y=1530):
             ablend(frame, im, 540 - im.shape[1] / 2, y - im.shape[0] / 2 + 12 * (1 - p), al, WHITE, BLUE)
 
 # front collage halves aligned on the stickers (ПОСЛЕ top half, ДО bottom half)
-AFT_H, BEF_H = C1[:955], C1[965:]
+AFT_H, BEF_H = C1[:955], B80                    # ДО: full original photo (more of the body than the collage half)
 def half_view(img, sl, sr, z):
-    mx, my = (sl[0] + sr[0]) / 2, (sl[1] + sr[1]) / 2; s = 620 / np.hypot(sr[0] - sl[0], sr[1] - sl[1]) * z
+    mx, my = (sl[0] + sr[0]) / 2, (sl[1] + sr[1]) / 2; s = SEP / np.hypot(sr[0] - sl[0], sr[1] - sl[1]) * z
     out = warp(img, s, mx, my, 540, 760)
     msk = warp(np.full(img.shape[:2], 255, np.uint8), s, mx, my, 540, 760)[..., None] if False else None
     return out
 def feather_mask(shape_hw, sl, sr, z):
-    m = np.full(shape_hw, 255, np.uint8); m = cv2.GaussianBlur(cv2.copyMakeBorder(m[40:-40, 40:-40], 40, 40, 40, 40, cv2.BORDER_CONSTANT, value=0), (0, 0), 25)
-    mx, my = (sl[0] + sr[0]) / 2, (sl[1] + sr[1]) / 2; s = 620 / np.hypot(sr[0] - sl[0], sr[1] - sl[1]) * z
+    m = np.full(shape_hw, 255, np.uint8); m = cv2.GaussianBlur(cv2.copyMakeBorder(m[12:-12, 12:-12], 12, 12, 12, 12, cv2.BORDER_CONSTANT, value=0), (0, 0), 7)
+    mx, my = (sl[0] + sr[0]) / 2, (sl[1] + sr[1]) / 2; s = SEP / np.hypot(sr[0] - sl[0], sr[1] - sl[1]) * z
     M = np.float32([[s, 0, 540 - s * mx], [0, s, 760 - s * my]])
     return cv2.warpAffine(m, M, (W, H)).astype(np.float32)[..., None] / 255
-SA, SB = ((281, 288), (768, 300)), ((257, 1243 - 965), (852, 1200 - 965))
+SEP = 487                       # sticker distance on screen: ПОСЛЕ half shown at full width, nothing cropped
+SA, SB = ((281, 288), (768, 300)), ((267, 528), (852, 479))
 
 def morph_frame(t, tw, z):
-    a_ = warp(BEF_H, 620 / np.hypot(SB[1][0] - SB[0][0], SB[1][1] - SB[0][1]) * z, (SB[0][0] + SB[1][0]) / 2, (SB[0][1] + SB[1][1]) / 2, 540, 760)
-    b_ = warp(AFT_H, 620 / np.hypot(SA[1][0] - SA[0][0], SA[1][1] - SA[0][1]) * z, (SA[0][0] + SA[1][0]) / 2, (SA[0][1] + SA[1][1]) / 2, 540, 760)
+    a_ = warp(BEF_H, SEP / np.hypot(SB[1][0] - SB[0][0], SB[1][1] - SB[0][1]) * z, (SB[0][0] + SB[1][0]) / 2, (SB[0][1] + SB[1][1]) / 2, 540, 760)
+    b_ = warp(AFT_H, SEP / np.hypot(SA[1][0] - SA[0][0], SA[1][1] - SA[0][1]) * z, (SA[0][0] + SA[1][0]) / 2, (SA[0][1] + SA[1][1]) / 2, 540, 760)
     ma, mb = feather_mask(BEF_H.shape[:2], *SB, z), feather_mask(AFT_H.shape[:2], *SA, z)
     bg = np.float32([16, 16, 18]) / 255
     a_ = a_ * ma + bg * (1 - ma); b_ = b_ * mb + bg * (1 - mb)
@@ -269,8 +270,8 @@ def render(t):
         T_RES.draw(fr, 1240, t, 27.8, t1 - 0.05, cps=40)
     elif n == "_unused":
         z = 1.0
-        a_ = warp(BEF_H, 620 / np.hypot(SB[1][0] - SB[0][0], SB[1][1] - SB[0][1]) * z, (SB[0][0] + SB[1][0]) / 2, (SB[0][1] + SB[1][1]) / 2, 540, 760)
-        b_ = warp(AFT_H, 620 / np.hypot(SA[1][0] - SA[0][0], SA[1][1] - SA[0][1]) * z, (SA[0][0] + SA[1][0]) / 2, (SA[0][1] + SA[1][1]) / 2, 540, 760)
+        a_ = warp(BEF_H, SEP / np.hypot(SB[1][0] - SB[0][0], SB[1][1] - SB[0][1]) * z, (SB[0][0] + SB[1][0]) / 2, (SB[0][1] + SB[1][1]) / 2, 540, 760)
+        b_ = warp(AFT_H, SEP / np.hypot(SA[1][0] - SA[0][0], SA[1][1] - SA[0][1]) * z, (SA[0][0] + SA[1][0]) / 2, (SA[0][1] + SA[1][1]) / 2, 540, 760)
         ma, mb = feather_mask(BEF_H.shape[:2], *SB, z), feather_mask(AFT_H.shape[:2], *SA, z)
         bg = np.float32([16, 16, 18]) / 255
         a_ = a_ * ma + bg * (1 - ma); b_ = b_ * mb + bg * (1 - mb)
