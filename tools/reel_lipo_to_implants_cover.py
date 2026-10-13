@@ -6,6 +6,7 @@ def soft(img, sh):
     m = cv2.GaussianBlur(m, (0, 0), h * 0.03); mm = np.repeat(m[..., None], 3, 2)
     return body_view(img, sh, 410, 560, (540, H)), body_view(mm, sh, 410, 560, (540, H))[..., :1]
 (a_, ma), (b_, mb) = soft(BF["f"], SHO[("B", "f")]), soft(AF["f"], SHO[("A", "f")])
+prof = ma.max(1, keepdims=True); prof[:H // 2] = 1; mb = np.minimum(mb, prof)   # cut ПОСЛЕ legs at the same height as ДО
 bgc = np.float32([16, 16, 18]) / 255; a_ = a_ * ma + bgc * (1 - ma); b_ = b_ * mb + bgc * (1 - mb)
 fr = np.concatenate([a_, b_], 1); fr = look(fr, 99); fr = fr * (1 - HAZE)
 chip(fr, CH_DO, 40, 228, 9, 0); chip(fr, CH_PO, 580, 228, 9, 0)
