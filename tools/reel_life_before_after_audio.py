@@ -39,15 +39,15 @@ SH,BM,SM,DG=shutter(),boom(),shimmer(),ding()
 sfx=np.zeros(n+SR)
 def put(s,t,g): i=int(max(0,t)*SR); seg=sfx[i:i+len(s)]; seg+=s[:len(seg)]*g
 WB,PP,IM,RS=whoosh(),pop(),impact(),riser(); KEYS=[key() for _ in range(8)]
-for c in [2.0,2.75,6.45,8.85,11.85,12.75,13.7,14.6,19.6,23.9,26.2,30.2,32.2,34.3,35.4,38.3,41.2]: put(WB,c-0.25,0.24); put(BM,c,0.22)
-put(IM,2.0,0.2); put(RS,26.7-1.1,0.2); put(IM,26.75,0.3); put(IM,0.0,0.25)
+for c in [3.3,6.45,8.85,11.85,12.75,13.7,14.6,19.6,23.9,26.2,30.2,32.2,34.3,35.4,38.3,41.2]: put(WB,c-0.25,0.24); put(BM,c,0.22)
+put(RS,1.6-1.0,0.18); put(SM,1.75,0.18); put(BM,1.65,0.25); put(RS,26.7-1.1,0.2); put(IM,26.75,0.3); put(IM,0.0,0.25)
 SW=whoosh(0.28,800,9000,0.5)
 TITLES=[(0.2,2),(3.45,2),(9.0,2),(12.0,2),(17.9,2),(21.75,2),(24.2,2),(27.8,2),(34.35,1)]
 for t0,nl in TITLES:
     for k in range(nl): put(SW,t0+k*0.16-0.05,0.13)
     put(PP,t0+0.05,0.12)
 for t in [9.0,30.45,31.0,35.65,38.55,41.45]: put(PP,t,0.2)
-for t in [0.02,2.0,11.85,12.75,13.7,23.9,30.2,32.2,35.4,38.3,41.2]: put(SH,t+0.02,0.22)      # camera shutter on photo cuts
+for t in [11.85,12.75,13.7,23.9,30.2,32.2,35.4,38.3,41.2]: put(SH,t+0.02,0.22)      # camera shutter on photo cuts
 put(SM,26.75,0.2); put(SM,35.45,0.14); put(DG,34.45,0.12); put(RS,35.4-1.0,0.14)
 mix=mus+vo[:,None]+sfx[:n,None]*0.5
 mix/=max(1,np.abs(mix).max()/0.97)

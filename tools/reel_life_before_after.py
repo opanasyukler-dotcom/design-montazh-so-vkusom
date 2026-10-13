@@ -23,7 +23,7 @@ def src_of(t):
         best = so
     return best
 
-BL = [("hook", 0, 2.0), ("hook2", 2.0, 2.75), ("talk1", 2.75, 6.45), ("talk2", 6.45, 8.85), ("talkq", 8.85, 11.85),
+BL = [("hook", 0, 3.3), ("talk1", 3.3, 6.45), ("talk2", 6.45, 8.85), ("talkq", 8.85, 11.85),
       ("before", 11.85, 14.6), ("talkj", 14.6, 19.6), ("talk3", 19.6, 23.9), ("surgeon", 23.9, 26.2), ("morph", 26.2, 30.2),
       ("aft1", 30.2, 32.2), ("aft2", 32.2, 34.3), ("happy", 34.3, 35.4),
       ("c1", 35.4, 38.3), ("c2", 38.3, 41.2), ("c3", 41.2, DUR)]
@@ -231,6 +231,14 @@ def feather_mask(shape_hw, sl, sr, z):
     return cv2.warpAffine(m, M, (W, H)).astype(np.float32)[..., None] / 255
 SA, SB = ((281, 288), (768, 300)), ((257, 1243 - 965), (852, 1200 - 965))
 
+def morph_frame(t, tw, z):
+    a_ = warp(BEF_H, 620 / np.hypot(SB[1][0] - SB[0][0], SB[1][1] - SB[0][1]) * z, (SB[0][0] + SB[1][0]) / 2, (SB[0][1] + SB[1][1]) / 2, 540, 760)
+    b_ = warp(AFT_H, 620 / np.hypot(SA[1][0] - SA[0][0], SA[1][1] - SA[0][1]) * z, (SA[0][0] + SA[1][0]) / 2, (SA[0][1] + SA[1][1]) / 2, 540, 760)
+    ma, mb = feather_mask(BEF_H.shape[:2], *SB, z), feather_mask(AFT_H.shape[:2], *SA, z)
+    bg = np.float32([16, 16, 18]) / 255
+    a_ = a_ * ma + bg * (1 - ma); b_ = b_ * mb + bg * (1 - mb)
+    p = ease((t - tw) / 1.0); f = 0.35; edge = (xx_ / W * 0.6 + yy_ / H * 0.4)[..., None]
+    m = np.clip((p * (1 + f) - edge) / f, 0, 1); return a_ * (1 - m) + b_ * m
 def collage(img, t, t0):
     lt = t - t0; fr = warp(img, (1 + 0.02 * lt) * trans(t, t0, 0.06), 540, 960); fr = mblur(fr, lt)
     fr[957:963] = np.maximum(fr[957:963], min(1, lt / 0.4))
@@ -239,9 +247,9 @@ def collage(img, t, t0):
 def render(t):
     n, t0, t1 = block(t); lt = t - t0; flash = 0; DEFER[0] = True; PENDING.clear()
     if n == "hook":
-        fr = fitp(B80, 1.0 + 0.03 * t); chip(fr, CH_DO, 60, 228, t, 0.1)
-    elif n == "hook2":
-        fr = mblur(fitp(B81, 1.0 * trans(t, t0, 0.06)), lt); chip(fr, CH_DO, 60, 228, t, t0)
+        # opening: ДО -> ПОСЛЕ transition on «разделилась на до и после»
+        fr = morph_frame(t, 1.6, 1.0 + 0.04 * t / 3.3)
+        chip(fr, CH_DO, 60, 228, t, 0.1, 2.05); chip(fr, CH_PO, 60, 228, t, 2.45)
     elif n.startswith("talk") or n == "happy":
         z = dict(talk1=1.0, talk2=1.32, talkq=1.12, talkj=1.38, talk3=1.15, happy=1.25)[n] * (1 + 0.03 * lt / 3) * trans(t, t0)
         fr = mblur(iframe(t, z, 820 if z > 1.2 else 900), lt)
@@ -255,8 +263,12 @@ def render(t):
         fr = mblur(fitp(img, (1.0 + 0.03 * (t - s0)) * trans(t, s0, 0.05)), t - s0); chip(fr, CH_DO, 60, 228, t, t0 + 0.05)
         T_COVER.draw(fr, 1170, t, t0 + 0.15, t1 - 0.05, cps=34)
     elif n == "morph":
-        # first ПОСЛЕ: smooth ДО -> ПОСЛЕ on the front collage halves aligned on the stickers
-        z = 1.0 + 0.05 * lt / 4
+        # ПОСЛЕ: smooth ДО -> ПОСЛЕ on the front collage halves aligned on the stickers
+        fr = morph_frame(t, 26.7, 1.0 + 0.05 * lt / 4)
+        chip(fr, CH_DO, 60, 228, t, t0 + 0.05, 27.2); chip(fr, CH_PO, 60, 228, t, 27.6)
+        T_RES.draw(fr, 1240, t, 27.8, t1 - 0.05, cps=40)
+    elif n == "_unused":
+        z = 1.0
         a_ = warp(BEF_H, 620 / np.hypot(SB[1][0] - SB[0][0], SB[1][1] - SB[0][1]) * z, (SB[0][0] + SB[1][0]) / 2, (SB[0][1] + SB[1][1]) / 2, 540, 760)
         b_ = warp(AFT_H, 620 / np.hypot(SA[1][0] - SA[0][0], SA[1][1] - SA[0][1]) * z, (SA[0][0] + SA[1][0]) / 2, (SA[0][1] + SA[1][1]) / 2, 540, 760)
         ma, mb = feather_mask(BEF_H.shape[:2], *SB, z), feather_mask(AFT_H.shape[:2], *SA, z)
@@ -276,7 +288,7 @@ def render(t):
         bullet(fr, t, 31.0, "через 3 дня — снова на работе", 70, 1310)
     else:
         fr = collage({"c1": C1, "c2": C2, "c3": C3}[n], t, t0)
-    if t < 2.75: T_HOOK.draw(fr, 1150, t, 0.2, 2.7, cps=24)
+    if t < 3.3: T_HOOK.draw(fr, 1150, t, 0.2, 3.2, cps=24)
     fr = look(fr, t)
     if n not in ("c1", "c2", "c3"): fr = fr * (1 - HAZE)
     if n not in ("c1", "c2", "c3"): subs(fr, t)
