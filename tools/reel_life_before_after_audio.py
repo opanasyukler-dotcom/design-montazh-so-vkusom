@@ -51,7 +51,7 @@ for t in [11.85,12.75,13.7,23.9,30.2,32.2,35.4,38.3,41.2]: put(SH,t+0.02,0.22)  
 put(SM,26.75,0.2);
 for t in [3.45,9.3,20.05,34.3]: put(PP,t,0.24); put(SW,t-0.05,0.16)        # face circle pops
 put(whoosh(1.1,400,4000,0.4),21.6,0.12)                                   # route drawing
- put(SM,35.45,0.14); put(DG,34.45,0.12); put(RS,35.4-1.0,0.14)
+put(SM,35.45,0.14); put(DG,34.45,0.12); put(RS,35.4-1.0,0.14)
 mix=mus+vo[:,None]+sfx[:n,None]*0.5
 mix/=max(1,np.abs(mix).max()/0.97)
 with wave.open("mix.wav","wb") as w:
