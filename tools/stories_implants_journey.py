@@ -86,7 +86,7 @@ def text_img(lines, f, col=WHITE, lh=1.22, align="center", width=W - 2 * MARGIN,
     im = Image.new("RGBA", (width + 2 * pad, hh), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
     for i, ln in enumerate(lines):
         lw = f.getlength(ln) + ((tail.width + 14) if (tail is not None and i == len(lines) - 1) else 0)
-        x = pad + (width - lw) / 2 if align == "center" else pad
+        x = pad + (width - lw) / 2 if align == "center" else (pad + width - lw if align == "right" else pad)
         d.text((x, pad + i * step + step / 2), ln, font=f, fill=col + (255,), anchor="lm")
         if tail is not None and i == len(lines) - 1:
             im.alpha_composite(tail, (int(x + f.getlength(ln) + 14), int(pad + i * step + step / 2 - tail.height / 2)))
@@ -103,7 +103,7 @@ class Column:
         self.y = y; self.align = align; self.width = width; self.items = []; self.bottom = y
 
     def _add(self, im, pad, t0, gap):
-        x = MARGIN - pad if self.align == "left" else (W - im.width) // 2
+        x = (W - im.width) // 2 if self.align == "center" else MARGIN - pad
         self.items.append(Sprite(im, x, self.y - pad, t0))
         self.y += im.height - 2 * pad + gap; self.bottom = self.y
 
@@ -118,7 +118,7 @@ class Column:
 
     def rule(self, t0, length=150, gap=30):
         im = Image.new("RGBA", (length, 4), LILAC + (255,))
-        x = MARGIN if self.align == "left" else (W - length) // 2
+        x = {"left": MARGIN, "right": W - MARGIN - length}.get(self.align, (W - length) // 2)
         self.items.append(Sprite(im, x, self.y, t0, dy=0)); self.y += 4 + gap; self.bottom = self.y; return self
 
     def icon_row(self, icon, text, t0, size=38, gap=26, ih=170):
@@ -309,14 +309,14 @@ FIX = {"чем то": "чем-то", "двоечка был": "двоечка б
 
 # ---------------- stories ----------------
 def s1():
-    c = Clip("IMG_3059.MOV", 44.0, 56.0, ct=0.20, zoom=(1.0, 1.04), zc=(0.5, 0.6), frost=200, sat=0.95)
-    # poll sticker goes on the frosted top band (~260..560); text sits low over the hips
-    col = Column(1090)
+    c = Clip("IMG_3059.MOV", 44.0, 56.0, ct=0.20, zoom=(1.0, 1.04), zc=(0.5, 0.6), sat=0.95)
+    # head is cropped out of frame; poll sticker goes over the shoulders (~260..560), text low on the left
+    col = Column(1090, align="left")
     col.head("«А ЧТО ЕСЛИ Я ХОЧУ КРАСИВУЮ ГРУДЬ, НО БОЮСЬ ИМПЛАНТОВ?»", 0.4, size=62).rule(1.0)
     col.body("Вот с этой мыслью год назад пришла наша пациентка.", 1.6)
     col.body("Она хотела красивую форму, но к имплантам тогда была не готова.", 3.0)
     print("s1 column bottom", col.bottom)
-    render(1, "boyus_implantov", 12.0, clip_bg(c), col.items, shade=np.maximum(bottom_shade(760, 0.8), top_shade(560, 0.35)))
+    render(1, "boyus_implantov", 12.0, clip_bg(c), col.items, shade=bottom_shade(760, 0.8))
 
 
 def top_shade(bottom, a=0.72):
@@ -347,7 +347,7 @@ def interview(num, slug, a, b, build):
 
 def s2():
     def b():
-        col = Column(0)
+        col = Column(0, align="left")
         col.head("УЗНАЁТЕ СЕБЯ?", 0, size=60, gap=20).rule(0, gap=22)
         col.body("Хочется изменить грудь.", 0, size=36, gap=10)
         col.body("Но внутри есть мысль:", 0, size=36, gap=10)
@@ -371,7 +371,7 @@ def s3():
 def s4():
     a, b = 0.0, 18.6
     c = Clip("IMG_3116.MOV", a, b, zoom=(1.0, 1.03), zc=(0.5, 0.3))
-    col = Column(0)
+    col = Column(0, align="left")
     col.head("А ЧЕРЕЗ ГОД ЗАПРОС ИЗМЕНИЛСЯ", 0, size=58, gap=20).rule(0, gap=22)
     col.body("Форма уже нравится.", 0, size=38, gap=10)
     col.body("Но теперь пациентке хочется больше объёма и более пышную грудь.", 0, size=38, gap=0)
@@ -382,7 +382,7 @@ def s4():
 
 def s5():
     def b():
-        col = Column(0)
+        col = Column(0, align="right")
         col.head("И ВОТ ЗДЕСЬ ОЧЕНЬ ВАЖНАЯ МЫСЛЬ", 0, size=56, gap=20).rule(0, gap=22)
         col.body("Иногда женщина боится имплантов не потому, что они ей точно не подходят.", 0, size=36, gap=10)
         col.body("А потому что она пока к ним не готова.", 0, size=36, wght=500, gap=10)
@@ -404,7 +404,7 @@ def s6():
 def s7():
     a, b = 0.6, 27.88
     c = Clip("IMG_3144.MOV", a, b, zoom=(1.0, 1.03), zc=(0.5, 0.3))
-    col = Column(0)
+    col = Column(0, align="right")
     col.head("ПЕРЕД ОПЕРАЦИЕЙ ЕЩЁ РАЗ ОБСУЖДАЕМ ОБЪЁМ", 0, size=54, gap=20).rule(0, gap=22)
     col.body("Не по принципу:", 0, size=36, gap=6)
     col.body("«Мне нравится 325 мл, значит ставим 325».", 0, size=38, wght=500, col=POWDER, italic=True, gap=12)
@@ -415,8 +415,8 @@ def s7():
 
 
 def s8():
-    c = Clip("IMG_1360.MP4", 8.0, 20.0, ct=0.21, zoom=(1.0, 1.04), zc=(0.5, 0.3), frost=120)
-    col = Column(1330)
+    c = Clip("IMG_1360.MP4", 8.0, 20.0, ct=0.21, zoom=(1.0, 1.04), zc=(0.5, 0.3))
+    col = Column(1330, align="left")
     col.head("ПЕРВЫЙ РЕЗУЛЬТАТ", 1.0, size=70, with_heart=True).rule(1.5)
     col.body("Именно тот более наполненный объём, которого пациентке не хватало после первого этапа.", 2.2)
     sh = lambda t: bottom_shade(1080, 0.78) * ease((t - 0.8) / 0.6)
@@ -434,93 +434,141 @@ def s9():
            subs=Subs(chunks(load_words("IMG_3138.MOV", a, b)), FIX), audio=("IMG_3138.MOV", a, b))
 
 
+def fit_half(im, top, bottom, hh, cx=0.5):
+    """neck (top) .. fingertips (bottom) as fractions of height; fit to the half's height, pad with the backdrop"""
+    crop = im.crop((0, int(im.height * top), im.width, int(im.height * bottom)))
+    w = int(crop.width * hh / crop.height); crop = crop.resize((w, hh), Image.LANCZOS)
+    a = np.asarray(crop)
+    bgc = tuple(int(v) for v in np.median(np.concatenate([a[:, :12].reshape(-1, 3), a[:, -12:].reshape(-1, 3)]), 0))
+    half = Image.new("RGB", (W, hh), bgc)
+    x = int(W / 2 - w * cx)
+    half.paste(crop, (x, 0))
+    if w < W:   # soften the seam between the photo edge and the padded backdrop
+        m = Image.new("L", (w, hh), 255); d = ImageDraw.Draw(m)
+        for k in range(40): d.rectangle((k, 0, w - 1 - k, hh), outline=int(255 * k / 40))
+        half.paste(Image.new("RGB", (W, hh), bgc), (0, 0))
+        half.paste(crop, (x, 0), m)
+    return half
+
+
 def collage(after, before):
-    """top = ПОСЛЕ, bottom = ДО; each half 1080x957 with a 6px graphite seam"""
+    """top = ПОСЛЕ, bottom = ДО; each half with a 6px graphite seam"""
     hh = (H - 6) // 2
     cv_ = Image.new("RGB", (W, H), GRAPHITE)
-    cv_.paste(after.resize((W, hh), Image.LANCZOS), (0, 0))
-    cv_.paste(before.resize((W, H - hh - 6), Image.LANCZOS), (0, hh + 6))
+    cv_.paste(after, (0, 0)); cv_.paste(before, (0, hh + 6))
     im = cv_.convert("RGBA")
-    im.alpha_composite(chip("ПОСЛЕ"), (48, 250))
-    im.alpha_composite(chip("ДО", POWDER), (48, hh + 6 + 40))
+    im.alpha_composite(chip("ПОСЛЕ"), (MARGIN - 20, 250))
+    im.alpha_composite(chip("ДО", POWDER), (MARGIN - 20, hh + 6 + 40))
     return np.asarray(im.convert("RGB"))
 
 
-def photos():
-    asp = W / ((H - 6) // 2)
-    A_front = crop_frac(load_img("IMG_7678.JPG"), 0.50, 0.265, 0.70, asp)    # shoulders..navel, no face
-    B_front = crop_frac(load_img("IMG_7690.HEIC"), 0.50, 0.35, 1.00, asp)
-    A_side = crop_frac(load_img("IMG_7679.JPG"), 0.53, 0.305, 0.68, asp)
-    B_side = crop_frac(load_img("IMG_7691.HEIC"), 0.50, 0.35, 1.00, asp)
-    return collage(A_front, B_front), collage(A_side, B_side)
+def collage_story(num, slug, after, before):
+    C = collage(after, before)
+    def bg(i, t):
+        z = 1.0 + 0.025 * t / 8
+        M = cv2.getRotationMatrix2D((W / 2, H / 2), 0, z)
+        return cv2.warpAffine(C, M, (W, H), borderMode=cv2.BORDER_REFLECT)
+    render(num, slug, 8.0, bg, [])
+
+
+HALF = (H - 6) // 2
 
 
 def s10():
-    C1, C2 = photos()
-    col = Column(330)
-    T = 3.2
-    col.head("И ВОТ ЗДЕСЬ ГЛАВНЫЙ ВЫВОД", T, size=64).rule(T + 0.5)
-    col.body("У одной и той же пациентки в разное время может быть разный запрос.", T + 1.3)
-    col.body("Сначала:", T + 3.0, gap=4)
-    col.body("«Хочу без имплантов»", T + 3.5, wght=600, col=POWDER, italic=True, size=50)
-    col.body("Потом:", T + 4.7, gap=4)
-    col.body("«Теперь хочу больше объёма»", T + 5.2, wght=600, col=LILAC, italic=True, size=50)
-    col.body("И оба решения могут быть правильными именно в тот момент, когда женщина к ним готова.", T + 6.8, wght=400)
-    B1 = cv2.GaussianBlur(C1, (0, 0), 14); B2 = cv2.GaussianBlur(C2, (0, 0), 14)
+    collage_story(10, "kollazh_anfas", fit_half(load_img("IMG_7678.JPG"), 0.055, 0.645, HALF),
+                  fit_half(load_img("IMG_7690.HEIC"), 0.035, 0.865, HALF))
 
+
+def s11():
+    collage_story(11, "kollazh_3-4", fit_half(load_img("IMG_7679.JPG"), 0.125, 0.675, HALF, cx=0.55),
+                  fit_half(load_img("IMG_7691.HEIC"), 0.105, 0.875, HALF, cx=0.5))
+
+
+def s12():
+    ph = load_img("5223F1B9-E4B1-4ABB-8DB1-EDB2B7955A04.png")
+    ph = ph.resize((W, int(ph.height * W / ph.width)), Image.LANCZOS)
+    base = Image.new("RGB", (W, H), GRAPHITE); base.paste(ph, (0, H - ph.height))
+    base = np.asarray(base)
+    col = Column(250, align="left")
+    col.head("И ВОТ ЗДЕСЬ ГЛАВНЫЙ ВЫВОД", 0, size=60, gap=20).rule(0, gap=26)
+    col.body("У одной и той же пациентки в разное время может быть разный запрос.", 0, size=38, gap=22)
+    col.body("Сначала:", 0, size=36, gap=0)
+    col.body("«Хочу без имплантов»", 0, wght=600, col=POWDER, italic=True, size=46, gap=16)
+    col.body("Потом:", 0, size=36, gap=0)
+    col.body("«Теперь хочу больше объёма»", 0, wght=600, col=LILAC, italic=True, size=46, gap=22)
+    col.body("И оба решения могут быть правильными именно в тот момент, когда женщина к ним готова.", 0, size=38, wght=450)
+    print("s12 bottom", col.bottom)
     def bg(i, t):
-        k2 = ease((t - 1.6) / 0.8)                                   # front -> 3/4 before text
-        clean = C1 * (1 - k2) + C2 * k2
-        blur = B1 * (1 - k2) + B2 * k2
-        kb = ease((t - T + 0.4) / 0.7)
-        z = 1.0 + 0.03 * t / 16
-        fr = (clean * (1 - kb) + blur * kb).astype(np.uint8)
-        M = cv2.getRotationMatrix2D((W / 2, H / 2), 0, z)
-        return cv2.warpAffine(fr, M, (W, H), borderMode=cv2.BORDER_REFLECT)
-    sh = lambda t: np.full((H, 1, 1), 0.62, np.float32) * ease((t - T + 0.4) / 0.7)
-    render(10, "do_posle_vyvod", 16.0, bg, col.items, shade=sh, animate=True)
+        z = 1.0 + 0.03 * t / 12
+        M = cv2.getRotationMatrix2D((W * 0.3, H * 0.7), 0, z)
+        return cv2.warpAffine(base, M, (W, H), borderMode=cv2.BORDER_REPLICATE)
+    render(12, "glavnyj_vyvod", 12.0, bg, col.items, shade=top_shade(col.bottom + 160, 0.8))
 
 
 def icon(name):
     return Image.open(os.path.join(SRC, "drive", name)).convert("RGBA")
 
 
-def s11():
-    c = Clip("IMG_1365.MP4", 0.0, 13.0, ct=0.10, zoom=(1.0, 1.04), zc=(0.5, 0.3), frost=70)
-    col = Column(980)
-    col.head("А ВЫ СЕЙЧАС ГДЕ?", 0.5, size=74).rule(1.0)
-    col.space(300)  # poll sticker
-    col.icon_row(icon("IMG_7693.PNG"), "Если сомневаетесь, загляните в актуальное «Тест». "
-                 "Там можно предварительно понять, какой вариант вам ближе.", 2.0, size=36)
-    render(11, "vy_seichas_gde", 13.0, clip_bg(c), col.items, shade=bottom_shade(700, 0.8))
+def s13():
+    c = Clip("IMG_1365.MP4", 0.0, 13.0, ct=0.10, zoom=(1.0, 1.04), zc=(0.5, 0.3))
+    col = Column(1060, align="right")
+    col.head("А ВЫ СЕЙЧАС ГДЕ?", 0, size=74).rule(0)
+    # poll sticker «Что ближе вам?» goes under the headline: ~1230..1560
+    render(13, "vy_seichas_gde", 13.0, clip_bg(c), col.items, shade=bottom_shade(760, 0.8))
 
 
-def s12():
+def pingpong(name, a, b, **kw):
+    """short clip played forward then backward"""
+    c = Clip(name, a, b, **kw); n = c.n; frames = []
+    for i in range(n): frames.append(c.frame(i).copy())
+    return lambda i, t: frames[i % (2 * n) if i % (2 * n) < n else 2 * n - 1 - i % (2 * n)]
+
+
+def s14():
+    bg = pingpong("C0856.MP4", 0.0, 4.8, zoom=(1.0, 1.0))
+    col = Column(1020, align="left")
+    col.head("АКТУАЛЬНОЕ «ТЕСТ»", 0, size=60, gap=22).rule(0, gap=26)
+    col.icon_row(icon("IMG_7693.PNG"), "Если сомневаетесь, загляните в актуальное «Тест».", 0, size=40, ih=190, gap=22)
+    col.body("Там можно предварительно понять, какой вариант вам ближе.", 0, size=38, gap=0)
+    # link sticker goes under the text: ~1460..1600
+    print("s14 bottom", col.bottom)
+    render(14, "test", 9.6, bg, col.items, shade=bottom_shade(640, 0.85))
+
+
+def s15():
+    c = Clip("copy_3AF02E7B-EC4D-4A5C-8FF7-65665E757D3C.mov", 6.0, 18.0, zoom=(1.0, 1.04), zc=(0.5, 0.3))
+    col = Column(0, align="left")
+    col.head("ЕСЛИ ХОТИТЕ ПОДРОБНЕЕ РАЗОБРАТЬСЯ", 0, size=56, gap=20).rule(0, gap=30)
+    col.icon_row(icon("IMG_7692.PNG"), "В актуальном «Липофилинг» показываю, кому может подойти увеличение собственной жировой тканью.", 0, size=36, ih=180, gap=24)
+    col.icon_row(icon("IMG_7694.PNG"), "В актуальном «Импланты» рассказываю про формы, объёмы и подбор имплантов.", 0, size=36, ih=180, gap=0)
+    col.to_bottom(1640)
+    render(15, "aktualnye", 12.0, clip_bg(c), col.items, shade=bottom_shade(col.top - 300, 0.85))
+
+
+def s16():
     ph = load_img("7E7475C1-682A-40D7-BACC-4487368771D1.png")
     ph = ph.resize((W, int(ph.height * W / ph.width)), Image.LANCZOS)        # 1080x1350
-    base = Image.new("RGB", (W, H), GRAPHITE); base.paste(ph, (0, -140))
+    base = Image.new("RGB", (W, H), GRAPHITE); base.paste(ph, (0, 0))
     base = np.asarray(base).astype(np.float32)
     ys = np.arange(H, dtype=np.float32)
-    p = np.clip((ys - 640) / 460, 0, 1); p = p * p * (3 - 2 * p)
-    base = base * (1 - p[:, None, None]) + np.array(GRAPHITE, np.float32) * p[:, None, None]
-    base = base.astype(np.uint8)
-    col = Column(870)
-    col.head("ЕСЛИ ХОТИТЕ ПОДРОБНЕЕ РАЗОБРАТЬСЯ", 0.4, size=52, gap=18).rule(0.8, gap=24)
-    col.icon_row(icon("IMG_7692.PNG"), "В актуальном «Липофилинг» показываю, кому может подойти увеличение собственной жировой тканью.", 1.2, size=32, ih=150, gap=14)
-    col.icon_row(icon("IMG_7694.PNG"), "В актуальном «Импланты» рассказываю про формы, объёмы и подбор имплантов.", 2.0, size=32, ih=150, gap=22)
-    col.body("А если хотите понять, что подойдёт именно вам, приходите на консультацию.", 2.8, size=36, wght=500, gap=14)
-    col.body("Для записи напишите в Direct «КОНСУЛЬТАЦИЯ» или свяжитесь с нами по телефону", 3.6, size=32, gap=4)
-    col.head("+7 926 636 30 00", 3.9, size=50, col=LILAC, gap=2)
-    col.body("в WhatsApp, Telegram или MAX", 4.2, size=32)
-    print("s12 column bottom", col.bottom)
-    z0 = 1.0
+    p = np.clip((ys - 900) / 450, 0, 1); p = p * p * (3 - 2 * p)
+    base = (base * (1 - p[:, None, None]) + np.array(GRAPHITE, np.float32) * p[:, None, None]).astype(np.uint8)
+    col = Column(0, align="right")
+    col.head("КОНСУЛЬТАЦИЯ", 0, size=62, gap=20).rule(0, gap=26)
+    col.body("А если хотите понять, что подойдёт именно вам, приходите на консультацию.", 0, size=38, wght=450, gap=26)
+    col.body("Для записи напишите в Direct «КОНСУЛЬТАЦИЯ» или свяжитесь с нами по телефону", 0, size=34, gap=8)
+    col.head("+7 926 636 30 00", 0, size=58, col=LILAC, gap=6)
+    col.body("WhatsApp · Telegram · MAX", 0, size=34, wght=500, gap=0)
+    col.to_bottom(1660)
+    print("s16 top", col.top)
     def bg(i, t):
-        z = z0 + 0.025 * t / 12
+        z = 1.0 + 0.025 * t / 12
         M = cv2.getRotationMatrix2D((W / 2, 420), 0, z)
         return cv2.warpAffine(base, M, (W, H), borderMode=cv2.BORDER_REPLICATE)
-    render(12, "konsultaciya", 12.0, bg, col.items)
+    render(16, "konsultaciya", 12.0, bg, col.items)
 
 
-STORIES = {1: s1, 2: s2, 3: s3, 4: s4, 5: s5, 6: s6, 7: s7, 8: s8, 9: s9, 10: s10, 11: s11, 12: s12}
+STORIES = {1: s1, 2: s2, 3: s3, 4: s4, 5: s5, 6: s6, 7: s7, 8: s8, 9: s9, 10: s10, 11: s11, 12: s12,
+           13: s13, 14: s14, 15: s15, 16: s16}
 for k, fn in STORIES.items():
     if not ONLY or k in ONLY: fn()
