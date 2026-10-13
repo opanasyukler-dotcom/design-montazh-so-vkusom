@@ -133,6 +133,12 @@ class Column:
 
     def space(self, h): self.y += h; self.bottom = self.y; return self
 
+    def to_bottom(self, yb):
+        """move the whole block so its last line ends at yb; returns the new top"""
+        d = int(yb - self.bottom)
+        for it in self.items: it.y += d
+        self.top = self.items[0].y if self.items else yb; self.bottom += d; return self
+
 
 # ---------------- subtitles ----------------
 def load_words(name, a, b):
@@ -157,7 +163,7 @@ def chunks(words, maxc=34):
     return res
 
 
-def sub_sprite(text, y=1590):
+def sub_sprite(text, y=1645):
     f = mont(42, 500); lines = wrap(text, f, W - 220)
     step = int(42 * 1.28); px, py = 28, 14
     wmax = max(f.getlength(l) for l in lines); hh = step * len(lines) + 2 * py
@@ -253,15 +259,18 @@ def chip(text, fill=LILAC):
 
 
 # ---------------- render core ----------------
-def render(num, slug, dur, bg, sprites, shade=None, subs=None, audio=None):
-    """bg(i, t) -> uint8 frame; shade: per-row darkening (H,1,1) or fn(t); audio: (file, a, b)"""
+def render(num, slug, dur, bg, sprites, shade=None, subs=None, audio=None, animate=False):
+    """bg(i, t) -> uint8 frame; shade: per-row darkening (H,1,1) or fn(t); audio: (file, a, b).
+    Text stands still from the first frame unless animate=True."""
+    if not animate:
+        for sp in sprites: sp.t0, sp.dur = -1.0, 0.01
     out = os.path.join(OUT, f"{num:02d}_{slug}.mp4"); tmp = out + ".v.mp4"
     n = int(round(dur * FPS))
     enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS),
                             "-i", "-", "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", tmp],
                            stdin=subprocess.PIPE)
     still_t = max(s.t0 + s.dur for s in sprites) + 0.3 if sprites else dur / 2
-    still_i = min(n - 1, int(still_t * FPS))
+    still_i = min(n - 1, int(max(still_t, 2.0) * FPS))
     preview = os.environ.get("PREVIEW")
     for i in range(n):
         t = i / FPS
@@ -322,81 +331,86 @@ def bottom_shade(top, a=0.75):
     return (a * p)[:, None, None]
 
 
-def interview(num, slug, a, b, build, extra_shade=None):
-    c = Clip(INTERVIEW, a, b, zoom=(1.0, 1.05), zc=(0.5, 0.35))
-    col = build()
-    sh = np.maximum(top_shade(col.bottom + 120), bottom_shade(1380, 0.55))
-    if extra_shade is not None: sh = np.maximum(sh, extra_shade)
-    render(num, slug, b - a, clip_bg(c), col.items, shade=sh,
+LOW = 1560   # text block ends here; subtitles sit just below it, faces stay clear above
+
+
+def low_shade(col, a=0.82):
+    return bottom_shade(col.top - 260, a)
+
+
+def interview(num, slug, a, b, build):
+    c = Clip(INTERVIEW, a, b, zoom=(1.0, 1.04), zc=(0.5, 0.3))
+    col = build().to_bottom(LOW)
+    render(num, slug, b - a, clip_bg(c), col.items, shade=low_shade(col),
            subs=Subs(chunks(load_words(INTERVIEW, a, b)), FIX), audio=(INTERVIEW, a, b))
 
 
 def s2():
     def b():
-        col = Column(240)
-        col.head("УЗНАЁТЕ СЕБЯ?", 0.3, size=72).rule(0.8)
-        col.body("Хочется изменить грудь.", 1.4)
-        col.body("Но внутри есть мысль:", 2.8)
-        col.body("«А вдруг имплант будет ощущаться чем-то чужим?»", 4.0, wght=500, col=POWDER, italic=True)
-        col.body("И поэтому хочется сначала выбрать более мягкий вариант.", 6.2)
+        col = Column(0)
+        col.head("УЗНАЁТЕ СЕБЯ?", 0, size=60, gap=20).rule(0, gap=22)
+        col.body("Хочется изменить грудь.", 0, size=36, gap=10)
+        col.body("Но внутри есть мысль:", 0, size=36, gap=10)
+        col.body("«А вдруг имплант будет ощущаться чем-то чужим?»", 0, size=38, wght=500, col=POWDER, italic=True, gap=14)
+        col.body("И поэтому хочется сначала выбрать более мягкий вариант.", 0, size=36, gap=0)
         return col
     interview(2, "uznaete_sebya", 0.0, 11.25, b)
 
 
 def s3():
     def b():
-        col = Column(240)
-        col.body("Тогда выбрали:", 0.3)
-        col.head("ПОДТЯЖКУ + ЛИПОФИЛИНГ", 0.9, size=68).rule(1.3)
-        col.body("То есть поработали с формой груди и добавили объём собственной жировой тканью.", 2.2)
-        col.body("И на тот момент это было именно то решение, к которому пациентка была готова.", 4.4)
+        col = Column(0)
+        col.body("Тогда выбрали:", 0, size=36, gap=6)
+        col.head("ПОДТЯЖКУ + ЛИПОФИЛИНГ", 0, size=58, gap=20).rule(0, gap=22)
+        col.body("То есть поработали с формой груди и добавили объём собственной жировой тканью.", 0, size=36, gap=12)
+        col.body("И на тот момент это было именно то решение, к которому пациентка была готова.", 0, size=36, gap=0)
         return col
     interview(3, "podtyazhka_lipofiling", 11.2, 18.2, b)
 
 
 def s4():
     a, b = 0.0, 18.6
-    c = Clip("IMG_3116.MOV", a, b, zoom=(1.0, 1.04), zc=(0.5, 0.4))
-    col = Column(240)
-    col.head("А ЧЕРЕЗ ГОД ЗАПРОС ИЗМЕНИЛСЯ", 0.4, size=66).rule(1.0)
-    col.body("Форма уже нравится.", 1.8)
-    col.body("Но теперь пациентке хочется больше объёма и более пышную грудь.", 3.2)
-    sh = np.maximum(top_shade(col.bottom + 120), bottom_shade(1380, 0.5))
-    render(4, "zapros_izmenilsya", b - a, clip_bg(c), col.items, shade=sh,
+    c = Clip("IMG_3116.MOV", a, b, zoom=(1.0, 1.03), zc=(0.5, 0.3))
+    col = Column(0)
+    col.head("А ЧЕРЕЗ ГОД ЗАПРОС ИЗМЕНИЛСЯ", 0, size=58, gap=20).rule(0, gap=22)
+    col.body("Форма уже нравится.", 0, size=38, gap=10)
+    col.body("Но теперь пациентке хочется больше объёма и более пышную грудь.", 0, size=38, gap=0)
+    col.to_bottom(LOW)
+    render(4, "zapros_izmenilsya", b - a, clip_bg(c), col.items, shade=low_shade(col),
            subs=Subs(chunks(load_words("IMG_3116.MOV", a, b)), FIX), audio=("IMG_3116.MOV", a, b))
 
 
 def s5():
     def b():
-        col = Column(240)
-        col.head("И ВОТ ЗДЕСЬ ОЧЕНЬ ВАЖНАЯ МЫСЛЬ", 0.4, size=64).rule(1.0)
-        col.body("Иногда женщина боится имплантов не потому, что они ей точно не подходят.", 2.0)
-        col.body("А потому что она пока к ним не готова.", 4.6, wght=500)
-        col.body("И это тоже нормально.", 6.6, wght=500, col=POWDER, italic=True)
+        col = Column(0)
+        col.head("И ВОТ ЗДЕСЬ ОЧЕНЬ ВАЖНАЯ МЫСЛЬ", 0, size=56, gap=20).rule(0, gap=22)
+        col.body("Иногда женщина боится имплантов не потому, что они ей точно не подходят.", 0, size=36, gap=10)
+        col.body("А потому что она пока к ним не готова.", 0, size=36, wght=500, gap=10)
+        col.body("И это тоже нормально.", 0, size=38, wght=500, col=POWDER, italic=True, gap=0)
         return col
     interview(5, "vazhnaya_mysl", 18.15, 35.4, b)
 
 
 def s6():
     def b():
-        col = Column(250)
-        col.head("«ХОЧЕТСЯ РАСПРАВИТЬ ПЛЕЧИ И ЛЮБОВАТЬСЯ СОБОЙ»", 0.4, size=74, gap=30).rule(1.0)
-        col.body("И мне кажется, вот здесь многие женщины поймут её особенно хорошо.", 2.4)
-        # question sticker goes ~950..1350
+        col = Column(0)
+        col.head("«ХОЧЕТСЯ РАСПРАВИТЬ ПЛЕЧИ И ЛЮБОВАТЬСЯ СОБОЙ»", 0, size=60, gap=20).rule(0, gap=22)
+        col.body("И мне кажется, вот здесь многие женщины поймут её особенно хорошо.", 0, size=36, gap=0)
         return col
+    # question sticker goes on the robe between the (blurred) head and the text: ~860..1150
     interview(6, "rasparvit_plechi", 35.35, 49.1, b)
 
 
 def s7():
     a, b = 0.6, 27.88
-    c = Clip("IMG_3144.MOV", a, b, zoom=(1.0, 1.03), zc=(0.5, 0.4))
-    col = Column(240)
-    col.head("ПЕРЕД ОПЕРАЦИЕЙ ЕЩЁ РАЗ ОБСУЖДАЕМ ОБЪЁМ", 0.4, size=62).rule(1.0)
-    col.body("Не по принципу:", 2.0)
-    col.body("«Мне нравится 325 мл, значит ставим 325».", 3.0, wght=500, col=POWDER, italic=True)
-    col.body("А смотрим на пропорции пациентки и на тот результат, который она хочет получить.", 5.0)
-    sh = np.maximum(top_shade(col.bottom + 120), bottom_shade(1380, 0.5))
-    render(7, "vybor_obema", b - a, clip_bg(c), col.items, shade=sh,
+    c = Clip("IMG_3144.MOV", a, b, zoom=(1.0, 1.03), zc=(0.5, 0.3))
+    col = Column(0)
+    col.head("ПЕРЕД ОПЕРАЦИЕЙ ЕЩЁ РАЗ ОБСУЖДАЕМ ОБЪЁМ", 0, size=54, gap=20).rule(0, gap=22)
+    col.body("Не по принципу:", 0, size=36, gap=6)
+    col.body("«Мне нравится 325 мл, значит ставим 325».", 0, size=38, wght=500, col=POWDER, italic=True, gap=12)
+    col.body("А смотрим на пропорции пациентки и на тот результат, который она хочет получить.", 0, size=36, gap=0)
+    col.to_bottom(LOW)
+    render(7, "vybor_obema", b - a, clip_bg(c), col.items, shade=low_shade(col),
            subs=Subs(chunks(load_words("IMG_3144.MOV", a, b)), FIX), audio=("IMG_3144.MOV", a, b))
 
 
@@ -406,17 +420,17 @@ def s8():
     col.head("ПЕРВЫЙ РЕЗУЛЬТАТ", 1.0, size=70, with_heart=True).rule(1.5)
     col.body("Именно тот более наполненный объём, которого пациентке не хватало после первого этапа.", 2.2)
     sh = lambda t: bottom_shade(1080, 0.78) * ease((t - 0.8) / 0.6)
-    render(8, "pervyj_rezultat", 12.0, clip_bg(c), col.items, shade=sh)
+    render(8, "pervyj_rezultat", 12.0, clip_bg(c), col.items, shade=sh, animate=True)
 
 
 def s9():
     a, b = 1.1, 16.25
-    c = Clip("IMG_3138.MOV", a, b, zoom=(1.0, 1.04), zc=(0.6, 0.4))
-    col = Column(250)
-    col.head("«КАК БУДТО ТАК И БЫЛО ВСЕГДА»", 4.8, size=70, with_heart=True).rule(5.3)
-    col.body("Это лучший момент всей истории.", 6.4, wght=400)
-    sh = lambda t: top_shade(col.bottom + 120, 0.7) * ease((t - 4.4) / 0.8)
-    render(9, "kak_budto_vsegda", b - a, clip_bg(c), col.items, shade=sh,
+    c = Clip("IMG_3138.MOV", a, b, zoom=(1.0, 1.03), zc=(0.6, 0.3))
+    col = Column(0)
+    col.head("«КАК БУДТО ТАК И БЫЛО ВСЕГДА»", 0, size=58, with_heart=True, gap=20).rule(0, gap=22)
+    col.body("Это лучший момент всей истории.", 0, size=38, wght=400, gap=0)
+    col.to_bottom(LOW)
+    render(9, "kak_budto_vsegda", b - a, clip_bg(c), col.items, shade=low_shade(col),
            subs=Subs(chunks(load_words("IMG_3138.MOV", a, b)), FIX), audio=("IMG_3138.MOV", a, b))
 
 
@@ -464,7 +478,7 @@ def s10():
         M = cv2.getRotationMatrix2D((W / 2, H / 2), 0, z)
         return cv2.warpAffine(fr, M, (W, H), borderMode=cv2.BORDER_REFLECT)
     sh = lambda t: np.full((H, 1, 1), 0.62, np.float32) * ease((t - T + 0.4) / 0.7)
-    render(10, "do_posle_vyvod", 16.0, bg, col.items, shade=sh)
+    render(10, "do_posle_vyvod", 16.0, bg, col.items, shade=sh, animate=True)
 
 
 def icon(name):
