@@ -142,9 +142,11 @@ def bullet(fr, t, t0, txt, x, y, size=38, t1=1e9):
     ablend(fr, im, x - 70 * (1 - p), y, al, WHITE, BLUE)
 
 DEFER = [False]; PENDING = []
+LIGHT = [False]; ROSE = (184, 128, 146)
 def ablend(fr, img, x, y, al, c_dark, c_light):
     """text layer: deferred so it is drawn on top of the grade and the dark haze"""
     if DEFER[0]: PENDING.append((img, x, y, al, c_dark, c_light)); return
+    if LIGHT[0]: c_dark = {WHITE: BLUE, PINK: ROSE}.get(tuple(c_dark), c_dark)
     if al <= 0.003: return
     h, w = img.shape[:2]; x, y = int(round(x)), int(round(y))
     x0, y0 = max(x, 0), max(y, 0); x1, y1 = min(x + w, W), min(y + h, H)
@@ -245,57 +247,161 @@ def collage(img, t, t0):
     fr[957:963] = np.maximum(fr[957:963], min(1, lt / 0.4))
     chip(fr, CH_PO, 40, 228, t, t0 + 0.25); chip(fr, CH_DO, 40, 990, t, t0 + 0.4); return fr
 
+LOGO_D = LOGO.copy(); LOGO_D[..., :3] = LOGO[..., 3:4] * (np.float32(BLUE) / 255)
+# ---------------- light (white) layouts ----------------
+LIGHT = [False]
+ROSE = (184, 128, 146)                                         # powder deepened so it reads on white
+_g = (yy_ / H)[..., None]
+WHITE_BG = (np.float32([250, 247, 246]) / 255 * (1 - _g) + np.float32([236, 222, 222]) / 255 * _g).astype(np.float32)
+def white_bg(t):
+    fr = WHITE_BG.copy()
+    for k, (cx, cy, r) in enumerate([(160, 380, 260), (930, 1500, 330)]):        # soft powder blobs drifting
+        x = cx + 40 * np.sin(t * 0.7 + k); y = cy + 30 * np.cos(t * 0.6 + k)
+        g = np.exp(-(((xx_ - x) / r) ** 2 + ((yy_ - y) / r) ** 2))[..., None]
+        fr = fr * (1 - 0.35 * g) + np.float32(PINK) / 255 * 0.35 * g
+    return fr
+def ring(fr, cx, cy, r, prog, col=BLUE, th=7, start=-90):
+    if prog <= 0: return
+    m = np.zeros((H, W), np.uint8)
+    cv2.ellipse(m, (int(cx), int(cy)), (int(r), int(r)), 0, start, start + 360 * min(prog, 1), 255, th, cv2.LINE_AA)
+    a = m.astype(np.float32)[..., None] / 255; fr *= 1 - a; fr += np.float32(col) / 255 * a
+def face_disc(t, r, zoom=1.0):
+    f = IV.get(int(round(src_of(t) * 60))); half = 430 / zoom
+    crop = f[int(720 - half):int(720 + half), int(540 - half):int(540 + half)]
+    return cv2.resize(crop, (2 * int(r), 2 * int(r)), interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+def put_disc(fr, img, cx, cy, al=1.0, shadow=True):
+    r = img.shape[0] // 2; m = np.zeros((2 * r, 2 * r), np.uint8); cv2.circle(m, (r, r), r - 1, 255, -1, cv2.LINE_AA)
+    rgba = np.concatenate([img * (m[..., None] / 255.0), m[..., None] / 255.0], -1).astype(np.float32)
+    if shadow: blend(fr, shadow_of(rgba, 22, 0.35), cx - r, cy - r + 14, al)
+    blend(fr, rgba, cx - r, cy - r, al)
+def circle_scene(fr, t, t0, cx, cy, r):
+    """interview face in a circle: pops in with a bounce, navy ring draws around, powder ring pulses"""
+    lt = t - t0; s = max(back(lt / 0.45), 0.02); rr = int(r * s)
+    if rr < 4: return
+    put_disc(fr, face_disc(t, rr), cx, cy + 6 * np.sin(t * 1.8))
+    ring(fr, cx, cy + 6 * np.sin(t * 1.8), rr + 14, ease((lt - 0.15) / 0.7))
+    pul = (lt * 0.8) % 1
+    ring(fr, cx, cy, rr + 24 + 60 * pul, 1.0, col=tuple(int(c) for c in np.float32(PINK) * (1 - pul) + np.float32([250, 247, 246]) * pul), th=4)
+def card(fr, img, t, t0, cx, cy, w, rot0=0.0, frm=(0, 900), al=1.0):
+    """photo as a rounded card with shadow, flying in"""
+    lt = t - t0
+    if lt < 0: return
+    p = ease(lt / 0.45); h = int(img.shape[0] * w / img.shape[1])
+    im = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+    m = np.zeros((h, w), np.uint8); cv2.rectangle(m, (0, 0), (w - 1, h - 1), 255, -1)
+    m = cv2.GaussianBlur(m, (0, 0), 1.2); mm = np.zeros_like(m); cv2.rectangle(mm, (18, 18), (w - 19, h - 19), 255, -1)
+    mm = cv2.dilate(mm, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (37, 37)))
+    rgba = np.concatenate([im * (mm[..., None] / 255.0), mm[..., None] / 255.0], -1).astype(np.float32)
+    ang = rot0 * (1 - 0.6 * p); sc = 0.85 + 0.15 * p
+    pad = int(max(w, h) * 0.3); big = cv2.copyMakeBorder(rgba, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=0)
+    Mr = cv2.getRotationMatrix2D((big.shape[1] / 2, big.shape[0] / 2), ang, sc); big = cv2.warpAffine(big, Mr, (big.shape[1], big.shape[0]))
+    x = cx - big.shape[1] / 2 + frm[0] * (1 - p); y = cy - big.shape[0] / 2 + frm[1] * (1 - p)
+    blend(fr, shadow_of(big, 26, 0.38), x, y + 18, al * p); blend(fr, big, x, y, al * min(1, p * 2))
+def route(fr, t, t0, y=1290):
+    """animated route Саратов -> Москва"""
+    lt = t - t0
+    if lt < 0: return
+    a, b = np.array([170, y + 60]), np.array([910, y - 40])
+    pts = bez(a, b, -0.25, 60); p = ease(lt / 1.2)
+    stroke(fr, partial(pts, p), 1.0, th=5, dash=True, col=BLUE)
+    for P, txt, tt in ((a, "САРАТОВ", 0.0), (b, "МОСКВА", 1.0)):
+        if lt >= tt:
+            q = back((lt - tt) / 0.35); cv2.circle(fr, tuple(int(v) for v in P), int(16 * q), tuple(float(c) / 255 for c in BLUE), -1, cv2.LINE_AA)
+            cv2.circle(fr, tuple(int(v) for v in P), int(7 * q), (1.0, 1.0, 1.0), -1, cv2.LINE_AA)
+            if ("rt", txt) not in TC:
+                f = osw(52); asc, desc = f.getmetrics(); im = Image.new("RGBA", (int(f.getlength(txt)) + 10, asc + desc + 6), (0, 0, 0, 0))
+                ImageDraw.Draw(im).text((5, 3 + asc), txt, font=f, fill=WHITE + (255,), anchor="ls"); TC[("rt", txt)] = to_np(im)
+            im = TC[("rt", txt)]; ablend(fr, im, P[0] - im.shape[1] / 2, P[1] + 26, min(1, (lt - tt) / 0.2), WHITE, BLUE)
+    if 0 < p < 1:
+        q = partial(pts, p)[-1]; cv2.circle(fr, (int(q[0]), int(q[1])), 11, tuple(float(c) / 255 * 0.85 for c in PINK), -1, cv2.LINE_AA)
+def dark_to_circle(t, t0, cx, cy, r, dur=0.45):
+    """first moments of a white scene: the full-screen interview shrinks into the circle"""
+    p = ease((t - t0) / dur)
+    if p >= 1: return None
+    fr = white_bg(t); R = int(r + (1300 - r) * (1 - p))
+    full = iframe(t, 1.0)
+    m = np.zeros((H, W), np.float32); cv2.circle(m, (int(540 + (cx - 540) * p), int(900 + (cy - 900) * p)), R, 1, -1, cv2.LINE_AA)
+    return fr * (1 - m[..., None]) + full * m[..., None]
+def circle_to_full(t, t0, z, cy_src, cx=540, cy=760, r=300, dur=0.45):
+    """first moments of a dark scene: the circle grows until the interview fills the frame"""
+    p = ease((t - t0) / dur)
+    full = iframe(t, z, cy_src)
+    if p >= 1: return full
+    fr = white_bg(t); R = int(r + (1300 - r) * p)
+    m = np.zeros((H, W), np.float32); cv2.circle(m, (int(cx + (540 - cx) * p), int(cy + (900 - cy) * p)), R, 1, -1, cv2.LINE_AA)
+    return fr * (1 - m[..., None]) + full * m[..., None]
+def push_in(fr_new, t, t0, dur=0.35, frm=1):
+    p = ease((t - t0) / dur)
+    if p >= 1: return fr_new
+    out = np.zeros_like(fr_new); dx = int(W * (1 - p)) * frm
+    if frm > 0: out[:, dx:] = fr_new[:, :W - dx]
+    else: out[:, :W + dx] = fr_new[:, -dx:]
+    return mblur(out, 0.0)
+
+LIGHT_BLOCKS = ("talk1", "talkq", "before", "talk3", "aft1", "aft2", "happy")
 def render(t):
-    n, t0, t1 = block(t); lt = t - t0; flash = 0; DEFER[0] = True; PENDING.clear()
+    n, t0, t1 = block(t); lt = t - t0; flash = 0; DEFER[0] = True; PENDING.clear(); LIGHT[0] = n in LIGHT_BLOCKS
     if n == "hook":
-        # opening: ДО -> ПОСЛЕ transition on «разделилась на до и после»
         fr = morph_frame(t, 1.6, 1.0 + 0.04 * t / 3.3)
         chip(fr, CH_DO, 60, 228, t, 0.1, 2.05); chip(fr, CH_PO, 60, 228, t, 2.45)
-    elif n.startswith("talk") or n == "happy":
-        z = dict(talk1=1.0, talk2=1.32, talkq=1.12, talkj=1.38, talk3=1.15, happy=1.25)[n] * (1 + 0.03 * lt / 3) * trans(t, t0)
-        fr = mblur(iframe(t, z, 820 if z > 1.2 else 900), lt)
-        if n == "talk1": T_CONF.draw(fr, 1180, t, t0 + 0.7, t1 - 0.05, cps=30)
-        if n == "talkq": T_LIKE.draw(fr, 1200, t, t0 + 0.15, t1 - 0.1)
-        if n == "talkj": T_JOY.draw(fr, 1240, t, 17.9, t1 - 0.05, cps=30)
-        if n == "talk3": T_TRIP.draw(fr, 1180, t, 21.75, t1 - 0.05, cps=32)
-        if n == "happy": T_HAPPY.draw(fr, 1250, t, t0 + 0.05, t1, cps=34)
-    elif n == "before":
-        img, s0 = (B80, t0) if t < 12.75 else ((B81, 12.75) if t < 13.7 else (B82, 13.7))
-        fr = mblur(fitp(img, (1.0 + 0.03 * (t - s0)) * trans(t, s0, 0.05)), t - s0); chip(fr, CH_DO, 60, 228, t, t0 + 0.05)
-        T_COVER.draw(fr, 1170, t, t0 + 0.15, t1 - 0.05, cps=34)
+    elif n == "talk1":                                                  # white sheet wipes up, face circle pops
+        fr = white_bg(t); circle_scene(fr, t, t0 + 0.15, 540, 760, 300)
+        p = ease(lt / 0.4)
+        if p < 1:
+            prev = morph_frame(t0, 1.6, 1.04); cut = int(H * (1 - p)); fr[:cut] = prev[:cut]
+        T_CONF.draw(fr, 1180, t, t0 + 0.6, t1 - 0.05)
+    elif n == "talk2":
+        fr = circle_to_full(t, t0, 1.32 * (1 + 0.03 * lt / 3), 820)
+    elif n == "talkq":
+        fr = dark_to_circle(t, t0, 540, 700, 260)
+        if fr is None:
+            fr = white_bg(t); circle_scene(fr, t, t0 + 0.45 - 0.45, 540, 700, 260)
+        T_LIKE.draw(fr, 1120, t, t0 + 0.5, t1 - 0.1)
+    elif n == "before":                                                 # ДО photos as cards flying onto white
+        fr = white_bg(t)
+        card(fr, B80, t, t0, 540, 860, 640, rot0=-8, frm=(-700, 0))
+        card(fr, B81, t, 12.75, 560, 860, 640, rot0=7, frm=(700, 0))
+        card(fr, B82, t, 13.7, 540, 860, 640, rot0=-4, frm=(0, 1100))
+        chip(fr, CH_DO, 60, 228, t, t0 + 0.05)
+        T_COVER.draw(fr, 1330, t, t0 + 0.15, t1 - 0.05)
+    elif n == "talkj":
+        fr = push_in(mblur(iframe(t, 1.38 * (1 + 0.03 * lt / 5), 820), lt), t, t0)
+        T_JOY.draw(fr, 1240, t, 17.9, t1 - 0.05)
+    elif n == "talk3":
+        fr = dark_to_circle(t, t0, 540, 640, 250)
+        if fr is None:
+            fr = white_bg(t); circle_scene(fr, t, t0, 540, 640, 250)
+        route(fr, t, 21.6)
+        T_TRIP.draw(fr, 1000, t, 21.75, t1 - 0.05)
+    elif n == "surgeon":
+        fr = mblur(fillp(SURG, (1.12 + 0.07 * lt / 2.3) * trans(t, t0, 0.12), 0.5, 0.38), lt); flash = 0.45 * max(0, 1 - lt / 0.18)
+        T_OP.draw(fr, 1210, t, t0 + 0.3, t1 - 0.05)
     elif n == "morph":
-        # ПОСЛЕ: smooth ДО -> ПОСЛЕ on the front collage halves aligned on the stickers
         fr = morph_frame(t, 26.7, 1.0 + 0.05 * lt / 4)
         chip(fr, CH_DO, 60, 228, t, t0 + 0.05, 27.2); chip(fr, CH_PO, 60, 228, t, 27.6)
-        T_RES.draw(fr, 1240, t, 27.8, t1 - 0.05, cps=40)
-    elif n == "_unused":
-        z = 1.0
-        a_ = warp(BEF_H, SEP / np.hypot(SB[1][0] - SB[0][0], SB[1][1] - SB[0][1]) * z, (SB[0][0] + SB[1][0]) / 2, (SB[0][1] + SB[1][1]) / 2, 540, 760)
-        b_ = warp(AFT_H, SEP / np.hypot(SA[1][0] - SA[0][0], SA[1][1] - SA[0][1]) * z, (SA[0][0] + SA[1][0]) / 2, (SA[0][1] + SA[1][1]) / 2, 540, 760)
-        ma, mb = feather_mask(BEF_H.shape[:2], *SB, z), feather_mask(AFT_H.shape[:2], *SA, z)
-        bg = np.float32([16, 16, 18]) / 255
-        a_ = a_ * ma + bg * (1 - ma); b_ = b_ * mb + bg * (1 - mb)
-        p = ease((t - 26.7) / 1.1); f = 0.35; edge = (xx_ / W * 0.6 + yy_ / H * 0.4)[..., None]
-        m = np.clip((p * (1 + f) - edge) / f, 0, 1); fr = a_ * (1 - m) + b_ * m
-        chip(fr, CH_DO, 60, 228, t, t0 + 0.05, 27.2); chip(fr, CH_PO, 60, 228, t, 27.6)
-        T_RES.draw(fr, 1240, t, 27.8, t1 - 0.05, cps=40)
-    elif n == "surgeon":
-        fr = mblur(fillp(SURG, (1.12 + 0.07 * lt / 2.3) * trans(t, t0), 0.5, 0.38), lt)
-        T_OP.draw(fr, 1210, t, t0 + 0.3, t1 - 0.05, cps=34)
-    elif n in ("aft1", "aft2"):
-        img = A84 if n == "aft1" else A85
-        fr = mblur(fillp(img, (1.35 + 0.05 * lt / 2) * trans(t, t0), 0.5, 0.44), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.1)
-        bullet(fr, t, 30.45, "через неделю — уже дома", 70, 1230)
-        bullet(fr, t, 31.0, "через 3 дня — снова на работе", 70, 1310)
+        T_RES.draw(fr, 1240, t, 27.8, t1 - 0.05)
+    elif n in ("aft1", "aft2"):                                         # ПОСЛЕ as a big card on white
+        fr = white_bg(t)
+        if n == "aft1": card(fr, A84, t, t0, 540, 760, 740, rot0=6, frm=(0, 1200))
+        else:
+            card(fr, A84, t, 30.2, 540, 760, 740, rot0=6, frm=(0, 1200), al=1 - ease(lt / 0.3))
+            card(fr, A85, t, t0, 540, 760, 740, rot0=-6, frm=(800, 0))
+        chip(fr, CH_PO, 60, 228, t, 30.3)
+        bullet(fr, t, 30.45, "через неделю — уже дома", 70, 1345)
+        bullet(fr, t, 31.0, "через 3 дня — снова на работе", 70, 1415)
+    elif n == "happy":
+        fr = white_bg(t); circle_scene(fr, t, t0, 540, 760, 320)
+        T_HAPPY.draw(fr, 1210, t, t0 + 0.05, t1)
     else:
         fr = collage({"c1": C1, "c2": C2, "c3": C3}[n], t, t0)
-    if t < 3.3: T_HOOK.draw(fr, 1150, t, 0.2, 3.2, cps=24)
-    fr = look(fr, t)
-    if n not in ("c1", "c2", "c3"): fr = fr * (1 - HAZE)
+    if t < 3.3: T_HOOK.draw(fr, 1150, t, 0.2, 3.2)
+    dark = not LIGHT[0] and n not in ("c1", "c2", "c3")
+    if not LIGHT[0]: fr = look(fr, t)
+    if dark: fr = fr * (1 - HAZE)
     if n not in ("c1", "c2", "c3"): subs(fr, t)
     DEFER[0] = False
     for args in PENDING: ablend(fr, *args)
-    blend(fr, LOGO, 540 - LOGO.shape[1] / 2, 120, 0.9)
+    blend(fr, LOGO_D if LIGHT[0] else LOGO, 540 - LOGO.shape[1] / 2, 120, 0.9)
     if flash > 0: fr = fr * (1 - flash) + flash
     if t > DUR - 0.8: fr *= 1 - 0.95 * (t - (DUR - 0.8)) / 0.8
     return np.clip(fr, 0, 1)
