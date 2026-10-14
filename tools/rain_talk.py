@@ -1,7 +1,7 @@
 """«Ливень / прямое включение» — selfie talk under an umbrella (4K 60 fps vertical, iPhone).
 Clean cut (no «э-э», false start, stretched «и-и»/«в-в», filler «вот», pauses), the rain shot from the source as a
 cut-away on «ливень», software stabilisation + reframing zooms (new framing on every jump cut, slow push-ins,
-a closer push on the strong lines), blemish removal + light skin smoothing, denoise + gentle sharpen + grade,
+a closer push on the strong lines), no skin retouch, denoise + gentle sharpen + grade,
 Montserrat phrase subtitles with brand-colour key words. Straight from the source, x264 crf 12, 2160x3840 60 fps.
 Work dir: in/src.mov, words.json (whisper, verbatim prompt), db.npy (10 ms loudness of a16.wav), fonts, models/yunet.onnx.
   python3 -I rain_talk.py cut | motion | info | test 3,10 | render f0 f1 out.mp4
@@ -284,7 +284,8 @@ def sub_img(words):
         a = np.maximum(aw, ah)
         rgba = np.zeros((hgt, wid, 4), np.float32); rgba[..., :3] = WHITE * aw[..., None] + BLUSH * ah[..., None]; rgba[..., 3] = a
         sh = np.zeros_like(rgba); sh[..., 3] = np.minimum(1, cv2.GaussianBlur(a, (0, 0), 8 * K) * 1.6) * 0.65
-        _sub[k] = (rgba, sh, (pad + asc) / K)
+        dark = rgba.copy(); dark[..., :3] = INK * aw[..., None] + COCOA * ah[..., None]
+        _sub[k] = (rgba, sh, (pad + asc) / K, dark)
     return _sub[k]
 def blend(dst, img, x, y, alpha=1.0):
     h, w = img.shape[:2]; x, y = int(round(x * K)), int(round(y * K))
@@ -293,10 +294,11 @@ def blend(dst, img, x, y, alpha=1.0):
     s = img[y0 - y:y1 - y, x0 - x:x1 - x]; d = dst[y0:y1, x0:x1].astype(np.float32) / 255
     dst[y0:y1, x0:x1] = np.clip((d * (1 - s[..., 3:4] * alpha) + s[..., :3] * alpha) * 255 + 0.5, 0, 255).astype(np.uint8)
 SUB_Y = 1400
-def draw_subs(fr, tt):
+def draw_subs(fr, tt, dark=False):
     for t0, t1, words in SUBS:
         if t0 <= tt < t1:
-            rgba, sh, base = sub_img(words); age = tt - t0
+            rgba, sh, base, dk = sub_img(words); age = tt - t0
+            if dark: rgba, sh = dk, sh * 0.15
             al = min(1, age / 0.10); dy = 12 * (1 - ease(age / 0.2))
             x = W / 2 - rgba.shape[1] / K / 2; y = SUB_Y - base + dy
             blend(fr, sh, x, y + 5, al); blend(fr, rgba, x, y, al)
@@ -318,16 +320,140 @@ class Cutaway:
 CA = Cutaway()
 
 # ---------------------------------------------------------------- frame
+# ---------------------------------------------------------------- effects (no retouch: the face is left as shot)
+def wt(i, end=False): return src2cut(SRCW[i][1] if end else SRCW[i][0])
+SHRINK = [(wt(23) - 0.1, wt(25, True) + 0.25, 0.80), (wt(99) - 0.1, wt(101, True) + 0.3, 0.82)]     # picture shrinks onto a blurred bed
+CIRCLE = [(wt(43) - 0.1, wt(49, True) + 0.3, 400)]                                                  # face in a circle on blush
+END_CIRCLE = (wt(112) - 0.15, 330)                                                                   # iris into a circle at the end
+GLITCH = [(wt(95) - 0.05, wt(97, True) + 0.15)]                                                      # «схожу с ума»
+SHAKE = [(wt(5) - 0.05, wt(6, True))] + GLITCH                                                       # «закон подлости»
+FLASH = [wt(6) - 0.02]
+WHIP = [STARTS[i] for i in range(1, len(CUTS)) if GROUP[i] != GROUP[i - 1] and not (CA_T0 - 0.2 < STARTS[i] < CA_T1 + 0.2)][1::2]
+def env(tt, t0, t1, fade=0.32): return ease_io((tt - t0) / fade) * (1 - ease_io((tt - t1) / fade))
+
+def bed(fr, tint=0.0, dim=0.55):
+    q = cv2.GaussianBlur(cv2.resize(fr, (OW // 24, OH // 24), interpolation=cv2.INTER_AREA), (0, 0), 2.5)
+    b = cv2.resize(q, (OW, OH), interpolation=cv2.INTER_LINEAR).astype(np.float32) * dim
+    if tint: b = b * (1 - tint) + BLUSH * 255 * tint
+    return b
+_rm = {}
+def rmask(w, h, r):
+    k = (w, h, r)
+    if k not in _rm:
+        m = np.zeros((h, w), np.uint8); r = max(1, r)
+        cv2.rectangle(m, (r, 0), (w - r, h), 255, -1); cv2.rectangle(m, (0, r), (w, h - r), 255, -1)
+        for cx, cy in ((r, r), (w - r - 1, r), (r, h - r - 1), (w - r - 1, h - r - 1)): cv2.circle(m, (cx, cy), r, 255, -1, cv2.LINE_AA)
+        _rm[k] = m.astype(np.float32)[..., None] / 255
+    return _rm[k]
+def shrink(fr, s):
+    out = bed(fr); w, h = int(OW * s) // 2 * 2, int(OH * s) // 2 * 2
+    fg = cv2.resize(fr, (w, h), interpolation=cv2.INTER_AREA).astype(np.float32)
+    x0, y0 = (OW - w) // 2, (OH - h) // 2 - int(30 * K * (1 - s) / 0.2)
+    m = rmask(w, h, int(44 * K * min(1, (1 - s) / 0.15)))
+    sh = cv2.GaussianBlur(np.pad(m[..., 0], 60)[::4, ::4], (0, 0), 8); sh = cv2.resize(sh, (w + 120, h + 120))[..., None] * 0.45
+    ys, xs = y0 - 60 + 24, x0 - 60
+    reg = out[ys:ys + h + 120, xs:xs + w + 120]; reg *= 1 - sh[:reg.shape[0], :reg.shape[1]]
+    out[y0:y0 + h, x0:x0 + w] = out[y0:y0 + h, x0:x0 + w] * (1 - m) + fg * m
+    return np.clip(out + 0.5, 0, 255).astype(np.uint8)
+class FaceTrack:
+    def __init__(self): self.c = None; self.n = 0; self.last = -9
+    def __call__(self, fr, fo):
+        if fo != self.last + 1: self.c = None; self.n = 0
+        self.last = fo
+        if self.n % 3 == 0 or self.c is None:
+            f = detect(fr)
+            if f is not None:
+                c = np.float32([f[0] + f[2] / 2, f[1] + f[3] * 0.45, f[2]])
+                self.c = c if self.c is None else self.c * 0.6 + c * 0.4
+        self.n += 1
+        return self.c if self.c is not None else np.float32([OW / 2, OH * 0.4, OW * 0.4])
+FT, FTB = FaceTrack(), FaceTrack()
+def iris(fr, p, r_design, face, tint=0.75):
+    """the picture closes into a circle around the face; the circle glides to the upper middle"""
+    if p <= 0.003: return fr
+    e = ease_io(p); R0 = np.hypot(OW, OH) / 2; R = R0 + (r_design * K - R0) * e
+    fx, fy, fw = face; tx, ty = OW / 2, 820 * K
+    zc = 1 + max(0, (r_design * K * 1.25) / fw - 1) * e * 0          # keep native scale (no upscaling)
+    dx, dy = (tx - fx) * e, (ty - fy) * e
+    M = np.float32([[1, 0, dx], [0, 1, dy]])
+    moved = cv2.warpAffine(fr, M, (OW, OH), borderMode=cv2.BORDER_REFLECT) if abs(dx) + abs(dy) > 1 else fr
+    cx, cy = fx + dx, fy + dy
+    m = np.zeros((OH // 2, OW // 2), np.uint8); cv2.circle(m, (int(cx / 2), int(cy / 2)), int(R / 2), 255, -1, cv2.LINE_AA)
+    m = cv2.resize(m, (OW, OH), interpolation=cv2.INTER_LINEAR).astype(np.float32)[..., None] / 255
+    b = bed(fr, tint=tint, dim=0.9)
+    ring = np.zeros((OH // 2, OW // 2), np.uint8); cv2.circle(ring, (int(cx / 2), int(cy / 2)), int(R / 2) + 4, 255, 5, cv2.LINE_AA)
+    ring = cv2.resize(ring, (OW, OH)).astype(np.float32)[..., None] / 255 * e
+    shadow = np.zeros((OH // 8, OW // 8), np.float32); cv2.circle(shadow, (int(cx / 8), int(cy / 8 + 3)), int(R / 8), 1.0, -1)
+    shadow = cv2.resize(cv2.GaussianBlur(shadow, (0, 0), 6), (OW, OH))[..., None] * 0.35 * e
+    out = b * (1 - shadow) * (1 - m) + moved.astype(np.float32) * m
+    out = out * (1 - ring) + 255 * ring
+    return np.clip(out + 0.5, 0, 255).astype(np.uint8)
+def bubble(dst, talk, face, a):
+    """live face in a circle over the cut-away (she keeps talking in the corner)"""
+    if a <= 0.01: return dst
+    fx, fy, fw = face; side = int(fw * 1.7)
+    x0 = int(np.clip(fx - side / 2, 0, OW - side)); y0 = int(np.clip(fy - side / 2, 0, OH - side))
+    D = int(470 * K * (0.6 + 0.4 * a)) // 2 * 2
+    crop = cv2.resize(talk[y0:y0 + side, x0:x0 + side], (D, D), interpolation=cv2.INTER_AREA).astype(np.float32)
+    m = np.zeros((D, D), np.uint8); cv2.circle(m, (D // 2, D // 2), D // 2 - 6, 255, -1, cv2.LINE_AA); m = m.astype(np.float32)[..., None] / 255 * a
+    ring = np.zeros((D, D), np.uint8); cv2.circle(ring, (D // 2, D // 2), D // 2 - 6, 255, 10, cv2.LINE_AA); ring = ring.astype(np.float32)[..., None] / 255 * a
+    cx, cy = 300 * K, 470 * K; X, Y = cx - D // 2, cy - D // 2
+    reg = dst[Y:Y + D, X:X + D].astype(np.float32)
+    sh = cv2.GaussianBlur(m[..., 0], (0, 0), 14)[..., None] * 0.4
+    reg = reg * (1 - sh); reg = reg * (1 - m) + crop * m; reg = reg * (1 - ring) + np.float32(BLUSH * 255) * ring
+    dst[Y:Y + D, X:X + D] = np.clip(reg + 0.5, 0, 255).astype(np.uint8)
+    return dst
+def shake(fr, amt, tt):
+    if amt <= 0.01: return fr
+    r = np.random.default_rng(int(tt * 60)); dx, dy = r.uniform(-1, 1, 2) * 16 * K * amt
+    M = np.float32([[1.02, 0, -OW * 0.01 + dx], [0, 1.02, -OH * 0.01 + dy]])
+    return cv2.warpAffine(fr, M, (OW, OH), borderMode=cv2.BORDER_REFLECT)
+def glitch(fr, amt, tt):
+    if amt <= 0.01: return fr
+    r = np.random.default_rng(int(tt * 30)); d = int(14 * K * amt * r.uniform(0.5, 1.0))
+    out = fr.copy(); out[:, d:, 0] = fr[:, :-d, 0] if d else fr[:, :, 0]; out[:, :OW - d, 2] = fr[:, d:, 2] if d else fr[:, :, 2]
+    if r.random() < 0.35 * amt:                                       # a couple of torn horizontal bands
+        for _ in range(2):
+            y = int(r.uniform(0, OH - 120 * K)); hgt = int(r.uniform(20, 90) * K); sx = int(r.uniform(-40, 40) * K)
+            out[y:y + hgt] = np.roll(out[y:y + hgt], sx, axis=1)
+    return out
+def whip(fr, amt):
+    if amt <= 0.02: return fr
+    acc = fr.astype(np.float32); n = 4
+    for k in range(1, n + 1):
+        sc = 1 + 0.035 * k * amt; w, h = int(OW * sc), int(OH * sc)
+        big = cv2.resize(fr, (w, h), interpolation=cv2.INTER_LINEAR)[(h - OH) // 2:(h - OH) // 2 + OH, (w - OW) // 2:(w - OW) // 2 + OW]
+        acc += big
+    out = acc / (n + 1); out = out + (255 - out) * 0.10 * amt
+    return np.clip(out + 0.5, 0, 255).astype(np.uint8)
+
 def render_frame(src, fo):
     tt = fo / FPS
+    z, cx, cy, c = camera(min(fo, NFR - 1)); talk = grade(warp(src, z, cx, cy, c))
     if CA_T0 <= tt < CA_T1:
         fr = grade(CA.frame(int(round((tt - CA_T0) * FPS))))
+        a = ease((tt - CA_T0 - 0.15) / 0.3) * (1 - ease_io((tt - CA_T1 + 0.3) / 0.25))
+        fr = bubble(fr, talk, FTB(talk, fo), a)
     else:
-        z, cx, cy, c = camera(fo); fr = grade(warp(SKIN(src), z, cx, cy, c))
-    for edge in (CA_T0, CA_T1):                                         # soft flash into / out of the cut-away
-        d = tt - edge
-        if 0 <= d < 0.08: fr = cv2.addWeighted(fr, 1 - 0.15 * (1 - d / 0.08), np.full_like(fr, 255), 0.15 * (1 - d / 0.08), 0)
-    draw_subs(fr, tt)
+        fr = talk
+        for t0, t1, r in CIRCLE:
+            p = env(tt, t0, t1, 0.4)
+            if p > 0: fr = iris(fr, p, r, FT(talk, fo))
+        t0, r = END_CIRCLE
+        if tt >= t0: fr = iris(fr, min(1, (tt - t0) / 0.6), r, FT(talk, fo), tint=0.85)
+        for t0, t1, s_ in SHRINK:
+            p = env(tt, t0, t1, 0.3)
+            if p > 0: fr = shrink(fr, 1 - (1 - s_) * p)
+    amt = max([env(tt, t0, t1, 0.08) for t0, t1 in SHAKE] + [0]); fr = shake(fr, amt, tt)
+    amt = max([env(tt, t0, t1, 0.06) for t0, t1 in GLITCH] + [0]); fr = glitch(fr, amt * (0.6 + 0.4 * abs(np.sin(tt * 23))), tt)
+    for w_ in WHIP:
+        d = tt - w_
+        if -0.10 < d < 0.12: fr = whip(fr, 1 - abs(d) / 0.12)
+    for t_ in FLASH + [CA_T0, CA_T1]:
+        d = tt - t_
+        if 0 <= d < 0.09: fr = cv2.addWeighted(fr, 1 - 0.3 * (1 - d / 0.09), np.full_like(fr, 255), 0.3 * (1 - d / 0.09), 0)
+    on_blush = any(env(tt, t0, t1, 0.4) > 0.5 for t0, t1, _ in CIRCLE) or tt >= END_CIRCLE[0] + 0.3
+    draw_subs(fr, tt, on_blush)
     if tt < 0.15: fr = (fr.astype(np.float32) * (tt / 0.15)).astype(np.uint8)
     if tt > DUR - 0.4: fr = (fr.astype(np.float32) * max(0, (DUR - tt) / 0.4)).astype(np.uint8)
     return fr
