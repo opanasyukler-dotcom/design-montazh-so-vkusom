@@ -1,5 +1,5 @@
 import numpy as np, wave, librosa, cv2
-SR=48000; DUR=47.6; M0=17.44
+SR=48000; DUR=47.6; M0=3.70   # "Freedom": the drop lands on the ДО→ПОСЛЕ transition (13.15 s)
 src=open("../v14/audio.py").read(); exec(src[src.index("rng=np.random"):src.index("n=int(DUR*SR)")])
 s2=open("../v15/audio.py").read()
 exec(s2[s2.index("def impact"):s2.index("n=int(DUR*SR)", s2.index("def impact"))])
@@ -15,7 +15,7 @@ for s,si,so,t0 in SEGS:
     seg=src_a[s][int(si*SR):int(so*SR)].copy(); f=int(0.015*SR); seg[:f]*=np.linspace(0,1,f); seg[-f:]*=np.linspace(1,0,f)
     i=int(t0*SR); vo[i:i+len(seg)]+=seg[:n-i]
 vo*=0.125
-y,_=librosa.load("mus.wav",sr=SR,mono=False,offset=M0,duration=DUR); mus=y.T[:n].copy(); mus/=np.abs(mus).max()
+y,_=librosa.load("mus_freedom.wav",sr=SR,mono=False,offset=M0,duration=DUR); mus=y.T[:n].copy(); mus/=np.abs(mus).max()
 if len(mus)<n: mus=np.pad(mus,((0,n-len(mus)),(0,0)))
 tt=np.arange(n)/SR; act=np.zeros(n)
 for s,si,so,t0 in SEGS: act[int((t0-0.05)*SR):int((t0+so-si+0.05)*SR)]=1
