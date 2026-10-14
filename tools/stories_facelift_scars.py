@@ -307,6 +307,49 @@ def clip_bg(c): return lambda i, t: c.frame(i)
 
 
 # ---------------- helpers for this series ----------------
+def retouch(rgb, bruise=1.0, smooth=0.45):
+    """light retouch: lift purple/red bruises that are darker than the surrounding skin, soften skin a little.
+    Large-radius statistics are computed at 1/4 size (fast enough for every video frame)."""
+    H0, W0 = rgb.shape[:2]
+    bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV).astype(np.float32)
+    h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    q = 4; small = cv2.resize(hsv, (W0 // q, H0 // q), interpolation=cv2.INTER_AREA)
+    k = max(4.0, min(H0, W0) / 22 / q)
+    up = lambda a: cv2.resize(a, (W0, H0), interpolation=cv2.INTER_LINEAR)
+    v_loc = up(cv2.GaussianBlur(small[..., 2], (0, 0), k)); s_loc = up(cv2.GaussianBlur(small[..., 1], (0, 0), k))
+    sh, ss, sv = small[..., 0], small[..., 1], small[..., 2]
+    skin0 = ((sh < 22) & (ss > 35) & (ss < 170) & (sv > 110)).astype(np.float32)        # skin around a bruise
+    near_skin = up(np.clip(cv2.GaussianBlur(skin0, (0, 0), k * 0.6) * 3.0, 0, 1))
+    purple = np.clip(np.maximum((h - 112) / 10, (9 - h) / 5), 0, 1)
+    dark = np.clip((v_loc - v - 2) / 22, 0, 1)
+    sat = np.clip((s - 25) / 35, 0, 1)
+    bright = np.clip((v - 70) / 30, 0, 1)
+    m = np.clip(cv2.GaussianBlur(purple * dark * sat * bright, (0, 0), 5) * 1.6, 0, 1) * near_skin * bruise
+    hsv[..., 2] = v + (v_loc - v).clip(0) * m * 0.85
+    hsv[..., 1] = s - (s - np.minimum(s, s_loc * 0.7)) * m
+    hsv[..., 0] = h + (190 - h) * m * 0.6 * (h > 90) + (10 - h).clip(0) * m * 0.6 * (h <= 90)
+    out = cv2.cvtColor(hsv.clip(0, 255).astype(np.uint8), cv2.COLOR_HSV2BGR)
+    skin = (((h < 25) | (h > 165)) & (s > 30) & (s < 190) & (v > 70)).astype(np.float32)
+    skin = cv2.GaussianBlur(skin, (0, 0), 4)[..., None] * smooth
+    sm = cv2.bilateralFilter(out, 9, 40, 9)
+    out = (out * (1 - skin) + sm * skin).astype(np.uint8)
+    return cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
+
+
+class RClip(Clip):
+    """Clip with the retouch applied to every decoded frame (before the slow zoom)"""
+    def frame(self, i):
+        buf = self.p.stdout.read(W * H * 3)
+        if len(buf) == W * H * 3: self.last = retouch(np.frombuffer(buf, np.uint8).reshape(H, W, 3))
+        fr = self.last
+        z = self.zoom[0] + (self.zoom[1] - self.zoom[0]) * i / max(1, self.n)
+        if abs(z - 1) > 1e-3:
+            M = cv2.getRotationMatrix2D((W * self.zc[0], H * self.zc[1]), 0, z)
+            fr = cv2.warpAffine(fr, M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+        return fr
+
+
 def top_shade(bottom, a=0.72):
     ys = np.arange(H, dtype=np.float32)
     p = np.clip((bottom - ys) / 380, 0, 1); p = p * p * (3 - 2 * p)
@@ -324,7 +367,16 @@ def cues(lst, a):
     return Subs([(s0 - a, e0 - a, t) for s0, e0, t in lst])
 
 
-def photo(name): return load_img(name)
+_PHOTOS = {}
+
+
+def photo(name):
+    """patient photo with the light retouch (cached); before/after collages are left untouched"""
+    if name not in _PHOTOS:
+        im = load_img(name)
+        if im.height > 2400: im = im.resize((im.width * 2400 // im.height, 2400), Image.LANCZOS)
+        _PHOTOS[name] = Image.fromarray(retouch(np.asarray(im)))
+    return _PHOTOS[name]
 
 
 def frame_crop(im, cx, cy, cw):
@@ -394,19 +446,17 @@ S2 = [(1.52, 4.36, "Добрый день, хочу сегодня показа�
 
 def s2():
     a, b = 1.45, 27.4
-    c = Clip("IMG_9032.MP4", a, b, zoom=(1.0, 1.04), zc=(0.5, 0.3))
+    c = RClip("IMG_9032.MP4", a, b, zoom=(1.0, 1.04), zc=(0.5, 0.3))
     col = Column(0, align="right")
     col.head("РУБЕЦ ПЛАНИРУЕТСЯ ЕЩЁ ДО ОПЕРАЦИИ", 0, size=58, gap=20).rule(0, gap=22)
     col.body("Не только его длина, но и место, где он будет расположен.", 0, size=36, gap=0)
     low(col)
-    for sp in col.items: at(sp, 13.6)          # appears when she talks about the short scar
-    sh = lambda t: bottom_shade(col.top - 260, 0.82) * max(0.45, ease((t - 13.2) / 0.6))
-    render(2, "rubec_planiruetsya", b - a, clip_bg(c), col.items, shade=sh, subs=cues(S2, a),
-           audio=("IMG_9032.MP4", a, b), animate=True)
+    render(2, "rubec_planiruetsya", b - a, clip_bg(c), col.items, shade=bottom_shade(col.top - 260, 0.82), subs=cues(S2, a),
+           audio=("IMG_9032.MP4", a, b))
 
 
 def s3():
-    img = frame_crop(photo("IMG_7767.JPG"), 0.36, 0.47, 0.62)
+    img = frame_crop(photo("IMG_7767.JPG"), 0.36, 0.55, 0.62)
     col = Column(0, align="left")
     col.body("Вот почему в хирургии лица важен не только вопрос:", 0.3, size=38, gap=8)
     col.head("«БУДЕТ ЛИ РУБЕЦ?»", 1.3, size=60, col=POWDER, gap=18)
@@ -414,9 +464,10 @@ def s3():
     col.body("Важнее другое:", 4.0, size=38, gap=6)
     col.body("где он будет проходить и насколько естественно эта зона будет выглядеть после заживления.", 4.6, size=38, wght=450, gap=0)
     low(col, 1650)
-    arr = [at(arrow_img((800, 300), (395, 470), LILAC), 4.6), at(arrow_img((770, 900), (445, 860), LILAC, bend=-0.2), 5.0)]
-    render(3, "gde_prohodit_rubec", 12.0, still_bg(img, zc=(0.35, 0.4)), col.items + arr,
-           shade=bottom_shade(col.top - 300, 0.85), animate=True)
+    # sutures: along the top of the ear (~600..730, 745) and down the front edge of the ear (~650..665, 750..990)
+    arr = [arrow_img((940, 560), (712, 742), LILAC, bend=0.18), arrow_img((960, 1010), (676, 905), LILAC, bend=-0.18)]
+    render(3, "gde_prohodit_rubec", 12.0, still_bg(img, zc=(0.62, 0.45)), col.items + arr,
+           shade=bottom_shade(col.top - 300, 0.85))
 
 
 S4 = [(39.62, 42.9, "Для первых суток пациентка очень неплохо выглядит."), (43.28, 46.2, "Все эти отёки, синяки, естественно, сойдут."),
@@ -427,7 +478,7 @@ S4 = [(39.62, 42.9, "Для первых суток пациентка очен�
 
 def s4():
     a, b = 39.5, 64.9
-    c = Clip("IMG_9032.MP4", a, b, zoom=(1.0, 1.03), zc=(0.5, 0.3))
+    c = RClip("IMG_9032.MP4", a, b, zoom=(1.0, 1.03), zc=(0.5, 0.3))
     ins = [(frame_crop(photo(n), cx, cy, cw), t0) for n, cx, cy, cw, t0 in
            [("IMG_7765.JPG", 0.5, 0.42, 0.74, 6.0), ("IMG_7766.JPG", 0.5, 0.42, 0.74, 9.2), ("IMG_7767.JPG", 0.45, 0.42, 0.74, 12.4)]]
     ins = [(np.asarray(im).astype(np.float32), t0) for im, t0 in ins]
@@ -455,7 +506,7 @@ S5 = [(12.92, 16.5, "— Как вам первый результат?"), (16.6
 
 def s5():
     a, b = 12.85, 31.9
-    c = Clip("IMG_9043.MP4", a, b, zoom=(1.0, 1.03), zc=(0.5, 0.3))
+    c = RClip("IMG_9043.MP4", a, b, zoom=(1.0, 1.03), zc=(0.5, 0.3))
     col = Column(0, align="center")
     col.head("ДАЖЕ В ПЕРВЫЕ СУТКИ ПАЦИЕНТКА УЖЕ ЗАМЕЧАЕТ ИЗМЕНЕНИЯ", 0, size=54, gap=20).rule(0, gap=22)
     col.body("Хотя отёк и следы операции ещё сохраняются.", 0, size=36, gap=0)
@@ -469,7 +520,7 @@ S6 = [(31.96, 35.0, "Вот… нравится."), (35.12, 36.3, "Очень к
 
 def s6():
     a, b = 31.9, 37.9
-    c = Clip("IMG_9043.MP4", a, b, zoom=(1.0, 1.05), zc=(0.5, 0.3))
+    c = RClip("IMG_9043.MP4", a, b, zoom=(1.0, 1.05), zc=(0.5, 0.3))
     col = Column(0, align="left")
     col.body("первый взгляд на результат", 0, size=34, wght=400, col=POWDER, italic=True, gap=0)
     low(col, 1570)
@@ -478,7 +529,7 @@ def s6():
 
 
 def s7():
-    c = Clip("IMG_9049.MP4", 0.0, 9.4, zoom=(1.0, 1.05), zc=(0.6, 0.7))
+    c = RClip("IMG_9049.MP4", 0.0, 9.4, zoom=(1.0, 1.05), zc=(0.6, 0.7))
     col = Column(240, align="left")
     col.body("И вот здесь начинается часть, о которой пациентки иногда думают меньше всего:", 0, size=38, gap=16)
     col.head("ЗА РУБЦОМ НУЖНО УХАЖИВАТЬ", 0, size=58, col=LILAC, gap=16).rule(0, gap=20)
@@ -492,7 +543,7 @@ S8 = [(0.0, 3.8, "И если сушит, можно с гиалуронкой �
 
 def s8():
     a, b = 0.0, 11.0
-    c = Clip("IMG_9031.MP4", a, b, zoom=(1.0, 1.03), zc=(0.4, 0.3))
+    c = RClip("IMG_9031.MP4", a, b, zoom=(1.0, 1.03), zc=(0.4, 0.3))
     col = Column(0, align="right")
     col.head("ПОСЛЕ ОПЕРАЦИИ ПАЦИЕНТКА ПОЛУЧАЕТ РЕКОМЕНДАЦИИ ПО УХОДУ", 0, size=52, gap=20).rule(0, gap=22)
     col.body("Уход зависит от операции и конкретного этапа восстановления.", 0, size=36, gap=0)
@@ -510,7 +561,7 @@ def s9():
     col.space(14).rule(4.4, gap=18)
     col.body("А не оценивать результат по одному кадру в первые дни.", 4.8, size=36, col=POWDER, italic=True, wght=500, gap=0)
     low(col, 1650)
-    render(9, "chto_uchityvat", 12.0, still_bg(img, zc=(0.4, 0.3)), col.items, shade=bottom_shade(col.top - 280, 0.86), animate=True)
+    render(9, "chto_uchityvat", 12.0, still_bg(img, zc=(0.4, 0.3)), col.items, shade=bottom_shade(col.top - 280, 0.86))
 
 
 def s10():
@@ -534,30 +585,20 @@ def s11():
     render(11, "obsudit_do_operacii", 10.0, still_bg(base, zc=(0.5, 0.25)), col.items, shade=bottom_shade(col.top - 300, 0.9))
 
 
-def collage_bf(num, slug, name, arrows):
-    im = photo(name).resize((W, H), Image.LANCZOS).convert("RGBA")
+def collage_bf(num, slug, name):
+    im = load_img(name).resize((W, H), Image.LANCZOS).convert("RGBA")
     im.alpha_composite(chip("ПОСЛЕ"), (MARGIN - 20, 250))
     im.alpha_composite(chip("ДО", POWDER), (MARGIN - 20, H // 2 + 40))
-    sps = []
-    for (x0, y0, x1, y1, colr, bend) in arrows:
-        sps.append(at(arrow_img((x0 * W, y0 * H), (x1 * W, y1 * H), colr, bend=bend), 0.6))
-    render(num, slug, 8.0, still_bg(im, z1=1.02, zc=(0.5, 0.5)), sps, animate=True)
+    render(num, slug, 8.0, still_bg(im, z1=1.02, zc=(0.5, 0.5)), [])
 
 
-def s12():
-    collage_bf(12, "do_posle_anfas", "IMG_7783.PNG",
-               [(0.10, 0.40, 0.27, 0.315, LILAC, 0.2), (0.90, 0.40, 0.66, 0.315, LILAC, -0.2),
-                (0.10, 0.92, 0.29, 0.815, POWDER, 0.2), (0.90, 0.92, 0.64, 0.815, POWDER, -0.2)])
+def s12(): collage_bf(12, "do_posle_anfas", "IMG_7783.PNG")
 
 
-def s13():
-    collage_bf(13, "do_posle_3-4", "IMG_7784.PNG",
-               [(0.95, 0.40, 0.78, 0.305, LILAC, -0.2), (0.95, 0.93, 0.78, 0.84, POWDER, -0.2)])
+def s13(): collage_bf(13, "do_posle_3-4", "IMG_7784.PNG")
 
 
-def s14():
-    collage_bf(14, "do_posle_profil", "IMG_7785.PNG",
-               [(0.85, 0.42, 0.50, 0.32, LILAC, -0.25), (0.88, 0.93, 0.56, 0.79, POWDER, -0.25)])
+def s14(): collage_bf(14, "do_posle_profil", "IMG_7785.PNG")
 
 
 def s15():
