@@ -579,15 +579,14 @@ def s10():
 
 
 def s11():
-    ph = photo("IMG_7782.PNG").resize((W, 1440), Image.LANCZOS)
-    base = Image.new("RGB", (W, H), GRAPHITE); base.paste(ph, (0, 0))
+    base = frame_crop(load_img("IMG_5513.JPG"), 0.5, 0.5, 0.84)       # surgeon in the white coat
     col = Column(0, align="right")
     col.body("Если вы давно думаете о подтяжке лица, но каждый раз возникает:", 0, size=36, gap=10)
     col.head("«А ВДРУГ РУБЦЫ БУДУТ ЗАМЕТНЫ?»", 0, size=54, col=POWDER, gap=18).rule(0, gap=20)
     col.body("Этот вопрос лучше обсудить ещё до операции.", 0, size=38, wght=600, gap=14)
     col.body("На консультации можно заранее понять, где будут проходить разрезы и какой объём операции нужен именно в вашем случае.", 0, size=34, gap=0)
     low(col, 1660)
-    render(11, "obsudit_do_operacii", 10.0, still_bg(base, zc=(0.5, 0.25)), col.items, shade=bottom_shade(col.top - 300, 0.9))
+    render(11, "obsudit_do_operacii", 10.0, still_bg(base, z1=1.03, zc=(0.5, 0.2)), col.items, shade=bottom_shade(col.top - 300, 0.9))
 
 
 def collage_bf(num, slug, name):
