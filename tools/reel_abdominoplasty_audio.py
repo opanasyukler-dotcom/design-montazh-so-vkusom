@@ -1,5 +1,5 @@
 import numpy as np, wave, librosa, cv2
-SR=48000; DUR=50.6; M0=17.44
+SR=48000; DUR=47.6; M0=17.44
 src=open("../v14/audio.py").read(); exec(src[src.index("rng=np.random"):src.index("n=int(DUR*SR)")])
 s2=open("../v15/audio.py").read()
 exec(s2[s2.index("def impact"):s2.index("n=int(DUR*SR)", s2.index("def impact"))])
@@ -25,11 +25,12 @@ mus*=((0.34-0.30*np.clip(d,0,1))*np.minimum(1,tt/0.3)*fade)[:,None]
 sfx=np.zeros(n+SR)
 def put(s,t,g): i=int(max(0,t)*SR); seg=sfx[i:i+len(s)]; seg+=s[:len(seg)]*g
 WB,PP,IM,RS=whoosh(),pop(),impact(),riser(); SH,BM,SM,DG=shutter(),boom(),shimmer(),ding(); SW=whoosh(0.28,800,9000,0.5)
-for c in [3.2,8.0,12.6,17.0,20.2,23.0,24.8,30.0,35.1,40.0,41.8,43.6,45.4,47.2]: put(WB,c-0.3,0.2); put(BM,c,0.18)
-for t in [0.0,9.5,11.0,40.0,41.8,43.6,45.4]: put(SH,t+0.02,0.2)
-for t in [17.3,17.75,18.2,18.65,30.0]: put(PP,t,0.22)
+for c in [8.0,12.6,17.0,20.2,23.0,24.8,30.0,35.1,40.0,41.85,43.7,45.55]: put(WB,c-0.3,0.2); put(BM,c,0.18)
+for t in [9.5,11.0,40.0,41.85,43.7,45.55]: put(SH,t+0.02,0.2)
+put(SH,0.35,0.18); put(SM,0.1,0.16)
+for t in [3.9,4.6,5.3,6.0,17.3,17.75,18.2,18.65]: put(PP,t,0.2)
 put(RS,13.1-1.0,0.16); put(SM,13.2,0.18); put(IM,14.2,0.22); put(IM,20.55,0.25); put(SM,26.7,0.14); put(IM,37.5,0.22)
-for t0,nl in [(0.3,3),(8.3,2),(14.2,3),(20.55,2),(26.7,2),(30.5,2),(37.5,2),(47.35,3)]:
+for t0,nl in [(0.9,3),(8.3,2),(14.2,3),(20.55,1),(26.7,2),(30.6,2),(37.5,2)]:
     for k in range(nl): put(SW,t0+k*0.24-0.05,0.13)
 put(DG,40.1,0.1)
 mix=mus+vo[:,None]+sfx[:n,None]*0.5

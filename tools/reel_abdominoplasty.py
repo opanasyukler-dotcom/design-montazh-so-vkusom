@@ -1,5 +1,5 @@
 _b = open("base.py").read()
-for a, b in [("DUR = 41.0", "DUR = 50.6"), ("ease((t - t0) / 0.3))\ndef mblur", "ease((t - t0) / 0.6))\ndef mblur"),
+for a, b in [("DUR = 41.0", "DUR = 47.6"), ("ease((t - t0) / 0.3))\ndef mblur", "ease((t - t0) / 0.6))\ndef mblur"),
              ("if lt > 0.1: return fr", "if lt > 0.18: return fr"), ("(1 - lt / 0.1)", "(1 - lt / 0.18)"),
              ("ti = t0 + k * 0.16; p = ease((t - ti) / 0.45)", "ti = t0 + k * 0.24; p = ease((t - ti) / 0.65)"),
              ("out = 1 - ease((t - t1) / 0.3) if t > t1 else 1.0", "out = 1 - ease((t - t1) / 0.4) if t > t1 else 1.0"),
@@ -25,9 +25,9 @@ def src_of(t, name):
         best = (so, t0 + so - si)
     return None if best is None else best[0] + t - best[1]
 
-BL = [("open", 0, 3.2), ("iv1", 3.2, 8.0), ("do", 8.0, 12.6), ("morph", 12.6, 17.0), ("zones", 17.0, 20.2),
-      ("belly", 20.2, 23.0), ("waist", 23.0, 24.8), ("life", 24.8, 30.0), ("circ", 30.0, 35.1), ("here", 35.1, 40.0),
-      ("col1", 40.0, 41.8), ("col2", 41.8, 43.6), ("col3", 43.6, 45.4), ("col4", 45.4, 47.2), ("cta", 47.2, DUR)]
+BL = [("open", 0, 8.0), ("do", 8.0, 12.6), ("morph", 12.6, 17.0), ("zones", 17.0, 20.2),          # ДО only until the morph
+      ("belly", 20.2, 23.0), ("waist", 23.0, 24.8), ("life", 24.8, 30.0), ("secret", 30.0, 35.1), ("here", 35.1, 40.0),
+      ("col1", 40.0, 41.85), ("col2", 41.85, 43.7), ("col3", 43.7, 45.55), ("col4", 45.55, DUR)]
 XF = 0.35
 def block(t):
     for n, a, b in BL:
@@ -53,7 +53,7 @@ BF = {k: photo(n) for k, n in [("f", 7728), ("q", 7729), ("s", 7730), ("b", 7731
 AF = {k: photo(n) for k, n in [("f", 7732), ("q", 7733), ("s", 7734), ("b", 7735)]}
 AF["f"] = blur_ell(AF["f"], (1040, 900), (260, 210)); AF["q"] = blur_ell(AF["q"], (1090, 1000), (240, 270)); AF["s"] = blur_ell(AF["s"], (1180, 990), (200, 240))
 # body anchors: (shoulder y, crotch y, centre x) in source pixels
-ANC = {("B", "f"): (900, 2120, 1088), ("B", "q"): (960, 2230, 1050), ("B", "b"): (960, 2250, 1010),
+ANC = {("B", "f"): (900, 2120, 1088), ("B", "s"): (980, 2250, 1040), ("B", "q"): (960, 2230, 1050), ("B", "b"): (960, 2250, 1010),
        ("A", "f"): (1130, 2140, 1025), ("A", "q"): (1278, 2200, 1080)}
 def pv(img, key, z=1.0, Y0=430, Y1=1120):
     top, bot, cx = ANC[key]; s = (Y1 - Y0) / (bot - top) * z
@@ -61,14 +61,101 @@ def pv(img, key, z=1.0, Y0=430, Y1=1120):
 COL = [load(f"dl/IMG_{n}.PNG") for n in (7736, 7737, 7738, 7739)]
 
 # ---------------- text ----------------
+def timg(txt, kind, size):
+    f = osw(size) if kind in ("H", "P") else mont(500, 36); asc, desc = f.getmetrics(); tw = int(f.getlength(txt))
+    im = Image.new("RGBA", (tw + 8, asc + desc + 4), (0, 0, 0, 0)); ImageDraw.Draw(im).text((4, 2 + asc), txt, font=f, fill=(255, 255, 255, 255), anchor="ls")
+    return to_np(im)
+def cols(kind): return (PINK, ROSE) if kind == "P" else (WHITE, BLUE)
+class Pill:
+    """outlined rounded frame opens from the centre, then the text wipes in left -> right (reference opening)"""
+    def __init__(s, lines, size=84):
+        s.ims = [(timg(t, k, size), k) for t, k in lines]
+        s.w = max(i.shape[1] for i, _ in s.ims) + 90; s.h = sum(i.shape[0] for i, _ in s.ims) + 50
+        im = Image.new("RGBA", (s.w + 8, s.h + 8), (0, 0, 0, 0))
+        ImageDraw.Draw(im).rounded_rectangle((3, 3, s.w + 4, s.h + 4), radius=min(46, s.h // 2), outline=(255, 255, 255, 255), width=4)
+        s.box = to_np(im)
+    def draw(s, fr, yc, t, t0, t1):
+        if t < t0 or t > t1 + 0.5: return
+        pb = ease((t - t0) / 0.5); out = 1 - ease((t - t1) / 0.45) if t > t1 else 1.0
+        bw = max(2, int(s.box.shape[1] * pb)); x0 = 540 - s.box.shape[1] / 2; y0 = yc - s.box.shape[0] / 2
+        b = s.box.copy(); c = (s.box.shape[1] - bw) // 2; b[:, :c] = 0; b[:, c + bw:] = 0
+        ablend(fr, b, x0, y0, out * 0.95, WHITE, BLUE)
+        yy = y0 + 4 + 25
+        for k, (im, kind) in enumerate(s.ims):
+            pw = ease((t - t0 - 0.35 - 0.2 * k) / 0.55)
+            if t > t1: pw = min(pw, 1 - ease((t - t1 - 0.05 * k) / 0.35))
+            if pw > 0:
+                vis = im.copy(); vis[:, int(vis.shape[1] * pw):] = 0
+                ablend(fr, vis, 540 - im.shape[1] / 2, yy, 1.0, *cols(kind))
+            yy += im.shape[0]
+class SlideL:
+    """left-aligned lines slide out of their own mask, one by one"""
+    def __init__(s, lines, size=80, x=70): s.ims = [(timg(t, k, size), k) for t, k in lines]; s.x = x
+    def draw(s, fr, y, t, t0, t1):
+        if t < t0 or t > t1 + 0.5: return
+        out = 1 - ease((t - t1) / 0.4) if t > t1 else 1.0
+        for k, (im, kind) in enumerate(s.ims):
+            p = ease((t - t0 - 0.28 * k) / 0.6)
+            if p > 0:
+                w = int(im.shape[1] * p); vis = np.zeros_like(im); vis[:, :w] = im[:, im.shape[1] - w:]
+                ablend(fr, vis, s.x, y, out, *cols(kind))
+                if kind == "P" and p > 0.3:                                 # thin powder bar grows under the key line
+                    bar = np.zeros((6, int((im.shape[1] - 8) * ease((t - t0 - 0.28 * k - 0.25) / 0.6)) + 1, 4), np.float32); bar[..., 3] = 1
+                    ablend(fr, bar, s.x + 4, y + im.shape[0] + 2, out, PINK, ROSE)
+            y += im.shape[0] + 10
+class Pop:
+    """each line punches in from a bigger size"""
+    def __init__(s, lines, size=110): s.ims = [(timg(t, k, size), k) for t, k in lines]
+    def draw(s, fr, y, t, t0, t1):
+        if t < t0 or t > t1 + 0.5: return
+        out = 1 - ease((t - t1) / 0.4) if t > t1 else 1.0
+        for k, (im, kind) in enumerate(s.ims):
+            lt = t - t0 - 0.3 * k
+            if lt > 0:
+                sc = 1 + 0.45 * (1 - ease(lt / 0.45)); im2 = cv2.resize(im, (int(im.shape[1] * sc), int(im.shape[0] * sc)))
+                ablend(fr, im2, 540 - im2.shape[1] / 2, y + im.shape[0] / 2 - im2.shape[0] / 2, out * min(1, lt / 0.2), *cols(kind))
+            y += im.shape[0] + 4
+def brackets(fr, cx, cy, w, h, t, t0, t1):
+    """viewfinder corners that close in on the area (reference)"""
+    if t < t0 or t > t1 + 0.4: return
+    p = ease((t - t0) / 0.7); al = min(1, (t - t0) / 0.2) * (1 - ease((t - t1) / 0.4) if t > t1 else 1)
+    sc = 1.5 - 0.5 * p; hw, hh = w * sc / 2, h * sc / 2; L = 60
+    m = np.zeros((H, W), np.uint8)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            x, y = int(cx + sx * hw), int(cy + sy * hh)
+            cv2.line(m, (x, y), (x - sx * L, y), 255, 5, cv2.LINE_AA); cv2.line(m, (x, y), (x, y - sy * L), 255, 5, cv2.LINE_AA)
+    a = m.astype(np.float32)[..., None] / 255 * al; fr *= 1 - a; fr += a
+CL = {}
+def callout(fr, txt, t, t0, pt, lx, ly, side, t1=1e9):
+    """diagnosis callout: pulsing dot -> thin line -> underlined small label (reference)"""
+    if t < t0 or t > t1 + 0.4: return
+    al = 1 - ease((t - t1) / 0.4) if t > t1 else 1.0
+    if txt not in CL:
+        f = mont(600, 42); asc, desc = f.getmetrics(); im = Image.new("RGBA", (int(f.getlength(txt)) + 8, asc + desc + 4), (0, 0, 0, 0))
+        ImageDraw.Draw(im).text((4, 2 + asc), txt, font=f, fill=(255, 255, 255, 255), anchor="ls"); CL[txt] = to_np(im)
+    im = CL[txt]; tw = im.shape[1]
+    ax = lx                                                                # line meets the label's outer end, underline runs inward
+    pl = ease((t - t0 - 0.2) / 0.5); pu = ease((t - t0 - 0.6) / 0.4)
+    m = np.zeros((H, W), np.uint8)
+    cv2.circle(m, (int(pt[0]), int(pt[1])), 8, 255, -1, cv2.LINE_AA)
+    pr = ((t - t0) * 0.9) % 1; ring_m = np.zeros((H, W), np.uint8); cv2.circle(ring_m, (int(pt[0]), int(pt[1])), int(14 + 26 * pr), 255, 3, cv2.LINE_AA)
+    ex, ey = pt[0] + (ax - pt[0]) * pl, pt[1] + (ly + 6 - pt[1]) * pl
+    cv2.line(m, (int(pt[0]), int(pt[1])), (int(ex), int(ey)), 255, 3, cv2.LINE_AA)
+    if pu > 0: cv2.line(m, (int(ax), int(ly + 6)), (int(ax - side * tw * pu), int(ly + 6)), 255, 3, cv2.LINE_AA)
+    a = (m.astype(np.float32) + ring_m.astype(np.float32) * (1 - pr) * 0.8)[..., None] / 255 * al * min(1, (t - t0) / 0.15)
+    fr *= 1 - np.clip(a, 0, 1); fr += np.clip(a, 0, 1)
+    if pu > 0:
+        x = lx if side < 0 else lx - tw; vis = im.copy(); vis[:, int(tw * pu):] = 0 if side < 0 else vis[:, int(tw * pu):]
+        if side > 0: vis[:, :int(tw * (1 - pu))] = 0
+        ablend(fr, vis, x, ly - im.shape[0] - 2, al, WHITE, BLUE)
 T0 = Title([("НАДО БЫЛО ПРОСТО", "H"), ("ДАВНО ПРИЙТИ", "P"), ("2 месяца после операции", "S")], 96)
-T1 = Title([("4 ДЕТЕЙ", "P"), ("ОДНИ РОДЫ С БЛИЗНЯШКАМИ", "H")], 92)
-T2 = Title([("АБДОМИНОПЛАСТИКА", "P"), ("+ ЛИПОСАКЦИЯ РУК", "H"), ("+ ЛИПОСАКЦИЯ СПИНЫ", "H")], 84)
-T3 = Title([("УШИЛИ ДИАСТАЗ", "P"), ("рубцу сейчас только 2 месяца", "S")], 104)
-T4 = Title([("НАЧАЛАСЬ", "H"), ("НОВАЯ ЖИЗНЬ", "P")], 104)
-T5 = Title([("«ОКАЗЫВАЕТСЯ, ВЕСЬ СЕКРЕТ —", "H"), ("ПРОСТО ПРИЙТИ»", "P")], 80)
-T6 = Title([("НАДО ЖИТЬ", "H"), ("ЗДЕСЬ И СЕЙЧАС", "P")], 110)
-TC = Title([("ЗАПИСЬ НА КОНСУЛЬТАЦИЮ", "H"), ("ПИШИТЕ «КОНСУЛЬТАЦИЯ»", "P"), ("в Direct", "S")], 92)
+T1 = Pill([("4 ДЕТЕЙ", "P"), ("ОДНИ РОДЫ С БЛИЗНЯШКАМИ", "H")], 80)                       # framed, bottom
+T2 = SlideL([("АБДОМИНОПЛАСТИКА", "P"), ("+ ЛИПОСАКЦИЯ РУК", "H"), ("+ ЛИПОСАКЦИЯ СПИНЫ", "H")], 76)   # left column
+T3 = Pop([("УШИЛИ ДИАСТАЗ", "P")], 118); T3s = timg("рубцу сейчас только 2 месяца", "S", 0)       # big punch, centre
+T4 = Title([("НАЧАЛАСЬ", "H"), ("НОВАЯ ЖИЗНЬ", "P")], 112)                                     # top of the frame
+T5 = Pill([("ВЕСЬ СЕКРЕТ —", "H"), ("ПРОСТО ПРИЙТИ", "P")], 92)
+T6 = Pop([("НАДО ЖИТЬ", "H"), ("ЗДЕСЬ И СЕЙЧАС", "P")], 116)
 CH_DO, CH_PO = label("ДО", WHITE), label("ПОСЛЕ", PINK)
 
 ZL = {}
@@ -108,7 +195,7 @@ for i in range(len(SUB)):
     nxt = SUB[i + 1][0] if i + 1 < len(SUB) else DUR
     SUB[i][1] = min(nxt, max(SUB[i][1], SUB[i][0] + 0.3) + 0.25)
 
-def face_disc_iv(t, r):
+def _unused_face_disc_iv(t, r):
     f = V["iv"].get(int(round(src_of(t, "iv") * 30))); half = 430
     crop = f[int(560 - half):int(560 + half), int(540 - half):int(540 + half)]
     return cv2.resize(crop, (2 * int(r), 2 * int(r)), interpolation=cv2.INTER_AREA).astype(np.float32) / 255
@@ -124,25 +211,34 @@ def morph(a_, b_, p, f=0.35):
     edge = (xx_ / W * 0.6 + yy_ / H * 0.4)[..., None]
     m = np.clip((p * (1 + f) - edge) / f, 0, 1); return a_ * (1 - m) + b_ * m
 
-LIGHT_BLOCKS = ("circ", "cta")
+LIGHT_BLOCKS = ()
+def focus(fr, lt, dur=0.9):                                             # reference: start out of focus, pull in
+    sg = 14 * (1 - ease(lt / dur)) ** 1.5
+    return cv2.GaussianBlur(fr, (0, 0), sg) if sg > 0.5 else fr
+OPEN_Z = lambda t: 1.0 + 0.06 * t / 8.0
+def P_open(x, y, t):                                                    # source px of the ДО front -> screen, opening framing
+    top, bot, cx = ANC[("B", "f")]; s = (1240 - 380) / (bot - top) * OPEN_Z(t); return (540 + (x - cx) * s, 810 + (y - (top + bot) / 2) * s)
 def render_block(t, b=None):
     n, t0, t1 = b or block(t); lt = t - t0; flash = 0; DEFER[0] = True; PENDING.clear(); LIGHT[0] = n in LIGHT_BLOCKS
-    if n == "open":                                                     # ДО, slow push
-        fr = pv(BF["f"], ("B", "f"), 1.0 + 0.05 * lt / 3.2); chip(fr, CH_DO, 60, 228, t, 0.2)
-    elif n == "iv1":
-        fr = mblur(vsync("iv", t, 1.12 * (1 + 0.03 * lt / 4.8) * trans(t, t0), 540, 900, 900), lt)
+    if n == "open":                                                     # ДО, closer, focus pull + viewfinder, then diagnosis callouts
+        fr = focus(pv(BF["f"], ("B", "f"), OPEN_Z(t), 380, 1240), t); chip(fr, CH_DO, 60, 228, t, 0.5)
+        bx, by = P_open(1110, 1900, t); brackets(fr, bx, by, 330, 300, t, 0.25, 2.6)
+        callout(fr, "избыток на руках", t, 3.9, P_open(430, 1440, t), 40, 1330, -1)
+        callout(fr, "растянутый живот", t, 4.6, P_open(1260, 1840, t), 1040, 1240, 1)
+        callout(fr, "потеря талии", t, 5.3, P_open(780, 1720, t), 40, 1440, -1)
+        callout(fr, "кожный фартук", t, 6.0, P_open(1180, 2080, t), 1040, 1350, 1)
     elif n == "do":                                                     # ДО: front -> 3/4 -> back, soft dissolves
-        seq = [("f", 8.0), ("q", 9.5), ("b", 11.0)]; fr = None
+        seq = [("q", 8.0), ("s", 9.5), ("b", 11.0)]; fr = None
         for k, (key, s0) in enumerate(seq):
             if t < s0: break
             img = pv(BF[key], ("B", key), 1.0 + 0.04 * (t - s0))
             a = ease((t - s0) / 0.45) if k else 1.0; fr = img if fr is None else fr * (1 - a) + img * a
-        chip(fr, CH_DO, 60, 228, t, t0 + 0.1); T1.draw(fr, 1210, t, t0 + 0.3, t1 - 0.05)
+        chip(fr, CH_DO, 60, 228, t, t0 + 0.1); T1.draw(fr, 1290, t, t0 + 0.3, t1 - 0.35)
     elif n == "morph":                                                  # smooth ДО -> ПОСЛЕ (shoulders + crotch aligned)
         z = 1.0 + 0.04 * lt / 4.4
         fr = morph(pv(BF["f"], ("B", "f"), z), pv(AF["f"], ("A", "f"), z), ease((t - 13.1) / 1.6))
         chip(fr, CH_DO, 60, 228, t, t0, 13.1); chip(fr, CH_PO, 60, 228, t, 14.0)
-        T2.draw(fr, 1190, t, 14.2, t1 - 0.05)
+        T2.draw(fr, 1170, t, 14.2, t1 - 0.3); flash = 0.22 * max(0, 1 - abs(t - 13.15) / 0.2)
     elif n == "zones":                                                  # where the figure changed
         fr = pv(AF["q"], ("A", "q"), 1.0 + 0.03 * lt / 3.2); chip(fr, CH_PO, 60, 228, t, t0 + 0.1)
         z = 1.0 + 0.03 * lt / 3.2; P = lambda x, y: (540 + (x - 1080) * 690 / 922 * z, 775 + (y - 1739) * 690 / 922 * z)
@@ -152,29 +248,29 @@ def render_block(t, b=None):
         zone(fr, "СПИНА", t, t0 + 1.65, P(740, 1800), 200, 940, -1)
     elif n == "belly":                                                  # close-up: belly, scar
         fr = mblur(vframe("surg", 35.9 + lt * 0.85, 1.05 * (1 + 0.03 * lt / 2.8) * trans(t, t0), 540, 820, 540, 800), lt)
-        chip(fr, CH_PO, 60, 228, t, t0 + 0.1); T3.draw(fr, 1210, t, t0 + 0.35, t1 - 0.05)
+        chip(fr, CH_PO, 60, 228, t, t0 + 0.1); T3.draw(fr, 1180, t, t0 + 0.35, t1 - 0.3)
+        if t > t0 + 0.9: ablend(fr, T3s, 540 - T3s.shape[1] / 2, 1330, min(1, (t - t0 - 0.9) / 0.4) * (1 - ease((t - t1 + 0.3) / 0.4)), WHITE, BLUE)
     elif n == "waist":
         fr = mblur(vsync("surg", t, 1.1 * trans(t, t0), 540, 980, 900), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.1)
     elif n == "life":                                                   # the figure now: she turns
         fr = mblur(vframe("walk", 0.2 + lt, 1.0 * trans(t, t0), 540, 900, 540, 900), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.1)
-        T4.draw(fr, 1230, t, 26.7, t1 - 0.05)
-    elif n == "circ":
-        fr = white_bg(t); circle_iv(fr, t, t0, 540, 720, 300)
-        T5.draw(fr, 1150, t, t0 + 0.5, t1 - 0.05)
+        T4.draw(fr, 300, t, 26.7, t1 - 0.3)
+    elif n == "secret":                                                 # interview: B&W flash in, focus pull, framed text
+        fr = focus(mblur(vsync("iv", t, 1.15 * (1 + 0.04 * lt / 5) * trans(t, t0), 540, 880, 880), lt), lt, 0.7)
+        if lt < 0.5: g = fr @ np.float32([0.299, 0.587, 0.114]); k = 1 - ease(lt / 0.5); fr = fr * (1 - k) + g[..., None] * k
+        T5.draw(fr, 1240, t, t0 + 0.6, t1 - 0.35)
     elif n == "here":
         fr = mblur(vframe("walk", 5.0 + lt * 0.9, 1.0 * trans(t, t0), 540, 900, 540, 900), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.1)
-        T6.draw(fr, 1230, t, 37.5, t1 - 0.05)
+        T6.draw(fr, 1180, t, 37.5, t1 - 0.3)
     elif n.startswith("col"):                                           # ready ДО/ПОСЛЕ collages: ПОСЛЕ top, ДО bottom
         img = COL[int(n[3]) - 1]; z = (1 + 0.02 * lt) * trans(t, t0, 0.04)
         fr = mblur(warp(img, W / img.shape[1] * z, img.shape[1] / 2, img.shape[0] / 2), lt)
         chip(fr, CH_PO, 40, 228, t, t0 + 0.3); chip(fr, CH_DO, 40, 990, t, t0 + 0.5)
-    else:                                                               # CTA on white
-        fr = white_bg(t); TC.draw(fr, 760, t, t0 + 0.15, 1e9)
-    if n in ("open", "iv1"): T0.draw(fr, 1180, t, 0.3, 7.7)
+    if n == "open": T0.draw(fr, 1170, t, 0.9, 3.5)
     dark = not LIGHT[0] and not n.startswith("col")
     if not LIGHT[0]: fr = look(fr, t)
     if dark: fr = fr * (1 - HAZE)
-    if not n.startswith("col") and n != "cta": subs(fr, t)
+    if not n.startswith("col"): subs(fr, t)
     DEFER[0] = False
     for args in PENDING: ablend(fr, *args)
     blend(fr, LOGO_D if LIGHT[0] else LOGO, 540 - LOGO.shape[1] / 2, 120, 0.9)
