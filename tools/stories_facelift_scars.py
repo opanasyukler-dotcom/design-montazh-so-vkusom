@@ -307,6 +307,9 @@ def clip_bg(c): return lambda i, t: c.frame(i)
 
 
 # ---------------- helpers for this series ----------------
+RETOUCH = False   # light retouch (bruise lift + skin softening) - switched off at the client's request
+
+
 def retouch(rgb, bruise=1.0, smooth=0.45):
     """light retouch: lift purple/red bruises that are darker than the surrounding skin, soften skin a little.
     Large-radius statistics are computed at 1/4 size (fast enough for every video frame)."""
@@ -341,7 +344,9 @@ class RClip(Clip):
     """Clip with the retouch applied to every decoded frame (before the slow zoom)"""
     def frame(self, i):
         buf = self.p.stdout.read(W * H * 3)
-        if len(buf) == W * H * 3: self.last = retouch(np.frombuffer(buf, np.uint8).reshape(H, W, 3))
+        if len(buf) == W * H * 3:
+            fr = np.frombuffer(buf, np.uint8).reshape(H, W, 3)
+            self.last = retouch(fr) if RETOUCH else fr
         fr = self.last
         z = self.zoom[0] + (self.zoom[1] - self.zoom[0]) * i / max(1, self.n)
         if abs(z - 1) > 1e-3:
@@ -375,7 +380,7 @@ def photo(name):
     if name not in _PHOTOS:
         im = load_img(name)
         if im.height > 2400: im = im.resize((im.width * 2400 // im.height, 2400), Image.LANCZOS)
-        _PHOTOS[name] = Image.fromarray(retouch(np.asarray(im)))
+        _PHOTOS[name] = Image.fromarray(retouch(np.asarray(im))) if RETOUCH else im
     return _PHOTOS[name]
 
 
