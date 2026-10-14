@@ -51,6 +51,10 @@ def photo(n):
     return im
 BF = {k: photo(n) for k, n in [("f", 7728), ("q", 7729), ("s", 7730), ("b", 7731)]}
 AF = {k: photo(n) for k, n in [("f", 7732), ("q", 7733), ("s", 7734), ("b", 7735)]}
+def knee_cut(img, y, f=70):                                            # ПОСЛЕ photos end at the knees, like the ДО cutouts
+    bg = img[3250:3260, 100:300].reshape(-1, 3).mean(0); m = np.clip((y - np.arange(img.shape[0], dtype=np.float32)) / f + 0.5, 0, 1)[:, None, None]
+    return (img * m + bg * (1 - m)).astype(np.uint8)
+AF["f"] = knee_cut(AF["f"], 2670); AF["q"] = knee_cut(AF["q"], 2570)
 AF["f"] = blur_ell(AF["f"], (1040, 900), (260, 210)); AF["q"] = blur_ell(AF["q"], (1090, 1000), (240, 270)); AF["s"] = blur_ell(AF["s"], (1180, 990), (200, 240))
 # body anchors: (shoulder y, crotch y, centre x) in source pixels
 ANC = {("B", "f"): (900, 2120, 1088), ("B", "s"): (980, 2250, 1040), ("B", "q"): (960, 2230, 1050), ("B", "b"): (960, 2250, 1010),
