@@ -216,32 +216,33 @@ class Counter:
             put(fr, text_spr("100", "XB", s.size, BLUSH, -0.03), s.x * K, Y, 0.5 * (1 - pk), scale=1 + 0.12 * pk)
 
 # ---------------------------------------------------------------- graphics timeline
-X0 = 84
+X0 = 80
+TOP = 330          # Instagram safe zone: nothing above ~y 300 (status bar / Reels header / 3:4 grid crop)
 def card(t0, t1, num, title_lines, sub=None, tsfx=True):
-    els = [Txt(t0, t1, num, "L", 118, X0 - 6, 150, BLUSH, -0.02, sfx="whoosh" if tsfx else None),
-           Txt(t0 + 0.1, t1, "/ 04", "L", 38, X0 + 160, 222, WHITE, 0.08, alpha=0.75),
-           Line(t0 + 0.12, t1, X0, 318, 300)]
-    y = 340
+    els = [Txt(t0, t1, num, "L", 80, X0 - 4, TOP - 10, BLUSH, -0.02, sfx="whoosh" if tsfx else None),
+           Txt(t0 + 0.1, t1, "/ 04", "L", 28, X0 + 108, TOP + 38, WHITE, 0.08, alpha=0.75),
+           Line(t0 + 0.12, t1, X0, TOP + 100, 210)]
+    y = TOP + 116
     for i, l in enumerate(title_lines):
-        els.append(Txt(t0 + 0.2 + i * 0.12, t1, l, "B", 86, X0, y)); y += 104
-    if sub: els.append(Txt(t0 + 0.45, t1, sub, "R", 40, X0, y + 16, track=0.01, stagger=0.05))
+        els.append(Txt(t0 + 0.2 + i * 0.12, t1, l, "B", 60, X0, y)); y += 72
+    if sub: els.append(Txt(t0 + 0.45, t1, sub, "R", 32, X0, y + 10, track=0.01, stagger=0.05))
     return els
 
-def kicker(t0, t1, text, big, y=180, sub=None):
-    els = [Txt(t0, t1, text, "L", 42, X0, y, track=0.12, stagger=0.05, sfx="swish"),
-           Line(t0 + 0.08, t1, X0, y + 66, 120)]
+def kicker(t0, t1, text, big, y=TOP, sub=None):
+    els = [Txt(t0, t1, text, "L", 32, X0, y, track=0.12, stagger=0.05, sfx="swish"),
+           Line(t0 + 0.08, t1, X0, y + 50, 90)]
     if big:
-        yy = y + 90
+        yy = y + 66
         for i, l in enumerate(big):
-            els.append(Txt(t0 + 0.15 + i * 0.12, t1, l, "B", 96, X0, yy)); yy += 112
-        if sub: els.append(Txt(t0 + 0.4, t1, sub, "R", 40, X0, yy + 12, stagger=0.05))
+            els.append(Txt(t0 + 0.15 + i * 0.12, t1, l, "B", 64, X0, yy)); yy += 76
+        if sub: els.append(Txt(t0 + 0.4, t1, sub, "R", 32, X0, yy + 8, stagger=0.05))
     return els
 
 EL = []
 # title
-EL += [Txt(0.15, 3.15, "обзор на", "L", 50, X0, 190, track=0.14, stagger=0.06, sfx="whoosh"),
-       Txt(0.30, 3.15, "слинг", "XB", 200, X0 - 10, 238, track=-0.02, stagger=0.0),
-       Line(0.45, 3.15, X0, 510, 380)]
+EL += [Txt(0.15, 3.15, "обзор на", "L", 36, X0, TOP, track=0.14, stagger=0.06, sfx="whoosh"),
+       Txt(0.30, 3.15, "слинг", "XB", 140, X0 - 6, TOP + 36, track=-0.02, stagger=0.0),
+       Line(0.45, 3.15, X0, TOP + 226, 270)]
 EL += kicker(3.45, 7.05, "лучшая покупка", ["одна из лучших", "за последнее время"])
 EL += kicker(7.32, 13.75, "для кого", ["для «ручных»", "малышей"])
 EL += kicker(13.92, 16.30, "для меня это", ["настоящее", "спасение"])
@@ -249,16 +250,17 @@ EL += card(16.50, 18.10, "01", ["свободные", "руки"])
 EL += card(18.27, 22.50, "02", ["спине", "легче"], "не нужно носить на одной руке")
 EL += card(22.68, 32.00, "03", ["дела по дому"], "а малыш рядом и на ручках")
 EL += card(32.17, 41.85, "04", ["спасает", "в тяжёлые дни"])
-EL += [Pill(34.63, 41.85, "регрессы", X0, 610), Pill(35.77, 41.85, "капризы", X0 + 260, 610),
-       Pill(38.40, 41.85, "«только на ручках»", X0, 700), Pill(40.89, 41.85, "ни на секунду", X0, 790)]
+PY = TOP + 290
+EL += [Pill(34.63, 41.85, "регрессы", X0, PY, 26), Pill(35.77, 41.85, "капризы", X0 + 190, PY, 26),
+       Pill(38.40, 41.85, "«только на ручках»", X0, PY + 66, 26), Pill(40.89, 41.85, "ни на секунду", X0, PY + 132, 26)]
 EL += kicker(42.05, 46.85, "итого", ["в полном", "восторге"], sub="жалею только, что не купила раньше")
-EL += [Txt(47.05, 49.50, "моя оценка", "L", 46, X0, 200, track=0.12, stagger=0.05, sfx="swish"),
-       Line(47.12, 49.50, X0, 272, 120), Counter(47.10, 48.55, 49.50, X0 - 12, 300)]
-EL += [Txt(49.68, 53.32, "однозначно", "L", 42, X0, 170, track=0.12, stagger=0.05, sfx="whoosh"),
-       Line(49.75, 53.32, X0, 236, 120),
-       Txt(49.82, 53.32, "самая полезная", "B", 80, X0, 262), Txt(49.94, 53.32, "покупка для мамы", "B", 80, X0, 360)]
+EL += [Txt(47.05, 49.50, "моя оценка", "L", 34, X0, TOP, track=0.12, stagger=0.05, sfx="swish"),
+       Line(47.12, 49.50, X0, TOP + 52, 90), Counter(47.10, 48.55, 49.50, X0 - 8, TOP + 70, 200)]
+EL += [Txt(49.68, 53.32, "однозначно", "L", 32, X0, TOP, track=0.12, stagger=0.05, sfx="whoosh"),
+       Line(49.75, 53.32, X0, TOP + 50, 90),
+       Txt(49.82, 53.32, "самая полезная", "B", 56, X0, TOP + 68), Txt(49.94, 53.32, "покупка для мамы", "B", 56, X0, TOP + 136)]
 for i, (txt, tt) in enumerate([("свободные руки", 50.45), ("спине легче", 50.75), ("дела по дому", 51.05), ("спокойнее в тяжёлые дни", 51.35)]):
-    EL.append(Check(tt, 53.32, txt, X0, 500 + i * 80, 46))
+    EL.append(Check(tt, 53.32, txt, X0, TOP + 232 + i * 60, 36))
 
 # ---------------------------------------------------------------- subtitles (phrase chunks from the cut word times)
 FIX = {"ребенок,": "ребёнок,", "ребенка": "ребёнка"}
@@ -287,7 +289,7 @@ def chunks():
         res.append((t0, t1, " ".join(x[2] for x in c).rstrip(".,")))
     return res
 SUBS = chunks()
-SUB_Y, SUB_SIZE = 1560, 52
+SUB_Y, SUB_SIZE = 1340, 44          # above the Reels caption / buttons zone
 def draw_subs(fr, t):
     for t0, t1, txt in SUBS:
         if t0 <= t < t1:
