@@ -23,27 +23,27 @@ GRADE = "eq=contrast=1.04:saturation=1.07:gamma=0.98,colorbalance=rm=0.02:gm=0.0
 # ---------------------------------------------------------------- shots, cut to the voice
 # (t0, clip, src_start, z0, z1, cx, cy, section)  — a shot lasts until the next t0; section=True → zoom-blur transition in
 SHOTS = [
-    (0.00, "C0898", 82.0, 1.06, 1.14, .50, .40, False),   # «Девочки, я не понимаю…» — face
-    (1.40, "C0898", 6.0, 1.10, 1.18, .50, .45, False),    # «…почему не купила эту штуку раньше» — her with the sling
-    (3.38, "C0900", 3.0, 1.00, 1.08, .45, .45, True),     # «одна из лучших покупок» — shoulder bow detail
-    (5.20, "C0901", 0.2, 1.00, 1.07, .45, .55, False),    #   buckle detail
-    (7.25, "C0903", 1.0, 1.02, 1.10, .45, .62, False),    # «ручной ребёнок» — baby asleep on mum
-    (10.00, "C0905", 8.0, 1.00, 1.07, .50, .45, False),   # «отказывается существовать отдельно от мамы» — baby in the sling
-    (13.85, "C0898", 66.0, 1.12, 1.20, .52, .42, False),  # «настоящим спасением»
-    (16.45, "C0899", 20.0, 1.00, 1.08, .55, .55, True),   # 01 — hands free at the counter
-    (18.20, "C0904", 8.5, 1.02, 1.10, .50, .45, True),    # 02 — back view, strap across the back
-    (22.60, "C0899", 6.5, 1.02, 1.10, .48, .48, True),    # 03 — snack with the baby in the sling
-    (25.78, "C0899", 58.0, 1.06, 1.12, .55, .45, False),  #   coffee
-    (28.50, "C0899", 31.0, 1.02, 1.08, .60, .50, False),  #   at the sink
-    (30.68, "C0905", 11.2, 1.04, 1.10, .45, .55, False),  #   «пока она рядом со мной»
-    (32.10, "C0898", 32.0, 1.04, 1.12, .50, .42, True),   # 04 — tired, hand on the head
-    (35.70, "C0899", 48.2, 1.10, 1.18, .45, .52, False),  #   looks at the baby, then facepalm
-    (38.33, "C0898", 26.5, 1.12, 1.20, .52, .42, False),  #   hand in the hair
-    (40.10, "C0903", 2.0, 1.02, 1.10, .45, .60, False),   #   «ни на секунду» — baby holds on
+    (0.00, "C0898", 82.0, 1.00, 1.06, .50, .40, False),   # «Девочки, я не понимаю…» — face
+    (1.40, "C0898", 6.0, 1.00, 1.06, .50, .45, False),    # «…почему не купила эту штуку раньше» — her with the sling
+    (3.38, "C0900", 3.0, 1.00, 1.06, .45, .45, True),     # «одна из лучших покупок» — shoulder bow detail
+    (5.20, "C0901", 0.2, 1.00, 1.06, .45, .55, False),    #   buckle detail
+    (7.25, "C0903", 1.0, 1.00, 1.06, .45, .62, False),    # «ручной ребёнок» — baby asleep on mum
+    (10.00, "C0905", 8.0, 1.00, 1.06, .50, .45, False),   # «отказывается существовать отдельно от мамы» — baby in the sling
+    (13.85, "C0898", 66.0, 1.00, 1.06, .52, .42, False),  # «настоящим спасением»
+    (16.45, "C0899", 20.0, 1.00, 1.06, .55, .55, True),   # 01 — hands free at the counter
+    (18.20, "C0904", 8.5, 1.00, 1.06, .50, .45, True),    # 02 — back view, strap across the back
+    (22.60, "C0899", 6.5, 1.00, 1.06, .48, .48, True),    # 03 — snack with the baby in the sling
+    (25.78, "C0899", 58.0, 1.00, 1.06, .55, .45, False),  #   coffee
+    (28.50, "C0899", 31.0, 1.00, 1.06, .60, .50, False),  #   at the sink
+    (30.68, "C0905", 11.2, 1.00, 1.06, .45, .55, False),  #   «пока она рядом со мной»
+    (32.10, "C0898", 32.0, 1.00, 1.06, .50, .42, True),   # 04 — tired, hand on the head
+    (35.70, "C0899", 48.2, 1.00, 1.06, .45, .52, False),  #   looks at the baby, then facepalm
+    (38.33, "C0898", 26.5, 1.00, 1.06, .52, .42, False),  #   hand in the hair
+    (40.10, "C0903", 2.0, 1.00, 1.06, .45, .60, False),   #   «ни на секунду» — baby holds on
     (42.00, "C0903", 14.5, 1.00, 1.06, .50, .45, True),   # «в полном восторге» — dad comes in
     (44.15, "C0903", 17.5, 1.00, 1.06, .50, .40, False),  #   kiss
     (47.00, "C0902", 3.0, 1.00, 1.06, .50, .45, True),    # «100 из 10» — close-up smile
-    (49.60, "C0903", 22.6, 1.00, 1.07, .50, .40, True),   # recap — family
+    (49.60, "C0903", 22.6, 1.00, 1.06, .50, .40, True),   # recap — family
 ]
 SECTION_CUTS = [s[0] for s in SHOTS if s[7]]
 
@@ -291,14 +291,14 @@ SUB_Y, SUB_SIZE = 1560, 52
 def draw_subs(fr, t):
     for t0, t1, txt in SUBS:
         if t0 <= t < t1:
-            sp = text_spr(txt, "M", SUB_SIZE, WHITE, 0.0, shadow=0.85, glow=0.5)
+            sp = text_spr(txt, "M", SUB_SIZE, WHITE, 0.0, shadow=0.5)
             e = oc((t - t0) / 0.16)
             put(fr, sp, (W * K - sp.w) / 2, SUB_Y * K + (1 - e) * 10 * K, min(1, e * 1.4))
 
 # ---------------------------------------------------------------- gradients
 _g = np.linspace(0, 1, OH, dtype=np.float32)
 G_TOP = (np.clip(1 - _g / 0.42, 0, 1) ** 1.6).astype(np.float32)          # top 42 %
-G_BOT = (np.clip((_g - 0.70) / 0.30, 0, 1) ** 1.5).astype(np.float32)     # bottom 30 %
+G_BOT = (np.clip((_g - 0.50) / 0.50, 0, 1) ** 1.8).astype(np.float32)     # long black spray-in over the bottom half, densest at the very bottom
 def top_strength(t):
     k = 0.0
     for a, b, s in [(0.1, 3.2, .42), (3.4, 7.1, .40), (7.3, 13.8, .40), (13.9, 16.35, .40), (16.45, 41.9, .48),
@@ -306,11 +306,11 @@ def top_strength(t):
         k = max(k, s * oc((t - a) / 0.3) * (1 - oc((t - b) / 0.3)))
     return k
 def shade(fr, t):
-    ts = top_strength(t)
+    ts = 0.0          # no dark haze behind the typography
     if ts > 0.01:
         n = int(OH * 0.42); m = (1 - G_TOP[:n] * ts)[:, None, None]
         fr[:n] = (fr[:n].astype(np.float32) * m).astype(np.uint8)
-    n0 = int(OH * 0.70); m = (1 - G_BOT[n0:] * 0.38)[:, None, None]
+    n0 = int(OH * 0.50); m = (1 - G_BOT[n0:] * 0.62)[:, None, None]
     fr[n0:] = (fr[n0:].astype(np.float32) * m).astype(np.uint8)
 
 # ---------------------------------------------------------------- footage
@@ -334,7 +334,7 @@ class Dec:
 def zoom_of(i, u):
     t0, clip, src, z0, z1, cx, cy, sec = SHOTS[i]; d = shot_end(i) - t0
     z = z0 + (z1 - z0) * cl(u / d)
-    if sec: z += 0.07 * (1 - oc(u / 0.45))                       # punch-in settle after a section change
+    if sec: z += 0.05 * (1 - oc(u / 0.45))                       # punch-in settle after a section change
     return z, cx, cy
 def warp(img, z, cx, cy):
     c = np.float32([cx * OW, cy * OH])
