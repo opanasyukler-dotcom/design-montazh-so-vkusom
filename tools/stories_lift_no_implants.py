@@ -530,7 +530,7 @@ def s6():
 
 
 def s7():
-    ph = load_img("IMG_7246.JPG").resize((W, H), Image.LANCZOS)          # the surgeon - a photo not used before
+    ph = ImageOps.fit(load_img("surgeon_white_coat.jpg"), (W, H), Image.LANCZOS, centering=(0.5, 0.0))   # the surgeon in the white coat
     col = Column(0, align="right")
     col.body("Если вы смотрите на наше ДО и думаете:", 0, size=34, gap=6)
     col.head("«У МЕНЯ ОЧЕНЬ ПОХОЖЕ»", 0, size=60, col=POWDER, gap=14)
