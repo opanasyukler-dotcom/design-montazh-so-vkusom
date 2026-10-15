@@ -74,6 +74,8 @@ class Sprite:
 
     def draw(self, fr, t):
         k = ease((t - self.t0) / self.dur)
+        t1 = getattr(self, "t1", None)                    # optional end time: quick fade-out
+        if t1 is not None: k *= 1 - min(1.0, max(0.0, (t - t1) / 0.3))
         if k <= 0: return
         y = self.y + int(round(self.dy * (1 - k)))
         h, w = self.a.shape[:2]
@@ -479,18 +481,22 @@ S2 = [(1.52, 4.36, "Добрый день, хочу сегодня показа�
       (24.3, 25.4, "подтяжку лица,"), (25.46, 27.4, "поэтому немножко другую методику используем.")]
 
 
-def video_slide(num, slug, name, a, b, col, cue, cy=0.3, zc=(0.5, 0.3)):
+def video_slide(num, slug, name, a, b, col, cue, cy=0.3, zc=(0.5, 0.3), text_until=None):
+    """text_until: clip time (s) when the camera zooms onto a face - the text block and its shade fade out there"""
     c = RClip(name, a, b, zoom=(1.0, 1.03), zc=zc, cy=cy)
     low(col)
-    render(num, slug, b - a, clip_bg(c), col.items, shade=bottom_shade(col.top - 240, 0.84), subs=cues(cue, a),
-           audio=(name, a, b))
+    sh = bottom_shade(col.top - 240, 0.84)
+    if text_until is not None:
+        for sp in col.items: sp.t1 = text_until
+        base = sh; sh = lambda t: base * (1 - min(1.0, max(0.0, (t - text_until) / 0.3)) * 0.65)   # keep a light shade for subtitles
+    render(num, slug, b - a, clip_bg(c), col.items, shade=sh, subs=cues(cue, a), audio=(name, a, b))
 
 
 def c2():
     col = Column(0, align="right")
     col.head("РУБЕЦ ПЛАНИРУЕТСЯ ЕЩЁ ДО ОПЕРАЦИИ", 0, size=62, gap=16).rule(0, gap=18)
     col.body("Не только его длина, но и место, где он будет расположен.", 0, size=34, gap=0)
-    video_slide(2, "rubec_planiruetsya", "IMG_9032.MP4", 1.45, 27.4, col, S2, cy=0.25)
+    video_slide(2, "rubec_planiruetsya", "IMG_9032.MP4", 1.45, 27.4, col, S2, cy=0.25, text_until=13.5)
 
 
 def c3():
@@ -567,7 +573,6 @@ def c6():
 def c7():
     c = RClip("IMG_9049.MP4", 0.0, 9.4, zoom=(1.0, 1.05), zc=(0.6, 0.7), cy=0.8)
     col = Column(80, align="left")
-    col.body("И вот здесь начинается часть, о которой пациентки иногда думают меньше всего:", 0, size=34, gap=12)
     col.head("ЗА РУБЦОМ НУЖНО УХАЖИВАТЬ", 0, size=64, col=LILAC, gap=12).rule(0, gap=16)
     col.body("Он не существует отдельно от всего послеоперационного восстановления.", 0, size=32, gap=0)
     render(7, "uhod_za_rubcom", 9.4, clip_bg(c), col.items, shade=top_shade(col.bottom + 160, 0.86))
