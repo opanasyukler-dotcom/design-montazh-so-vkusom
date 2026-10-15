@@ -121,7 +121,7 @@ def place(rgb, spec, span, yref, mask, cw=HW, ch=H, top=TOP):
 
 
 NAVY = (30, 56, 110)
-STK_D = {"front": 0.034, "profile": 0.034, "34": 0.042}   # nipple-only sticker diameter as a share of the body span
+STK_D = {"front": 0.072, "profile": 0.07, "34": 0.095}    # sticker covers the whole areola (share of the body span)
 STICKER = os.path.join(ROOT, "collage_lipofiling_lift/sticker_anna_tvauri.png")
 
 
@@ -163,23 +163,23 @@ def chip(text, fill):
     d.text((w / 2, 32), text, font=f, fill=GRAPHITE + (255,), anchor="mm"); return im
 
 
-def title(d, cw):
+def title(d, cw, y=70):
     f = ImageFont.truetype(BEBAS, 84)                     # Bebas Cyrillic draws "+" as "±", so the plus is drawn apart
     fp = ImageFont.truetype(os.path.join(ROOT, "fonts/Montserrat-VariableFont_wght.ttf"), 60); fp.set_variation_by_axes([700])
     a_, b_ = "ЛИПОФИЛИНГ", "ПОДТЯЖКА ГРУДИ"; gap = 22
     wa, wb, wp = f.getlength(a_), f.getlength(b_), fp.getlength("+")
     x = cw / 2 - (wa + wb + wp + 2 * gap) / 2
-    d.text((x, 70), a_, font=f, fill=WHITE + (255,), anchor="lm"); x += wa + gap
-    d.text((x, 66), "+", font=fp, fill=LILAC + (255,), anchor="lm"); x += wp + gap
-    d.text((x, 70), b_, font=f, fill=WHITE + (255,), anchor="lm")
-    d.rectangle((cw / 2 - 80, 122, cw / 2 + 80, 125), fill=LILAC + (255,))
+    d.text((x, y), a_, font=f, fill=WHITE + (255,), anchor="lm"); x += wa + gap
+    d.text((x, y - 4), "+", font=fp, fill=LILAC + (255,), anchor="lm"); x += wp + gap
+    d.text((x, y), b_, font=f, fill=WHITE + (255,), anchor="lm")
+    d.rectangle((cw / 2 - 80, y + 52, cw / 2 + 80, y + 55), fill=LILAC + (255,))
 
 
 def collage(name, layout="lr"):
     """lr: 4:5, before left / after right.  tb: 9:16, after on top / before below."""
     cfg = P[name]
     if layout == "tb":
-        CH = (1920 - TOP - 6) // 2; k = 640 / 690
+        CH = (1920 - TOP) // 2; k = 640 / 690              # title band sits between the halves
         span, yref, cw, ch, top = cfg["span"] * k, 110, W, CH, 0
     else:
         span, yref, cw, ch, top = cfg["span"], cfg["yref"], HW, H, TOP
@@ -193,12 +193,11 @@ def collage(name, layout="lr"):
     right = Image.fromarray(np.clip(ha, 0, 255).astype(np.uint8)).convert("RGBA")
     if layout == "tb":
         canvas = Image.new("RGBA", (W, 1920), (0, 0, 0, 255))
-        canvas.alpha_composite(right, (0, TOP)); canvas.alpha_composite(left, (0, TOP + ch + 6))
+        canvas.alpha_composite(right, (0, 0)); canvas.alpha_composite(left, (0, ch + TOP))
         d = ImageDraw.Draw(canvas)
-        d.line((40, TOP + ch + 3, W - 40, TOP + ch + 3), fill=(60, 60, 66, 255), width=2)
-        title(d, W)
-        canvas.alpha_composite(chip("ПОСЛЕ", LILAC), (40, TOP + 20))
-        canvas.alpha_composite(chip("ДО", POWDER), (40, TOP + ch + 6 + 20))
+        title(d, W, ch + TOP // 2 - 14)
+        canvas.alpha_composite(chip("ПОСЛЕ", LILAC), (40, 40))
+        canvas.alpha_composite(chip("ДО", POWDER), (40, ch + TOP + 20))
         out = os.path.join(OUT, f"lipofiling_podtyazhka_{name}_9x16.jpg")
     else:
         canvas = Image.new("RGBA", (W, H), (0, 0, 0, 255))
