@@ -3,7 +3,7 @@
 Left = ДО, right = ПОСЛЕ.  Each pair is scaled to the same body size (shoulder line -> reference line),
 everything above the chin line is cut away, the backdrop becomes pure black, the "before" skin is
 colour-matched to the "after" photo (LAB mean/std transfer on skin pixels) and the clinic's nipple
-stickers are lifted from the "after" photos and placed on the "before" nipples.
+stickers are drawn flat (navy disc, ANNA / TVAURI) on both photos, clipped to the body outline.
 
 usage: python3 collage_lipo_lift.py SRC_DIR OUT_DIR [lr|tb]   (lr = 4:5 before|after, tb = 9:16 after over before)
 SRC_DIR holds b_front/b_profile/b_34 and a_front/a_profile/a_34 (.jpg)
@@ -26,13 +26,13 @@ os.makedirs(OUT, exist_ok=True)
 P = {
     "front": dict(
         b=dict(ref=(0.15, 0.83), cx=0.51, cut=0.08, nip=[(0.3825, 0.373, "a0"), (0.6625, 0.390, "a1")]),
-        a=dict(ref=(0.14, 0.78), cx=0.52, cut=0.06, floor=0.945, stk=[(0.294, 0.320), (0.680, 0.320)]), span=690, yref=TOP + 150),
+        a=dict(ref=(0.14, 0.78), cx=0.52, cut=0.06, floor=0.945, stk=[(0.294, 0.320), (0.685, 0.325)]), span=690, yref=TOP + 150),
     "profile": dict(
         b=dict(ref=(0.09, 0.86), cx=0.52, cut=0.04, nip=[(0.700, 0.333, "a0")]),
         a=dict(ref=(0.155, 0.85), cx=0.47, cut=0.12, stk=[(0.655, 0.340)]), span=690, yref=TOP + 150),
     "34": dict(
         b=dict(ref=(0.10, 0.545), cx=0.50, cut=0.06, nip=[(0.567, 0.343, "a0"), (0.750, 0.352, "pf")]),
-        a=dict(ref=(0.155, 0.55), cx=0.55, cut=0.125, floor=0.925, stk=[(0.553, 0.345)]), span=455, yref=TOP + 150),
+        a=dict(ref=(0.155, 0.55), cx=0.55, cut=0.125, floor=0.925, stk=[(0.553, 0.345), (0.712, 0.345)]), span=455, yref=TOP + 150),
 }
 
 
@@ -113,7 +113,34 @@ def place(rgb, spec, span, yref, mask, cw=HW, ch=H, top=TOP):
     if "floor" in spec:                                   # the white floor strip under the backdrop
         yf = spec["floor"] * h * s + ty; cut = cut * np.clip((yf - ys) / 6, 0, 1)[:, None]
     m = m * cut; m[:top] = 0
-    return img * m[..., None], (s, tx, ty)
+    return img * m[..., None], (s, tx, ty), m
+
+
+NAVY = (30, 56, 110)
+STK_D = {"front": 0.102, "profile": 0.092, "34": 0.19}    # sticker diameter as a share of the body span
+
+
+def brand_sticker(d):
+    """flat clinic sticker: navy disc, faint inner ring, ANNA / TVAURI in white (as on the clinic's collages)"""
+    k = 4; D = d * k
+    im = Image.new("RGBA", (D, D), (0, 0, 0, 0)); dr = ImageDraw.Draw(im)
+    dr.ellipse((0, 0, D - 1, D - 1), fill=NAVY + (255,))
+    r = int(D * 0.05); dr.ellipse((r, r, D - 1 - r, D - 1 - r), outline=(150, 170, 210, 120), width=max(1, D // 90))
+    f = ImageFont.truetype(os.path.join(ROOT, "fonts/Montserrat-VariableFont_wght.ttf"), int(D * 0.21)); f.set_variation_by_axes([500])
+    dr.text((D / 2, D * 0.40), "ANNA", font=f, fill=WHITE + (255,), anchor="mm")
+    dr.text((D / 2, D * 0.62), "TVAURI", font=f, fill=WHITE + (255,), anchor="mm")
+    return im.resize((d, d), Image.LANCZOS)
+
+
+def stick(half, mask, pts, d):
+    """stickers centred on pts, clipped to the body silhouette (a sticker on the breast edge is cut by it)"""
+    st = brand_sticker(d)
+    layer = Image.new("RGBA", half.size, (0, 0, 0, 0))
+    for px, py in pts: layer.alpha_composite(st, (int(px - d / 2), int(py - d / 2)))
+    a = np.asarray(layer).astype(np.float32)
+    body = cv2.morphologyEx((mask > 0.25).astype(np.uint8), cv2.MORPH_CLOSE, np.ones((41, 41), np.uint8))  # dark old stickers are not holes
+    a[..., 3] *= cv2.GaussianBlur(body.astype(np.float32), (0, 0), 1.0)
+    half.alpha_composite(Image.fromarray(a.clip(0, 255).astype(np.uint8), "RGBA"))
 
 
 def chip(text, fill):
@@ -144,21 +171,14 @@ def collage(name, layout="lr"):
     else:
         span, yref, cw, ch, top = cfg["span"], cfg["yref"], HW, H, TOP
     b, a = load("b_" + name), load("a_" + name)
-    stickers = [lift_sticker(a, x * a.shape[1], y * a.shape[0], dark=name != "profile") for x, y in cfg["a"]["stk"]]
-    prof = load("a_profile"); pf = lift_sticker(prof, P["profile"]["a"]["stk"][0][0] * prof.shape[1], P["profile"]["a"]["stk"][0][1] * prof.shape[0], dark=False)
     b = color_match(b, a)
-    hb, tb = place(b, cfg["b"], span, yref, person_mask(b), cw, ch, top)
-    ha, ta = place(a, cfg["a"], span, yref, person_mask(a), cw, ch, top)
+    hb, tb, mb = place(b, cfg["b"], span, yref, person_mask(b), cw, ch, top)
+    ha, ta, ma = place(a, cfg["a"], span, yref, person_mask(a), cw, ch, top)
+    d = int(round(STK_D[name] * span))
     left = Image.fromarray(np.clip(hb, 0, 255).astype(np.uint8)).convert("RGBA")
-    # stickers on the before nipples, at the size they have on the after photo
-    for x, y, which in cfg["b"]["nip"]:
-        st = pf if which == "pf" else stickers[int(which[1:])]
-        sa = (P["profile"] if which == "pf" else cfg)  # whose scale the sticker comes from
-        s_after = span / ((sa["a"]["ref"][1] - sa["a"]["ref"][0]) * (prof if which == "pf" else a).shape[0])
-        st = st.resize((max(1, int(st.width * s_after)), max(1, int(st.height * s_after))), Image.LANCZOS)
-        px = x * b.shape[1] * tb[0] + tb[1]; py = y * b.shape[0] * tb[0] + tb[2]
-        left.alpha_composite(st, (int(px - st.width / 2), int(py - st.height / 2)))
+    stick(left, mb, [(x * b.shape[1] * tb[0] + tb[1], y * b.shape[0] * tb[0] + tb[2]) for x, y, _ in cfg["b"]["nip"]], d)
     right = Image.fromarray(np.clip(ha, 0, 255).astype(np.uint8)).convert("RGBA")
+    stick(right, ma, [(x * a.shape[1] * ta[0] + ta[1], y * a.shape[0] * ta[0] + ta[2]) for x, y in cfg["a"]["stk"]], d)
     if layout == "tb":
         canvas = Image.new("RGBA", (W, 1920), (0, 0, 0, 255))
         canvas.alpha_composite(right, (0, TOP)); canvas.alpha_composite(left, (0, TOP + ch + 6))
