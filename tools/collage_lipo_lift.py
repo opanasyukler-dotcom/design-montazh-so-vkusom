@@ -5,7 +5,7 @@ everything above the chin line is cut away, the backdrop becomes pure black, the
 colour-matched to the "after" photo (LAB mean/std transfer on skin pixels) and the clinic's nipple
 stickers are lifted from the "after" photos and placed on the "before" nipples.
 
-usage: python3 collage_lipo_lift.py SRC_DIR OUT_DIR
+usage: python3 collage_lipo_lift.py SRC_DIR OUT_DIR [lr|tb]   (lr = 4:5 before|after, tb = 9:16 after over before)
 SRC_DIR holds b_front/b_profile/b_34 and a_front/a_profile/a_34 (.jpg)
 """
 import os, sys
@@ -100,19 +100,19 @@ def lift_sticker(rgb, cx, cy, dark=True):
     return Image.fromarray(rgba, "RGBA")
 
 
-def place(rgb, spec, span, yref, mask):
-    """scale/translate one photo into a half canvas; black above the chin cut"""
+def place(rgb, spec, span, yref, mask, cw=HW, ch=H, top=TOP):
+    """scale/translate one photo into a half canvas (cw x ch); black above the chin cut"""
     h, w = rgb.shape[:2]
     s = span / ((spec["ref"][1] - spec["ref"][0]) * h)
-    tx = HW / 2 - spec["cx"] * w * s; ty = yref - spec["ref"][0] * h * s
+    tx = cw / 2 - spec["cx"] * w * s; ty = yref - spec["ref"][0] * h * s
     M = np.float32([[s, 0, tx], [0, s, ty]])
-    img = cv2.warpAffine(rgb, M, (HW, H), flags=cv2.INTER_AREA, borderValue=(0, 0, 0)).astype(np.float32)
-    m = cv2.warpAffine(mask, M, (HW, H), flags=cv2.INTER_LINEAR, borderValue=0)
+    img = cv2.warpAffine(rgb, M, (cw, ch), flags=cv2.INTER_AREA, borderValue=(0, 0, 0)).astype(np.float32)
+    m = cv2.warpAffine(mask, M, (cw, ch), flags=cv2.INTER_LINEAR, borderValue=0)
     ycut = spec["cut"] * h * s + ty
-    ys = np.arange(H, dtype=np.float32); cut = np.clip((ys - ycut) / 40, 0, 1)[:, None]
+    ys = np.arange(ch, dtype=np.float32); cut = np.clip((ys - ycut) / 40, 0, 1)[:, None]
     if "floor" in spec:                                   # the white floor strip under the backdrop
         yf = spec["floor"] * h * s + ty; cut = cut * np.clip((yf - ys) / 6, 0, 1)[:, None]
-    m = m * cut; m[:TOP] = 0
+    m = m * cut; m[:top] = 0
     return img * m[..., None], (s, tx, ty)
 
 
@@ -123,41 +123,63 @@ def chip(text, fill):
     d.text((w / 2, 32), text, font=f, fill=GRAPHITE + (255,), anchor="mm"); return im
 
 
-def collage(name):
+def title(d, cw):
+    f = ImageFont.truetype(BEBAS, 84)                     # Bebas Cyrillic draws "+" as "±", so the plus is drawn apart
+    fp = ImageFont.truetype(os.path.join(ROOT, "fonts/Montserrat-VariableFont_wght.ttf"), 60); fp.set_variation_by_axes([700])
+    a_, b_ = "ЛИПОФИЛИНГ", "ПОДТЯЖКА ГРУДИ"; gap = 22
+    wa, wb, wp = f.getlength(a_), f.getlength(b_), fp.getlength("+")
+    x = cw / 2 - (wa + wb + wp + 2 * gap) / 2
+    d.text((x, 70), a_, font=f, fill=WHITE + (255,), anchor="lm"); x += wa + gap
+    d.text((x, 66), "+", font=fp, fill=LILAC + (255,), anchor="lm"); x += wp + gap
+    d.text((x, 70), b_, font=f, fill=WHITE + (255,), anchor="lm")
+    d.rectangle((cw / 2 - 80, 122, cw / 2 + 80, 125), fill=LILAC + (255,))
+
+
+def collage(name, layout="lr"):
+    """lr: 4:5, before left / after right.  tb: 9:16, after on top / before below."""
     cfg = P[name]
+    if layout == "tb":
+        CH = (1920 - TOP - 6) // 2; k = 640 / 690
+        span, yref, cw, ch, top = cfg["span"] * k, 110, W, CH, 0
+    else:
+        span, yref, cw, ch, top = cfg["span"], cfg["yref"], HW, H, TOP
     b, a = load("b_" + name), load("a_" + name)
     stickers = [lift_sticker(a, x * a.shape[1], y * a.shape[0], dark=name != "profile") for x, y in cfg["a"]["stk"]]
     prof = load("a_profile"); pf = lift_sticker(prof, P["profile"]["a"]["stk"][0][0] * prof.shape[1], P["profile"]["a"]["stk"][0][1] * prof.shape[0], dark=False)
     b = color_match(b, a)
-    hb, tb = place(b, cfg["b"], cfg["span"], cfg["yref"], person_mask(b))
-    ha, ta = place(a, cfg["a"], cfg["span"], cfg["yref"], person_mask(a))
+    hb, tb = place(b, cfg["b"], span, yref, person_mask(b), cw, ch, top)
+    ha, ta = place(a, cfg["a"], span, yref, person_mask(a), cw, ch, top)
     left = Image.fromarray(np.clip(hb, 0, 255).astype(np.uint8)).convert("RGBA")
     # stickers on the before nipples, at the size they have on the after photo
     for x, y, which in cfg["b"]["nip"]:
         st = pf if which == "pf" else stickers[int(which[1:])]
         sa = (P["profile"] if which == "pf" else cfg)  # whose scale the sticker comes from
-        s_after = cfg["span"] / ((sa["a"]["ref"][1] - sa["a"]["ref"][0]) * (prof if which == "pf" else a).shape[0])
+        s_after = span / ((sa["a"]["ref"][1] - sa["a"]["ref"][0]) * (prof if which == "pf" else a).shape[0])
         st = st.resize((max(1, int(st.width * s_after)), max(1, int(st.height * s_after))), Image.LANCZOS)
         px = x * b.shape[1] * tb[0] + tb[1]; py = y * b.shape[0] * tb[0] + tb[2]
         left.alpha_composite(st, (int(px - st.width / 2), int(py - st.height / 2)))
     right = Image.fromarray(np.clip(ha, 0, 255).astype(np.uint8)).convert("RGBA")
-    canvas = Image.new("RGBA", (W, H), (0, 0, 0, 255))
-    canvas.alpha_composite(left, (0, 0)); canvas.alpha_composite(right, (W - HW, 0))
-    d = ImageDraw.Draw(canvas)
-    d.line((W // 2, TOP + 40, W // 2, H - 40), fill=(60, 60, 66, 255), width=2)
-    f = ImageFont.truetype(BEBAS, 84)                     # Bebas Cyrillic draws "+" as "±", so the plus is drawn apart
-    fp = ImageFont.truetype(os.path.join(ROOT, "fonts/Montserrat-VariableFont_wght.ttf"), 60); fp.set_variation_by_axes([700])
-    a_, b_ = "ЛИПОФИЛИНГ", "ПОДТЯЖКА ГРУДИ"; gap = 22
-    wa, wb, wp = f.getlength(a_), f.getlength(b_), fp.getlength("+")
-    x = W / 2 - (wa + wb + wp + 2 * gap) / 2
-    d.text((x, 70), a_, font=f, fill=WHITE + (255,), anchor="lm"); x += wa + gap
-    d.text((x, 66), "+", font=fp, fill=LILAC + (255,), anchor="lm"); x += wp + gap
-    d.text((x, 70), b_, font=f, fill=WHITE + (255,), anchor="lm")
-    d.rectangle((W / 2 - 80, 122, W / 2 + 80, 125), fill=LILAC + (255,))
-    canvas.alpha_composite(chip("ДО", POWDER), (40, H - 100))
-    canvas.alpha_composite(chip("ПОСЛЕ", LILAC), (W - HW + 40, H - 100))
-    out = os.path.join(OUT, f"lipofiling_podtyazhka_{name}.jpg")
+    if layout == "tb":
+        canvas = Image.new("RGBA", (W, 1920), (0, 0, 0, 255))
+        canvas.alpha_composite(right, (0, TOP)); canvas.alpha_composite(left, (0, TOP + ch + 6))
+        d = ImageDraw.Draw(canvas)
+        d.line((40, TOP + ch + 3, W - 40, TOP + ch + 3), fill=(60, 60, 66, 255), width=2)
+        title(d, W)
+        canvas.alpha_composite(chip("ПОСЛЕ", LILAC), (40, TOP + 20))
+        canvas.alpha_composite(chip("ДО", POWDER), (40, TOP + ch + 6 + 20))
+        out = os.path.join(OUT, f"lipofiling_podtyazhka_{name}_9x16.jpg")
+    else:
+        canvas = Image.new("RGBA", (W, H), (0, 0, 0, 255))
+        canvas.alpha_composite(left, (0, 0)); canvas.alpha_composite(right, (W - HW, 0))
+        d = ImageDraw.Draw(canvas)
+        d.line((W // 2, TOP + 40, W // 2, H - 40), fill=(60, 60, 66, 255), width=2)
+        title(d, W)
+        canvas.alpha_composite(chip("ДО", POWDER), (40, H - 100))
+        canvas.alpha_composite(chip("ПОСЛЕ", LILAC), (W - HW + 40, H - 100))
+        out = os.path.join(OUT, f"lipofiling_podtyazhka_{name}.jpg")
     canvas.convert("RGB").save(out, quality=95); print("wrote", out)
 
 
-for n in ["front", "34", "profile"]: collage(n)
+LAYOUT = sys.argv[3] if len(sys.argv) > 3 else "lr"
+for n in ["front", "34", "profile"]: collage(n, LAYOUT)
+
