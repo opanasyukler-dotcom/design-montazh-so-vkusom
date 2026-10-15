@@ -454,13 +454,13 @@ MARKUP = "markup_clean.mp4"
 
 def s1():
     img = frame_crop(load_img("IMG_7887.JPG"), 0.50, 0.535, 0.70)       # top of the frame is below the chin
-    col = Column(240, align="left")
-    col.head("«РАЗМЕР ГРУДИ МЕНЯ УСТРАИВАЕТ. Я ПРОСТО ХОЧУ ВЕРНУТЬ ФОРМУ»", 0, size=58, gap=20).rule(0, gap=22)
-    col.body("После беременности, родов и ГВ грудь может измениться даже без сильной потери объёма.", 0, size=36, gap=0)
-    print("s1 bottom", col.bottom)
-    # poll «Что беспокоит больше?» goes low over the stockings (~1450..1700)
-    render(1, "vernut_formu", 10.0, still_bg(img, z1=1.03, zc=(0.5, 0.3)), col.items,
-           shade=np.maximum(top_shade(col.bottom + 160, 0.78), bottom_shade(1350, 0.45)))
+    col = Column(0, align="left")
+    col.head("«РАЗМЕР ГРУДИ МЕНЯ УСТРАИВАЕТ. Я ПРОСТО ХОЧУ ВЕРНУТЬ ФОРМУ»", 0, size=56, gap=18).rule(0, gap=20)
+    col.body("После беременности, родов и ГВ грудь может измениться даже без сильной потери объёма.", 0, size=34, gap=0)
+    col.to_bottom(1700)
+    print("s1 top", col.top)
+    # poll «Что беспокоит больше?» goes above the text, over the belly (~1000..1250)
+    render(1, "vernut_formu", 10.0, still_bg(img, z1=1.03, zc=(0.5, 0.3)), col.items, shade=bottom_shade(col.top - 260, 0.85))
 
 
 def s2():
@@ -533,13 +533,12 @@ def s7():
     ph = load_img("IMG_7246.JPG").resize((W, H), Image.LANCZOS)          # the surgeon - a photo not used before
     col = Column(0, align="right")
     col.body("Если вы смотрите на наше ДО и думаете:", 0, size=34, gap=6)
-    col.head("«У МЕНЯ ОЧЕНЬ ПОХОЖЕ»", 0, size=56, col=POWDER, gap=12)
-    col.body("не нужно заранее решать, нужны вам импланты или только подтяжка.", 0, size=34, wght=500, gap=14).rule(0, gap=16)
-    col.body("На консультации посмотрим ваше ДО, состояние тканей и обсудим, какой вариант коррекции подойдёт именно вам.", 0, size=32, gap=16)
-    col.body("Для записи напишите в Direct «КОНСУЛЬТАЦИЯ» или свяжитесь с нами по телефону", 0, size=30, gap=4)
-    col.head("+7 926 636 30 00", 0, size=52, col=LILAC, gap=2)
-    col.body("WhatsApp · Telegram · MAX", 0, size=30, wght=500, gap=18)
-    col.body("А если больше всего пугают рубцы после подтяжки, смотрите актуальное «Рубцы».", 0, size=26, wght=400, col=(200, 200, 210), gap=0)
+    col.head("«У МЕНЯ ОЧЕНЬ ПОХОЖЕ»", 0, size=60, col=POWDER, gap=14)
+    col.body("не нужно заранее решать про импланты или подтяжку — на консультации подберём вариант именно для вас.", 0, size=34, wght=500, gap=16).rule(0, gap=18)
+    col.body("Запись в Direct «КОНСУЛЬТАЦИЯ» или по телефону", 0, size=32, gap=4)
+    col.head("+7 926 636 30 00", 0, size=56, col=LILAC, gap=2)
+    col.body("WhatsApp · Telegram · MAX", 0, size=30, wght=500, gap=20)
+    col.body("Пугают рубцы? Смотрите актуальное «Рубцы».", 0, size=28, wght=400, col=(205, 205, 215), gap=0)
     col.to_bottom(1700)
     print("s7 top", col.top)
     render(7, "konsultaciya", 10.0, still_bg(ph, z1=1.03, zc=(0.5, 0.2)), col.items, shade=bottom_shade(col.top - 300, 0.9))
