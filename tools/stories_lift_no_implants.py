@@ -433,7 +433,7 @@ def erase_band(y0, y1, a=1.0, feather=45):
     return (a * p)[:, None, None]
 
 
-FIXES = {"грудную оскарму": "грудное вскармливание", "скупулезно": "скрупулёзно", "и нам мы ориентируемся": "и мы ориентируемся",
+FIXES = {"грудное оскармливание": "грудное вскармливание", "Оно смущало": "Смущало", "грудную оскарму": "грудное вскармливание", "скупулезно": "скрупулёзно", "и нам мы ориентируемся": "и мы ориентируемся",
          "и мне и хотелось": "и мне хотелось", "кориолы": "ареолы"}
 
 
@@ -446,8 +446,10 @@ def subs_for(name, a, b):
 
 
 # ---------------- stories ----------------
-INTERVIEW = "0e42813373954547ac49a8ff2ea1fd34.mov"
-MARKUP = "18f021a850514e05a8e8b0f08913380b.mov"
+# the originals, cut and with the patient's face tracked + blurred by tools/face_blur_track.py:
+#   interview_blur.mp4 = IMG_9126 9.2-17.7 + 61.0-77.7     markup_blur.mp4 = IMG_9112 5.6-43.7
+INTERVIEW = "interview_blur.mp4"
+MARKUP = "markup_blur.mp4"
 
 
 def s1():
@@ -462,7 +464,8 @@ def s1():
 
 
 def s2():
-    ph = load_img("05CD8279-670A-411E-9141-1CCCA2521678.jpg").resize((W, H), Image.LANCZOS)   # the old story with markup
+    # the old markup story with its old caption removed (inpainted: drive/05CD_clean.jpg) - the whole ДО stays visible
+    ph = load_img("05CD_clean.jpg").resize((W, H), Image.LANCZOS)
     col = Column(0, align="left")
     col.head("НАШЕ ДО", 0, size=64, gap=16).rule(0, gap=22)
     col.body("После беременности, родов и ГВ:", 0, size=36, wght=500, gap=10)
@@ -471,21 +474,19 @@ def s2():
     col.space(18)
     col.body("Запрос пациентки:", 0, size=36, wght=500, gap=6)
     col.head("ПОДТЯНУТЬ ГРУДЬ, НО НЕ УВЕЛИЧИВАТЬ РАЗМЕР", 0, size=50, col=LILAC, gap=0)
-    low(col, 1690)
+    col.to_bottom(1700)
     print("s2 top", col.top)
-    # the old caption (lower left, from ~57% of the height) disappears under an opaque graphite fade
-    ys = np.arange(H, dtype=np.float32); p = np.clip((ys - 0.50 * H) / (0.07 * H), 0, 1); p = p * p * (3 - 2 * p)
-    render(2, "nashe_do", 10.0, still_bg(ph, z1=1.03, zc=(0.5, 0.2)), col.items, shade=(0.97 * p)[:, None, None])
+    render(2, "nashe_do", 10.0, still_bg(ph, z1=1.03, zc=(0.5, 0.2)), col.items, shade=bottom_shade(col.top - 200, 0.42))
 
 
 def s3():
-    a, b = 0.0, 21.6
+    a, b = 0.0, 25.2
     c = Clip(INTERVIEW, a, b, zoom=(1.0, 1.03), zc=(0.5, 0.3))
     col = Column(0, align="center")
     col.head("«ХОЧУ ВЕРНУТЬ ФОРМУ, НО НЕ ХОЧУ БОЛЬШЕ ГРУДЬ»", 0, size=60, gap=0)
-    col.to_bottom(1560)
-    render(3, "ne_hochu_bolshe", b - a, clip_bg(c), col.items, shade=erase_band(1340, 1860), subs=subs_for(INTERVIEW, a, b),
-           audio=(INTERVIEW, a, b))
+    col.to_bottom(1540)
+    render(3, "ne_hochu_bolshe", b - a, clip_bg(c), col.items, shade=bottom_shade(col.top - 260, 0.8),
+           subs=subs_for(INTERVIEW, a, b), audio=(INTERVIEW, a, b))
 
 
 def s4():
@@ -503,14 +504,14 @@ def s4():
 
 
 def s5():
-    a, b = 0.0, 26.9
+    a, b = 0.0, 38.1
     c = Clip(MARKUP, a, b, zoom=(1.0, 1.03), zc=(0.5, 0.3))
-    col = Column(0, align="center")
+    col = Column(0, align="left")
     col.head("ЭТИ ЛИНИИ НЕ ПРОСТО РИСУНОК ПЕРЕД ОПЕРАЦИЕЙ", 0, size=54, gap=16).rule(0, gap=18)
     col.body("Здесь уже начинается планирование будущей формы груди.", 0, size=36, gap=0)
-    col.to_bottom(1520)
+    col.to_bottom(1540)
     print("s5 top", col.top)
-    render(5, "ne_prosto_risunok", b - a, clip_bg(c), col.items, shade=erase_band(1110, 1620),
+    render(5, "ne_prosto_risunok", b - a, clip_bg(c), col.items, shade=bottom_shade(col.top - 260, 0.82),
            subs=subs_for(MARKUP, a, b), audio=(MARKUP, a, b))
 
 
