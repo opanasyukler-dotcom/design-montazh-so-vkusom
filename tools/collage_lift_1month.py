@@ -1,4 +1,4 @@
-"""Swap the AFTER (top) half of the «5 месяцев после операции» collages for new after photos.
+"""Swap the AFTER (top) half of the «1 месяц после операции» collages for new after photos.
 
 usage: python3 collage_lift_5months.py SRC OUT
   SRC holds old_{front,34,profile}.jpg (1320x2346 collages: after on top, before below)
@@ -16,9 +16,9 @@ INTER = "/usr/share/fonts/opentype/inter/Inter-Bold.otf"
 # new photo -> old top half: scale s, then the new point (nx, ny) lands on the old point (ox, oy)
 # (front: sticker midpoint; 3/4 and profile: the near sticker; s from sticker spacing / torso width / sticker-to-waist)
 FIT = {
-    "front":   dict(s=0.61, new=(835, 750), old=(690, 410), chin=110, lines=["5 месяцев", "после операции"]),
-    "34":      dict(s=0.62, new=(890, 620), old=(800, 340), chin=0, lines=["5 месяцев после", "операции"]),
-    "profile": dict(s=0.76, new=(1100, 730), old=(880, 380), chin=225, lines=["5 месяцев после", "операции"]),
+    "front":   dict(s=0.61, new=(835, 750), old=(690, 410), chin=110, lines=["1 месяц", "после операции"]),
+    "34":      dict(s=0.62, new=(890, 620), old=(800, 340), chin=0, lines=["1 месяц после", "операции"]),
+    "profile": dict(s=0.76, new=(1100, 730), old=(880, 380), chin=225, lines=["1 месяц после", "операции"]),
 }
 
 
