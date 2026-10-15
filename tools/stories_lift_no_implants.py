@@ -446,10 +446,10 @@ def subs_for(name, a, b):
 
 
 # ---------------- stories ----------------
-# the originals, cut and with the patient's face tracked + blurred by tools/face_blur_track.py:
-#   interview_blur.mp4 = IMG_9126 9.2-17.7 + 61.0-77.7     markup_blur.mp4 = IMG_9112 5.6-43.7
-INTERVIEW = "interview_blur.mp4"
-MARKUP = "markup_blur.mp4"
+# the originals, cut (faces left as they are, at the client's request):
+#   interview_clean.mp4 = IMG_9126 9.2-17.7 + 61.0-77.7     markup_clean.mp4 = IMG_9112 5.6-43.7
+INTERVIEW = "interview_clean.mp4"
+MARKUP = "markup_clean.mp4"
 
 
 def s1():
