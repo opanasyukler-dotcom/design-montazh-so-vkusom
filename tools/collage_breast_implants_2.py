@@ -77,9 +77,44 @@ def panel(name, img):
     return p
 
 
+# bruises on the after photo: under the breast and in the cleavage (source pixels)
+BRUISE_ZONE = [(520, 600), (1000, 600), (1010, 900), (520, 900)]
+BRUISE_KEEP = 0.35          # "slightly": keep 35 % of the bruise colour
+
+
+def soften_bruises(img):
+    """pull yellow / green-grey patches towards the surrounding skin tone (median of a wide neighbourhood)"""
+    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB).astype(np.float32)
+    zone = np.zeros(img.shape[:2], np.uint8); cv2.fillPoly(zone, [np.array(BRUISE_ZONE, np.int32)], 1)
+    ref = lab.copy()
+    for c in range(3):                                            # wide median (~250 px) as the "clean skin" reference
+        small = cv2.resize(lab[..., c], None, fx=0.125, fy=0.125, interpolation=cv2.INTER_AREA).astype(np.uint8)
+        med = cv2.medianBlur(cv2.medianBlur(small, 31), 15)
+        ref[..., c] = cv2.GaussianBlur(cv2.resize(med.astype(np.float32), (img.shape[1], img.shape[0])), (0, 0), 20)
+    dev = np.maximum(lab[..., 2] - ref[..., 2] - 2, 0) / 6 + np.maximum(ref[..., 0] - lab[..., 0] - 10, 0) / 20
+    sticker = cv2.dilate(((lab[..., 2] < 128) | (lab[..., 0] < 90)).astype(np.uint8), np.ones((9, 9), np.uint8))
+    m = np.clip(dev, 0, 1) * zone * (1 - sticker)
+    m = cv2.GaussianBlur(m, (0, 0), 6)[..., None] * (1 - BRUISE_KEEP)
+    out = lab.copy()
+    out[..., 1:] = lab[..., 1:] * (1 - m) + ref[..., 1:] * m      # colour of the bruise -> skin colour
+    out[..., :1] = lab[..., :1] * (1 - m * 0.8) + ref[..., :1] * m * 0.8
+    return cv2.cvtColor(out.clip(0, 255).astype(np.uint8), cv2.COLOR_LAB2BGR)
+
+
+def warm(img, da=4.0, db=8.0, dl=2.0):
+    """warmer, livelier skin: shift a/b towards peach on skin pixels only (briefs, jeans, stickers stay)"""
+    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB).astype(np.float32)
+    m = np.clip((lab[..., 2] - 124) / 6, 0, 1) * np.clip((lab[..., 0] - 40) / 30, 0, 1)   # warm-ish pixels only:
+    m = cv2.GaussianBlur(m, (0, 0), 2)                                                     # cool briefs/jeans/stickers stay
+    lab[..., 0] += dl * m; lab[..., 1] += da * m; lab[..., 2] += db * m
+    return cv2.cvtColor(lab.clip(0, 255).astype(np.uint8), cv2.COLOR_LAB2BGR)
+
+
 def main():
     before, after = cv2.imread(BEFORE), cv2.imread(AFTER)
+    after = soften_bruises(after)
     after = match_skin(after, before)
+    before, after = warm(before), warm(after)
     canvas = np.zeros((H, W, 3), np.uint8)
     canvas[:, :W // 2] = panel("before", before)
     canvas[:, W // 2:] = panel("after", after)
