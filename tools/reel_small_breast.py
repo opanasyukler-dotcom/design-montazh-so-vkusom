@@ -1,0 +1,163 @@
+_b = open("base.py").read()
+for a, b in [("DUR = 41.0", "DUR = 40.8"), ("ease((t - t0) / 0.3))\ndef mblur", "ease((t - t0) / 0.6))\ndef mblur"),
+             ("if lt > 0.1: return fr", "if lt > 0.18: return fr"), ("(1 - lt / 0.1)", "(1 - lt / 0.18)"),
+             ("ti = t0 + k * 0.16; p = ease((t - ti) / 0.45)", "ti = t0 + k * 0.24; p = ease((t - ti) / 0.65)"),
+             ("out = 1 - ease((t - t1) / 0.3) if t > t1 else 1.0", "out = 1 - ease((t - t1) / 0.4) if t > t1 else 1.0"),
+             ("p = ease(lt / 0.45); h = int(img.shape[0]", "p = ease(lt / 0.7); h = int(img.shape[0]"),
+             ("p = ease((t - t0) / 0.35); al = min(1, (t - t0) / 0.1)", "p = ease((t - t0) / 0.5); al = min(1, (t - t0) / 0.15)")]:
+    assert _b.count(a) == 1, a; _b = _b.replace(a, b)
+exec(_b)
+exec(open("fx.py").read())
+
+# ---------------- voice edit: (source, src_in, src_out, reel_start) ----------------
+SEGS = [("surg", 5.16, 8.72, 0.30),      # у девушки практически не было объёма
+        ("surg", 12.48, 17.45, 4.20),    # она хотела ближе к тройке, но… не очень бросалось всем в глаза
+        ("surg", 0.00, 5.14, 9.50),      # мы сегодня сделали увеличение груди анатомическими имплантами 295
+        ("surg", 23.65, 35.72, 17.60),   # девушки с маленькой грудью… преимущество. …никогда подтяжки
+        ("surg", 37.02, 43.82, 29.90),   # ваше страдание… окупаются с лихвой тем, что у вас не будет птоза
+        ("surg", 53.88, 55.36, 37.00)]   # будем с вами делиться результатами
+def src_of(t):
+    best = None
+    for s, si, so, t0 in SEGS:
+        if t0 <= t <= t0 + so - si: return si + t - t0
+        if t < t0: return max(0.0, si - (t0 - t)) if best is None else min(best[0] + t - best[1], si)
+        best = (so, t0 + so - si)
+    return best[0] + t - best[1]
+
+BL = [("do", 0, 4.0), ("quote", 4.0, 9.4), ("res", 9.4, 14.8), ("turn", 14.8, 17.6), ("main", 17.6, 25.6),
+      ("wide", 25.6, 29.7), ("final", 29.7, 36.7), ("collage", 36.7, DUR)]
+XF = 0.35
+def block(t):
+    for n, a, b in BL:
+        if t < b: return n, a, b
+    return BL[-1]
+CUTS[:] = [b[1] for b in BL[1:]]
+LIGHT_BLOCKS = ("quote", "res")
+
+V = Src("v/surg.mp4"); NF = int(V.cap.get(cv2.CAP_PROP_FRAME_COUNT)) - 2
+HEAD = np.load("head.npy")
+def raw(ts):
+    i = min(max(int(round(ts * 30)), 0), NF - 1); f = V.get(i)
+    hx, hy = HEAD[min(i, len(HEAD) - 1)]
+    return blur_ell(f, (hx - 30, hy - 15), (260, 185))                  # patient's face, lying on the couch
+def vframe(ts, z=1.0, cx=540, cy=960, oy=960): return warp(raw(ts), z, cx, cy, 540, oy)
+
+COLL = load("dl/collage.jpg")
+DO_IMG = COLL[592:1636, 18:548].copy(); PO_IMG = COLL[592:1636, 556:1078].copy()     # the two halves of the collage
+def photo_full(img, z=1.0, cy_src=None):
+    s = 1640 / img.shape[0] * z; cy = img.shape[0] * 0.5 if cy_src is None else cy_src      # whole body fits, black sides
+    return warp(img, s, img.shape[1] / 2, cy, 540, 1000)
+
+_RM = {}
+def card_video(fr, img, s, cx, cy, r=40):
+    w, h = int(W * s), int(H * s)
+    if w < 8: return
+    im = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+    if (w, h) not in _RM:
+        m = np.zeros((h, w), np.uint8); rr = int(r * min(1, s * 1.6)); cv2.rectangle(m, (rr, 0), (w - rr, h), 255, -1); cv2.rectangle(m, (0, rr), (w, h - rr), 255, -1)
+        for x, y in ((rr, rr), (w - rr, rr), (rr, h - rr), (w - rr, h - rr)): cv2.circle(m, (x, y), rr, 255, -1, cv2.LINE_AA)
+        _RM[(w, h)] = m.astype(np.float32)[..., None] / 255
+    m = _RM[(w, h)]; rgba = np.concatenate([im * m, m], -1).astype(np.float32)
+    if s < 0.98: blend(fr, shadow_of(rgba, 30, 0.30), cx - w / 2, cy - h / 2 + 22, 1.0)
+    blend(fr, rgba, cx - w / 2, cy - h / 2, 1.0)
+
+# ---------------- text ----------------
+CH_DO, CH_PO = label("ДО", WHITE), label("ПОСЛЕ", PINK)
+T1 = Pop([("ПОЧТИ НЕ БЫЛО", "H"), ("СВОЕГО ОБЪЁМА", "P")], 104); T1s = timg("но запрос был ближе к тройке", "S", 0)
+T2 = Pill([("«ХОЧУ БЛИЖЕ К ТРОЙКЕ,", "H"), ("НО ЧТОБЫ НЕ БРОСАЛОСЬ", "P"), ("В ГЛАЗА»", "P")], 70)
+T3 = Title([("АНАТОМИЧЕСКИЕ ИМПЛАНТЫ", "H")], 78); T3s = timg("установка под мышцу", "S", 0)
+T4 = Title([("А ТЕПЕРЬ ВАЖНЫЙ МОМЕНТ", "H"), ("ДЛЯ ДЕВУШЕК С ОЧЕНЬ", "P"), ("МАЛЕНЬКОЙ ГРУДЬЮ", "P")], 88)
+T5 = Pop([("У МАЛЕНЬКОГО ОБЪЁМА", "H"), ("ЕСТЬ СВОЁ", "H"), ("ПРЕИМУЩЕСТВО", "P")], 104)
+T6 = SlideL([("ИНОГДА ТО, ЧТО КАЗАЛОСЬ", "H"), ("НЕДОСТАТКОМ,", "P"), ("СТАНОВИТСЯ", "H"), ("ПРЕИМУЩЕСТВОМ", "P")], 80)
+T7 = timg("будем делиться результатом дальше", "S", 0)
+NUM = {}
+def counter(fr, t, t0, t1, val, y):
+    """295 МЛ counts up and lands when the surgeon says it"""
+    if t < t0: return
+    v = int(round(val * ease((t - t0) / (t1 - t0)))); txt = f"{v} МЛ"
+    if txt not in NUM: NUM[txt] = timg(txt, "P", 150)
+    im = NUM[txt]; sc = 1 + 0.18 * max(0, 1 - abs(t - t1) / 0.25)        # small punch when it lands
+    im2 = cv2.resize(im, (int(im.shape[1] * sc), int(im.shape[0] * sc)))
+    ablend(fr, im2, 540 - im2.shape[1] / 2, y - im2.shape[0] / 2, min(1, (t - t0) / 0.2), PINK, ROSE)
+
+# ---------------- animated subtitles ----------------
+WR = json.load(open("words.json")); SUB = []
+for s, si, so, t0 in SEGS:
+    for a, b, w in WR[s]:
+        if b > si + 0.1 and a > si - 0.3 and a < so - 0.08:
+            w = w.lower().strip(".,!?«»—…").strip()
+            if w: SUB.append([t0 + max(0, a - si), t0 + min(b, so) - si, w])
+FIX = {"объема": "объёма", "подмышцу": "под мышцу", "лихой": "лихвой", "ее": "её", "еще": "ещё", "295": "295"}
+SUB = [[a, b, FIX.get(w, w)] for a, b, w in SUB]; SUB.sort()
+for i in range(len(SUB)):
+    nxt = SUB[i + 1][0] if i + 1 < len(SUB) else DUR
+    SUB[i][1] = min(nxt, max(SUB[i][1], SUB[i][0] + 0.3) + 0.25)
+KEY = {"объёма", "тройке", "анатомическими", "имплантами", "295", "маленькой", "преимущество", "никогда", "опустится", "подтяжки", "окупаются", "птоза", "лихвой"}
+SW_ = {}
+def subs2(fr, t, y):
+    for t0, t1, w in SUB:
+        if t0 <= t < t1:
+            if w not in SW_:
+                f = mont(600, 50); asc, desc = f.getmetrics(); im = Image.new("RGBA", (int(f.getlength(w)) + 20, asc + desc + 10), (0, 0, 0, 0))
+                ImageDraw.Draw(im).text((10, 5 + asc), w, font=f, fill=(255, 255, 255, 255), anchor="ls"); SW_[w] = to_np(im)
+            im = SW_[w]; sc = 0.55 + 0.45 * back((t - t0) / 0.28)
+            im2 = cv2.resize(im, (max(1, int(im.shape[1] * sc)), max(1, int(im.shape[0] * sc))))
+            c = (PINK, ROSE) if w.strip(",") in KEY else (WHITE, BLUE)
+            ablend(fr, im2, 540 - im2.shape[1] / 2, y - im2.shape[0] / 2, min(1, (t - t0) / 0.08), *c)
+
+def render_block(t, b=None):
+    n, t0, t1 = b or block(t); lt = t - t0; flash = 0; DEFER[0] = True; PENDING.clear(); LIGHT[0] = n in LIGHT_BLOCKS
+    sub_y = 1400
+    if n == "do":                                                       # ДО: focus pull + viewfinder on the chest
+        fr = focus(photo_full(DO_IMG, 1.0 + 0.05 * lt / 4), lt); chip(fr, CH_DO, 60, 228, t, 0.4)
+        brackets(fr, 560, 640, 470, 280, t, 0.3, 2.4)
+        T1.draw(fr, 1060, t, 1.0, t1 - 0.3)
+        if t > 1.9: ablend(fr, T1s, 540 - T1s.shape[1] / 2, 1290, min(1, (t - 1.9) / 0.4) * (1 - ease((t - t1 + 0.3) / 0.35)), WHITE, BLUE)
+    elif n == "quote":                                                  # her request: ДО as a card on white + quote in a frame
+        fr = white_bg(t); card(fr, DO_IMG, t, t0, 540, 610, 380, rot0=-5, frm=(0, -500)); sub_y = 1430
+        T2.draw(fr, 1215, t, t0 + 0.6, t1 - 0.35)
+    elif n == "res":                                                    # first result: video pulls back into a card, 295 ml counts up
+        fr = white_bg(t); p = ease((t - t0 - 0.1) / 1.0); card_video(fr, raw(src_of(t)), 1.0 - 0.58 * p, 540, 960 - 340 * p); sub_y = 1420
+        T3.draw(fr, 1050, t, 10.6, t1 - 0.3)
+        counter(fr, t, 12.2, 13.4, 295, 1200)
+        if t > 13.8: ablend(fr, T3s, 540 - T3s.shape[1] / 2, 1305, min(1, (t - 13.8) / 0.4) * (1 - ease((t - t1 + 0.3) / 0.35)), WHITE, BLUE)
+    elif n == "turn":                                                   # beautiful after-shot + the turn of the story
+        fr = mblur(photo_full(PO_IMG, (1.02 + 0.05 * lt / 2.8) * trans(t, t0)), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.15)
+        T4.draw(fr, 1000, t, t0 + 0.25, t1 - 0.3); flash = 0.25 * max(0, 1 - lt / 0.25)
+    elif n == "main":                                                   # close on the surgeon: the main thought
+        z = 1.5 - 0.12 * ease(lt / 8)
+        fr = mblur(vframe(src_of(t), z * trans(t, t0), 520, 560, 820), lt)
+        T5.draw(fr, 1000, t, 21.3, t1 - 0.35)
+    elif n == "wide":                                                   # wide: surgeon and the patient, slow push to the chest
+        fr = mblur(vframe(src_of(t), (1.0 + 0.12 * ease(lt / 4.1)) * trans(t, t0), 500, 1000, 960), lt)
+    elif n == "final":                                                  # final look at the result
+        fr = mblur(photo_full(PO_IMG, (1.04 + 0.06 * lt / 7) * trans(t, t0)), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.15)
+        T6.draw(fr, 990, t, 30.3, t1 - 0.35)
+    else:                                                               # the collage
+        z = 1.12 - 0.12 * ease(lt / 1.4)
+        fr = warp(COLL, z, 540, 1110, 540, 1110); chip(fr, CH_DO, 40, 610, t, t0 + 0.5); chip(fr, CH_PO, 580, 610, t, t0 + 0.7)
+        if t > t0 + 1.0: ablend(fr, T7, 540 - T7.shape[1] / 2, 370, min(1, (t - t0 - 1.0) / 0.5), WHITE, BLUE)
+    if not LIGHT[0] and n != "collage": fr = look(fr, t) * (1 - HAZE)
+    if n != "collage": subs2(fr, t, sub_y)
+    DEFER[0] = False
+    for args in PENDING: ablend(fr, *args)
+    blend(fr, LOGO_D if LIGHT[0] else LOGO, 540 - LOGO.shape[1] / 2, 120, 0.9)
+    if flash > 0: fr = fr * (1 - flash) + flash
+    return np.clip(fr, 0, 1)
+def render(t):
+    n, t0, t1 = block(t); i = BL.index((n, t0, t1)); fr = render_block(t)
+    if i > 0 and t < t0 + XF:
+        a = ease((t - t0) / XF); fr = render_block(t, BL[i - 1]) * (1 - a) + fr * a
+    if t > DUR - 0.8: fr = fr * (1 - 0.9 * (t - (DUR - 0.8)) / 0.8)
+    return fr
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        for ts in sys.argv[1:]:
+            cv2.imwrite(f"f/o_{ts}.jpg", cv2.cvtColor((render(float(ts)) * 255).astype(np.uint8), cv2.COLOR_RGB2BGR))
+        sys.exit()
+    enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
+                            "-c:v", "libx264", "-crf", "17", "-preset", "medium", "-pix_fmt", "yuv420p", "video.mp4"], stdin=subprocess.PIPE)
+    for i in range(int(DUR * FPS)):
+        enc.stdin.write((render(i / FPS) * 255).astype(np.uint8).tobytes())
+    enc.stdin.close(); enc.wait()
