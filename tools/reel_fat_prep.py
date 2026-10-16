@@ -59,7 +59,7 @@ T2 = SlideL([("ПОДГОТОВКА ЖИРА", "H"), ("ЗАВИСИТ", "P"), ("
 T3 = Pop([("ОДИНАКОВЫЙ ОБЪЁМ", "H"), ("НЕ ВСЕГДА НУЖЕН", "P")], 92)
 T4 = Title([("ПРИ АСИММЕТРИИ ОБЪЁМ", "H"), ("МОЖЕТ БЫТЬ РАЗНЫМ", "P"), ("всё рассчитывается индивидуально", "S")], 92)
 STEPS = [("СБОР", 21.85), ("ПОДГОТОВКА", 23.0), ("ШПРИЦЫ", 24.3), ("ВВЕДЕНИЕ", 25.8)]
-STEP_IM = {txt: timg(txt, "H", 70) for txt, _ in STEPS}
+STEP_IM = {txt: timg(txt, "H", 60) for txt, _ in STEPS}
 
 def step_chip(fr, txt, t, t0, cy, hi):
     """navy outline pill pops in, the current step fills with powder"""
@@ -127,18 +127,18 @@ def subs2(fr, t, y):
 
 def render_block(t, b=None):
     n, t0, t1 = b or block(t); lt = t - t0; flash = 0; DEFER[0] = True; PENDING.clear(); LIGHT[0] = n in LIGHT_BLOCKS
-    sub_y = 1530
+    sub_y = 1400                                                        # kept above Instagram's bottom UI
     if n == "hook":                                                     # close-up of the prepared fat, focus pull
         fr = focus(broll(47.9 + lt * 0.9, 1.12 - 0.04 * lt / 3.4), lt)
-        T0.draw(fr, 1170, t, 0.35, t1 - 0.25)
+        T0.draw(fr, 1060, t, 0.35, t1 - 0.25)
     elif n == "out":                                                    # full frame pulls back into a card on white
         fr = white_bg(t); p = ease((t - 3.55) / 1.1); s = 1.0 - 0.44 * p
-        card_video(fr, raw(src_of(t)), s, 540, 960 - 210 * p); sub_y = 1530 + 190 * p
+        card_video(fr, raw(src_of(t)), 1.0 - 0.58 * p, 540, 960 - 320 * p); sub_y = 1400
     elif n == "ml":
-        fr = white_bg(t); card_video(fr, raw(src_of(t)), 0.56, 540, 750); sub_y = 1720
-        T1.draw(fr, 1395, t, t0 + 0.25, t1 - 0.35)
+        fr = white_bg(t); card_video(fr, raw(src_of(t)), 0.42, 540, 640); sub_y = 1440
+        T1.draw(fr, 1170, t, t0 + 0.25, t1 - 0.35)
         for k, im in enumerate(T1s):
-            if t > t0 + 1.2 + 0.2 * k: ablend(fr, im, 540 - im.shape[1] / 2, 1500 + 50 * k, min(1, (t - t0 - 1.2 - 0.2 * k) / 0.4) * (1 - ease((t - t1 + 0.35) / 0.35)), WHITE, BLUE)
+            if t > t0 + 1.2 + 0.2 * k: ablend(fr, im, 540 - im.shape[1] / 2, 1305 + 46 * k, min(1, (t - t0 - 1.2 - 0.2 * k) / 0.4) * (1 - ease((t - t1 + 0.35) / 0.35)), WHITE, BLUE)
     elif n == "close":                                                  # punch-in on the syringes on the stand
         z = 2.0 + 0.15 * lt / 3.8
         fr = mblur(vframe(src_of(t), z * trans(t, t0), 240, 1150), lt)
@@ -146,24 +146,24 @@ def render_block(t, b=None):
     elif n == "prep":                                                   # slow push-in on the surgeon
         z = 1.0 + 0.3 * ease(lt / 6.9)
         fr = mblur(vframe(src_of(t), z * trans(t, t0), 600, 820, 540, 820), lt)
-        T2.draw(fr, 1140, t, 15.1, t1 - 0.35)
+        T2.draw(fr, 980, t, 15.1, t1 - 0.35)
     elif n == "scheme":                                                 # сбор -> подготовка -> шприцы -> введение
-        fr = white_bg(t); p = ease(lt / 0.8); card_video(fr, raw(src_of(t)), 0.56 - 0.2 * p, 540, 750 - 180 * p); sub_y = 1760
+        fr = white_bg(t); p = ease(lt / 0.8); card_video(fr, raw(src_of(t)), 0.42 - 0.12 * p, 540, 640 - 140 * p); sub_y = 1420
         for k, (txt, ts) in enumerate(STEPS):
             cur = (k == len(STEPS) - 1 and t >= ts) or (ts <= t < (STEPS[k + 1][1] if k + 1 < len(STEPS) else 1e9))
-            step_chip(fr, txt, t, ts, 1000 + k * 170, cur)
-            if k: arrow_down(fr, t, ts - 0.3, 1000 + (k - 1) * 170 + 50, 1000 + k * 170 - 52)
+            step_chip(fr, txt, t, ts, 880 + k * 130, cur)
+            if k: arrow_down(fr, t, ts - 0.3, 880 + (k - 1) * 130 + 46, 880 + k * 130 - 46)
     elif n == "hands":                                                  # close frame: hands and syringes
         fr = mblur(vframe(src_of(t), 1.55 * (1 + 0.05 * lt / 3) * trans(t, t0), 520, 1080), lt)
     elif n == "equal":                                                  # same volume in both — or not, with asymmetry
-        fr = white_bg(t); card_video(fr, raw(src_of(t)), 0.3, 540, 520); sub_y = 1760
-        T3.draw(fr, 860, t, 30.2, t1 - 0.35)
+        fr = white_bg(t); card_video(fr, raw(src_of(t)), 0.26, 540, 470); sub_y = 1440
+        T3.draw(fr, 740, t, 30.2, t1 - 0.35)
         f1 = ease((t - 30.4) / 1.4); asym = ease((t - 33.4) / 1.2)
-        gauge(fr, 380, 1180, 1560, 0.68 * f1 - 0.12 * asym, GL, t, 30.3)
-        gauge(fr, 700, 1180, 1560, 0.68 * f1 + 0.14 * asym, GR, t, 30.45)
+        gauge(fr, 380, 1030, 1300, 0.68 * f1 - 0.12 * asym, GL, t, 30.3)
+        gauge(fr, 700, 1030, 1300, 0.68 * f1 + 0.14 * asym, GR, t, 30.45)
     else:                                                               # outro: prepared fat, asymmetry note
         fr = broll(51.3 + lt * 0.85, 1.05 + 0.05 * lt / 4.5)
-        T4.draw(fr, 1150, t, t0 + 0.3, 1e9)
+        T4.draw(fr, 1020, t, t0 + 0.3, 1e9)
     if not LIGHT[0]: fr = look(fr, t) * (1 - HAZE)
     subs2(fr, t, sub_y)
     DEFER[0] = False
