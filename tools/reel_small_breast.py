@@ -32,7 +32,7 @@ def block(t):
         if t < b: return n, a, b
     return BL[-1]
 CUTS[:] = [b[1] for b in BL[1:]]
-LIGHT_BLOCKS = ("quote", "res")
+LIGHT_BLOCKS = ()
 
 V = Src("v/surg.mp4"); NF = int(V.cap.get(cv2.CAP_PROP_FRAME_COUNT)) - 2
 HEAD = np.load("head.npy")
@@ -43,6 +43,10 @@ def raw(ts):
 def vframe(ts, z=1.0, cx=540, cy=960, oy=960): return warp(raw(ts), z, cx, cy, 540, oy)
 
 COLL = load("dl/collage.jpg")
+def warm(img, k=1.0):                                                   # gentle warmth on the result
+    f = img.astype(np.float32); g = f.mean(2, keepdims=True); f = g + (f - g) * (1 + 0.06 * k)
+    f *= np.float32([1 + 0.07 * k, 1 + 0.025 * k, 1 - 0.09 * k]); return np.clip(f, 0, 255).astype(np.uint8)
+COLL[560:1660, 552:] = warm(COLL[560:1660, 552:])                        # ПОСЛЕ half of the collage
 DO_IMG = COLL[592:1636, 18:548].copy(); PO_IMG = COLL[592:1636, 556:1078].copy()     # the two halves of the collage
 def photo_full(img, z=1.0, cy_src=None):
     s = 1640 / img.shape[0] * z; cy = img.shape[0] * 0.5 if cy_src is None else cy_src      # whole body fits, black sides
@@ -113,14 +117,14 @@ def render_block(t, b=None):
         brackets(fr, 560, 640, 470, 280, t, 0.3, 2.4)
         T1.draw(fr, 1060, t, 1.0, t1 - 0.3)
         if t > 1.9: ablend(fr, T1s, 540 - T1s.shape[1] / 2, 1290, min(1, (t - 1.9) / 0.4) * (1 - ease((t - t1 + 0.3) / 0.35)), WHITE, BLUE)
-    elif n == "quote":                                                  # her request: ДО as a card on white + quote in a frame
-        fr = white_bg(t); card(fr, DO_IMG, t, t0, 540, 610, 380, rot0=-5, frm=(0, -500)); sub_y = 1430
-        T2.draw(fr, 1215, t, t0 + 0.6, t1 - 0.35)
-    elif n == "res":                                                    # first result: video pulls back into a card, 295 ml counts up
-        fr = white_bg(t); p = ease((t - t0 - 0.1) / 1.0); card_video(fr, raw(src_of(t)), 1.0 - 0.58 * p, 540, 960 - 340 * p); sub_y = 1420
-        T3.draw(fr, 1050, t, 10.6, t1 - 0.3)
-        counter(fr, t, 12.2, 13.4, 295, 1200)
-        if t > 13.8: ablend(fr, T3s, 540 - T3s.shape[1] / 2, 1305, min(1, (t - 13.8) / 0.4) * (1 - ease((t - t1 + 0.3) / 0.35)), WHITE, BLUE)
+    elif n == "quote":                                                  # her request: quote in a frame over ДО
+        fr = mblur(photo_full(DO_IMG, (1.06 + 0.05 * lt / 5.4) * trans(t, t0)), lt); chip(fr, CH_DO, 60, 228, t, t0 + 0.1)
+        T2.draw(fr, 1180, t, t0 + 0.5, t1 - 0.35)
+    elif n == "res":                                                    # first result on video, 295 ml counts up
+        fr = mblur(vframe(src_of(t), (1.0 + 0.06 * lt / 5.4) * trans(t, t0), 540, 960), lt)
+        T3.draw(fr, 560, t, 10.6, t1 - 0.3)
+        counter(fr, t, 12.2, 13.4, 295, 740)
+        if t > 13.8: ablend(fr, T3s, 540 - T3s.shape[1] / 2, 845, min(1, (t - 13.8) / 0.4) * (1 - ease((t - t1 + 0.3) / 0.35)), WHITE, BLUE)
     elif n == "turn":                                                   # beautiful after-shot + the turn of the story
         fr = mblur(photo_full(PO_IMG, (1.02 + 0.05 * lt / 2.8) * trans(t, t0)), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.15)
         T4.draw(fr, 1000, t, t0 + 0.25, t1 - 0.3); flash = 0.25 * max(0, 1 - lt / 0.25)
