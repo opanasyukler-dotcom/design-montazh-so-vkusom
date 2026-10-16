@@ -15,7 +15,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BEBAS = os.path.join(ROOT, "skills/montage-svg-typography/Шрифты/Коллекция шрифтов/BebasNeueCyrillic.ttf")
 MONT = os.path.join(ROOT, "fonts/Montserrat-VariableFont_wght.ttf")
 W, H = 1080, 1920
-TITLE = ["УВЕЛИЧЕНИЕ ГРУДИ", "ИМПЛАНТАМИ"]
+TITLE = ["УВЕЛИЧЕНИЕ ГРУДИ ИМПЛАНТАМИ"]
 
 # per photo: tattoo areas (polygons in source pixels), scale, shoulder line y (column x=500), body centre x
 SPEC = {
@@ -29,10 +29,10 @@ SPEC = {
     ], s=0.848, shoulder=799, cx=724),
 }
 # one shoulder line for both; s equalises shoulder->fingertips (before 722->1733, after 799->1740 px)
-SHOULDER_Y = 730
+SHOULDER_Y = 640
 TOP = SHOULDER_Y - 29          # straight cut at the neck (the after photo starts at its y 759)
 BOT = SHOULDER_Y + 806         # straight cut just under the fingertips
-TITLE_Y = 380
+TITLE_Y = 482
 
 
 def remove_tattoos(img, polys, small=False):
@@ -104,7 +104,7 @@ def main():
 
     pil = Image.fromarray(canvas[..., ::-1])
     d = ImageDraw.Draw(pil)
-    ft = ImageFont.truetype(BEBAS, 132)
+    ft = ImageFont.truetype(BEBAS, 84)
     for i, line in enumerate(TITLE):
         tw = d.textlength(line, font=ft)
         d.text(((W - tw) / 2, TITLE_Y + i * 122), line, font=ft, fill=(255, 255, 255))
