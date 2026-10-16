@@ -15,7 +15,11 @@ TITLE = "УВЕЛИЧЕНИЕ ГРУДИ ИМПЛАНТАМИ"
 
 # both photos are shot from the same distance -> one scale; aligned on the near sticker
 # before: chin ends at y~60, after: chin ~100 + chain; frames end at 2016 (after: sticker+1316)
-SPEC = {"before": dict(sticker=565, cx=652), "after": dict(sticker=700, cx=660)}
+# nipples (near, far) get the clinic sticker on top, d = diameter in source px (covers the whole areola);
+# the far one hangs over the breast edge like on the reference cover
+SPEC = {"before": dict(sticker=565, cx=652, nipples=[(697, 571), (975, 648)], d=112),
+        "after": dict(sticker=700, cx=660, nipples=[(811, 700), (1052, 655)], d=128)}
+STICKER = os.path.join(ROOT, "collage_lipofiling_lift/sticker_anna_tvauri.png")
 S = 0.58
 UP, DOWN = 490, 1310             # cut: sticker-UP (neck, under both chins) .. sticker+DOWN (bottom of the after frame)
 STICKER_Y = 590 + int(UP * S)    # photo band starts at y 590
@@ -110,6 +114,16 @@ def warm(img, da=4.0, db=8.0, dl=2.0):
     return cv2.cvtColor(lab.clip(0, 255).astype(np.uint8), cv2.COLOR_LAB2BGR)
 
 
+def put_stickers(pil, name, x_off):
+    sp = SPEC[name]; w = W // 2
+    x0 = int(round(sp["cx"] * S)) - w // 2
+    d = int(round(sp["d"] * S))
+    st = Image.open(STICKER).convert("RGBA").resize((d, d), Image.LANCZOS)
+    for x, y in sp["nipples"]:
+        cx = x * S - x0 + x_off; cy = STICKER_Y + (y - sp["sticker"]) * S
+        pil.alpha_composite(st, (int(round(cx - d / 2)), int(round(cy - d / 2))))
+
+
 def main():
     before, after = cv2.imread(BEFORE), cv2.imread(AFTER)
     after = soften_bruises(after)
@@ -118,10 +132,12 @@ def main():
     canvas = np.zeros((H, W, 3), np.uint8)
     canvas[:, :W // 2] = panel("before", before)
     canvas[:, W // 2:] = panel("after", after)
-    pil = Image.fromarray(canvas[..., ::-1]); d = ImageDraw.Draw(pil)
+    pil = Image.fromarray(canvas[..., ::-1]).convert("RGBA")
+    put_stickers(pil, "before", 0); put_stickers(pil, "after", W // 2)
+    d = ImageDraw.Draw(pil)
     ft = ImageFont.truetype(BEBAS, 84)
     d.text(((W - d.textlength(TITLE, font=ft)) / 2, TITLE_Y), TITLE, font=ft, fill=(255, 255, 255))
-    pil.save(OUT, quality=95)
+    pil.convert("RGB").save(OUT, quality=95)
     print("wrote", OUT)
 
 
