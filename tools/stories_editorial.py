@@ -42,12 +42,14 @@ SLIDES = [
         "text": "Я не удержалась и взяла девчачьи бодики, а\u00a0то бабушка ругается, "
                 "что мы как пацаны ходим.",
         "focus": (0.5, 0.45),
+        "layout": "collage",
     },
 ]
 HEADER_LABEL = "наш уход"
 
 # Photo frame: arch | rounded | oval | passe (override with: python3 ... <frame>)
 FRAME = "rounded"
+FADE_START, FADE_END = 560, 1000  # collage: solid paper under text, then fade out
 BOTTOM = 1620  # lower edge of floating frames, clear of the Instagram reply bar
 
 
@@ -147,8 +149,23 @@ def place_photo(img, path, x, y, w, focus, frame):
     outline(img, (x, y, x + w, y + h), frame)
 
 
+def collage(img, paths, focus, seam=10):
+    """Full-bleed vertical split of the photos, text area faded into paper on top."""
+    cw = (W - seam * (len(paths) - 1)) // len(paths)
+    for k, src in enumerate(paths):
+        img.paste(cover_crop(src, cw, H, focus), (k * (cw + seam), 0))
+    fade = np.zeros((H, 1), np.float32)
+    ramp = np.linspace(0, 1, FADE_END - FADE_START)
+    fade[:FADE_START] = 0.93
+    fade[FADE_START:FADE_END, 0] = 0.93 * (1 - ramp) ** 1.6
+    alpha = Image.fromarray((np.repeat(fade, W, 1) * 255).astype(np.uint8))
+    img.paste(linen(), (0, 0), alpha)
+
+
 def render(i, slide):
     img = linen()
+    if slide.get("layout") == "collage":
+        collage(img, slide["photos"], slide["focus"])
     d = ImageDraw.Draw(img)
     margin = 100
 
@@ -175,7 +192,9 @@ def render(i, slide):
 
     # Photo block under the text
     top = max(y + 70, 760)
-    if "photos" in slide:
+    if slide.get("layout") == "collage":
+        pass  # photos are already the background
+    elif "photos" in slide:
         # Two narrow frames side by side, the second one stepped down
         aw, gap, step = 400, 70, 120
         x = (W - 2 * aw - gap) // 2
