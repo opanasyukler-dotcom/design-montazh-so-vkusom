@@ -46,6 +46,10 @@ SLIDES = [
 ]
 HEADER_LABEL = "наш уход"
 
+# Photo frame: arch | rounded | oval | passe (override with: python3 ... <frame>)
+FRAME = "rounded"
+BOTTOM = 1620  # lower edge of floating frames, clear of the Instagram reply bar
+
 
 def montserrat(size, weight="Bold"):
     f = ImageFont.truetype(MONTSERRAT, size)
@@ -81,22 +85,66 @@ def wrap(draw, text, font, width):
     return lines
 
 
-def arch_photo(path, box_w, box_h, focus):
-    """Cover-crop the photo to box size and cut it into an arch (rounded top)."""
+def cover_crop(path, box_w, box_h, focus):
     src = Image.open(path).convert("RGB")
     scale = max(box_w / src.width, box_h / src.height)
     src = src.resize((round(src.width * scale), round(src.height * scale)), Image.LANCZOS)
     left = int((src.width - box_w) * focus[0])
     top = int((src.height - box_h) * focus[1])
-    crop = src.crop((left, top, left + box_w, top + box_h))
+    return src.crop((left, top, left + box_w, top + box_h))
 
-    ss = 4  # supersample the mask for a smooth arch edge
-    mask = Image.new("L", (box_w * ss, box_h * ss), 0)
-    md = ImageDraw.Draw(mask)
-    r = box_w * ss // 2
-    md.ellipse((0, 0, box_w * ss, 2 * r), fill=255)
-    md.rectangle((0, r, box_w * ss, box_h * ss), fill=255)
-    return crop, mask.resize((box_w, box_h), Image.LANCZOS)
+
+def shape_mask(w, h, shape, ss=4):
+    """Supersampled mask: arch (round top), rounded rect, oval or plain rect."""
+    m = Image.new("L", (w * ss, h * ss), 0)
+    md = ImageDraw.Draw(m)
+    if shape == "arch":
+        r = w * ss // 2
+        md.ellipse((0, 0, w * ss, 2 * r), fill=255)
+        md.rectangle((0, r, w * ss, h * ss), fill=255)
+    elif shape == "rounded":
+        md.rounded_rectangle((0, 0, w * ss - 1, h * ss - 1), radius=36 * ss, fill=255)
+    elif shape == "oval":
+        md.ellipse((0, 0, w * ss - 1, h * ss - 1), fill=255)
+    else:
+        md.rectangle((0, 0, w * ss, h * ss), fill=255)
+    return m.resize((w, h), Image.LANCZOS)
+
+
+def outline(img, box, shape, offset=18, width=2):
+    """Thin brown contour around the photo, like the circles in the reference."""
+    x0, y0, x1, y1 = box[0] - offset, box[1] - offset, box[2] + offset, box[3] + offset
+    ss = 4
+    layer = Image.new("L", ((x1 - x0) * ss, (y1 - y0) * ss), 0)
+    ld = ImageDraw.Draw(layer)
+    rect = (0, 0, layer.width - 1, layer.height - 1)
+    if shape == "oval":
+        ld.ellipse(rect, outline=255, width=width * ss)
+    else:
+        ld.rounded_rectangle(rect, radius=(36 + offset) * ss if shape == "rounded" else 0,
+                             outline=255, width=width * ss)
+    layer = layer.resize((x1 - x0, y1 - y0), Image.LANCZOS)
+    img.paste(Image.new("RGB", layer.size, BROWN), (x0, y0), layer)
+
+
+def place_photo(img, path, x, y, w, focus, frame):
+    """Draw one photo in the chosen frame style starting at (x, y), width w."""
+    if frame == "arch":  # bleeds off the bottom edge
+        h = H - y
+        img.paste(cover_crop(path, w, h, focus), (x, y), shape_mask(w, h, "arch"))
+        return
+    h = BOTTOM - y
+    if frame == "passe":  # white passe-partout card with a soft shadow
+        pad = 22
+        shadow = Image.new("L", img.size, 0)
+        ImageDraw.Draw(shadow).rectangle((x - pad + 6, y - pad + 14, x + w + pad + 6, y + h + pad + 14), fill=70)
+        shadow = shadow.filter(ImageFilter.GaussianBlur(22))
+        img.paste(Image.new("RGB", img.size, (120, 100, 90)), (0, 0), shadow)
+        ImageDraw.Draw(img).rectangle((x - pad, y - pad, x + w + pad, y + h + pad), fill=(252, 251, 249))
+        img.paste(cover_crop(path, w, h, focus), (x, y))
+        return
+    img.paste(cover_crop(path, w, h, focus), (x, y), shape_mask(w, h, frame))
+    outline(img, (x, y, x + w, y + h), frame)
 
 
 def render(i, slide):
@@ -125,20 +173,17 @@ def render(i, slide):
         d.text((bx, y), line, font=bf, fill=BODY)
         y += 54
 
-    # Arch photo bleeding off the bottom edge
+    # Photo block under the text
     top = max(y + 70, 760)
     if "photos" in slide:
-        # Two narrow arches side by side, the second one stepped down
-        aw, gap, step = 420, 40, 120
+        # Two narrow frames side by side, the second one stepped down
+        aw, gap, step = 400, 70, 120
         x = (W - 2 * aw - gap) // 2
         for k, src in enumerate(slide["photos"]):
-            t = top + k * step
-            photo, mask = arch_photo(src, aw, H - t, slide["focus"])
-            img.paste(photo, (x + k * (aw + gap), t), mask)
+            place_photo(img, src, x + k * (aw + gap), top + k * step, aw, slide["focus"], FRAME)
     else:
-        aw = 800
-        photo, mask = arch_photo(slide["photo"], aw, H - top, slide["focus"])
-        img.paste(photo, ((W - aw) // 2, top), mask)
+        aw = 760
+        place_photo(img, slide["photo"], (W - aw) // 2, top, aw, slide["focus"], FRAME)
 
     path = os.path.join(OUT, f"story_{i + 1:02d}.jpg")
     img.save(path, quality=95)
@@ -146,6 +191,9 @@ def render(i, slide):
 
 
 if __name__ == "__main__":
+    import sys
+    if len(sys.argv) > 1:
+        FRAME = sys.argv[1]
     os.makedirs(OUT, exist_ok=True)
     paths = [render(i, s) for i, s in enumerate(SLIDES)]
     ims = [Image.open(p).resize((540, 960)) for p in paths]
