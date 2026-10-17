@@ -26,15 +26,19 @@ SLIDES = [
     {
         "photo": f"{UPLOADS}/f696e9a3-image.png",
         "title": "СМЕСЬ",
+        "plate": True,  # boxes reach the top, text sits on a frosted plate
         "text": "Каждый раз рада, что у нас не самая дорогая на свете смесь.",
         "focus": (0.45, 0.55),
+        "layout": "full",
     },
     {
         "photo": f"{UPLOADS}/2b5ba369-image.jpg",
         "title": "НОЧНЫЕ\nПОДГУЗНИКИ",
         "text": "Решила попробовать такие, так как у\u00a0нас появилась проблема: "
                 "ночью всё стало протекать.",
+        "body_x": 100,  # full-width body keeps the text above the diaper
         "focus": (0.45, 0.55),
+        "layout": "full",
     },
     {
         "photos": [f"{UPLOADS}/9361c464-image.png", f"{UPLOADS}/2c24d1e3-image.png"],
@@ -53,7 +57,7 @@ SLIDES = [
         "layout": "full",
     },
 ]
-HEADER_LABEL = "наш уход"
+HEADER_LABEL = ""  # e.g. "наш уход"; empty = counter only
 
 # Photo frame: arch | rounded | oval | passe (override with: python3 ... <frame>)
 FRAME = "rounded"
@@ -174,11 +178,12 @@ def collage(img, paths, focus):
         img.paste(card, (x, y), mask)
 
 
-def full_bleed(img, path, focus, fade_end=780):
+def full_bleed(img, path, focus, wash=(0.6, 780)):
     """Photo on the whole story, softly washed with paper under the text."""
     img.paste(cover_crop(path, W, H, focus), (0, 0))
     ramp = np.zeros((H, 1), np.float32)
-    ramp[:fade_end, 0] = 0.6 * (1 - np.linspace(0, 1, fade_end)) ** 1.4
+    strength, fade_end = wash
+    ramp[:fade_end, 0] = strength * (1 - np.linspace(0, 1, fade_end)) ** 1.4
     alpha = Image.fromarray((np.repeat(ramp, W, 1) * 255).astype(np.uint8))
     img.paste(linen(), (0, 0), alpha)
 
@@ -186,28 +191,41 @@ def full_bleed(img, path, focus, fade_end=780):
 def render(i, slide):
     img = linen()
     if slide.get("layout") == "full":
-        full_bleed(img, slide["photo"], slide["focus"])
+        full_bleed(img, slide["photo"], slide["focus"], slide.get("wash", (0.6, 780)))
     d = ImageDraw.Draw(img)
     margin = 100
 
     # Running header, like a magazine page
     hf = manrope(26, "Regular")
-    d.text((margin, 170), HEADER_LABEL, font=hf, fill=HEADER)
+    if HEADER_LABEL:
+        d.text((margin, 170), HEADER_LABEL, font=hf, fill=HEADER)
     counter = f"{i + 1}/{len(SLIDES)}"
     d.text((W - margin - d.textlength(counter, font=hf), 170), counter, font=hf, fill=HEADER)
 
-    # Headline: bold grotesque caps, left-aligned
     tf = montserrat(78, "Bold")
-    y = 300
-    for line in slide["title"].split("\n"):
+    bf = manrope(38, "Light")
+    bx = slide.get("body_x", 300)
+    titles = slide["title"].split("\n")
+    body = wrap(d, slide["text"], bf, W - bx - margin)
+    y = 250 if slide.get("layout") == "full" else 300
+
+    # Frosted paper plate when the photo is too busy behind the text
+    if slide.get("plate"):
+        box = (margin - 45, y - 45, W - margin + 45, y + 92 * len(titles) + 30 + 54 * len(body) + 35)
+        frost = img.crop(box).filter(ImageFilter.GaussianBlur(18))
+        frost = Image.blend(frost, linen().crop(box), 0.82)
+        m = Image.new("L", (frost.width * 4, frost.height * 4), 0)
+        ImageDraw.Draw(m).rounded_rectangle((0, 0, m.width - 1, m.height - 1), radius=28 * 4, fill=255)
+        img.paste(frost, box[:2], m.resize(frost.size, Image.LANCZOS))
+
+    # Headline: bold grotesque caps, left-aligned
+    for line in titles:
         d.text((margin, y), line, font=tf, fill=BROWN)
         y += 92
 
     # Body text shifted right for editorial asymmetry
-    bf = manrope(38, "Light")
-    bx = 300
     y += 30
-    for line in wrap(d, slide["text"], bf, W - bx - margin):
+    for line in body:
         d.text((bx, y), line, font=bf, fill=BODY)
         y += 54
 
