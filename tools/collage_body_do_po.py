@@ -34,7 +34,7 @@ def half(name):
 
     return out * m + BG * (1 - m)
 def pill(d, x, y, txt, col):                                                       # label pill as in the example
-    f = osw(50); tw = f.getlength(txt); h = 56; w = int(tw + 52)
+    f = osw(60); tw = f.getlength(txt); h = 66; w = int(tw + 60)
     d.rounded_rectangle((x, y, x + w, y + h), radius=h // 2, fill=col)
     d.text((x + w / 2, y + h / 2 + 2), txt, font=f, fill=(28, 24, 40), anchor="mm")
 LOGO = Image.open("logo_clean.png").convert("RGBA"); LOGO = LOGO.resize((300, int(LOGO.size[1] * 300 / LOGO.size[0])), Image.LANCZOS)
@@ -44,8 +44,8 @@ for ang in ("f", "q", "s"):
     fr = np.concatenate([top, bot], 0).astype(np.float32)
     fr[HALF - 3:HALF + 3] = (34, 34, 44)                                              # thin dark divider instead of the white line
     im = Image.fromarray(np.clip(fr, 0, 255).astype(np.uint8)); d = ImageDraw.Draw(im)
-    pill(d, 54, 40, "ДО", (232, 212, 206)); pill(d, 54, HALF + 40, "ПОСЛЕ", (233, 214, 242))
-    cap = "4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ"; f = osw(54); tw = f.getlength(cap)                # caption on the seam
+    pill(d, 54, 40, "ДО", (232, 212, 206)); pill(d, 54, HALF + 72, "ПОСЛЕ", (233, 214, 242))
+    cap = "4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ"; f = osw(84); tw = f.getlength(cap)                # caption on the seam
     arr = np.asarray(im).astype(np.float32)
     lay = Image.new("L", (W, H), 0); ImageDraw.Draw(lay).text((W / 2, HALF + 2), cap, font=f, fill=255, anchor="mm")
     t = np.asarray(lay).astype(np.float32) / 255
