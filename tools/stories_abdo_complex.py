@@ -455,7 +455,7 @@ def s1():
 
 
 def s2():
-    a, b = 0.0, 7.6                                    # «У нас комплексная операция большая, абдоминопластика, ... липофилинг груди»
+    a, b = 0.0, 53.9                                   # the whole speech, as the client asked (story limit is 60 s)
     c = Clip("IMG_3806.MP4", a, b, zoom=(1.0, 1.03), zc=(0.5, 0.3))
     col = Column(0, align="left")
     col.head("ВЫ ПРАВЫ,", 0, size=50, gap=10)
