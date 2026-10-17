@@ -49,7 +49,6 @@ HEADER_LABEL = "наш уход"
 
 # Photo frame: arch | rounded | oval | passe (override with: python3 ... <frame>)
 FRAME = "rounded"
-FADE_START, FADE_END = 560, 1000  # collage: solid paper under text, then fade out
 BOTTOM = 1620  # lower edge of floating frames, clear of the Instagram reply bar
 
 
@@ -149,23 +148,26 @@ def place_photo(img, path, x, y, w, focus, frame):
     outline(img, (x, y, x + w, y + h), frame)
 
 
-def collage(img, paths, focus, seam=10):
-    """Full-bleed vertical split of the photos, text area faded into paper on top."""
-    cw = (W - seam * (len(paths) - 1)) // len(paths)
-    for k, src in enumerate(paths):
-        img.paste(cover_crop(src, cw, H, focus), (k * (cw + seam), 0))
-    fade = np.zeros((H, 1), np.float32)
-    ramp = np.linspace(0, 1, FADE_END - FADE_START)
-    fade[:FADE_START] = 0.93
-    fade[FADE_START:FADE_END, 0] = 0.93 * (1 - ramp) ** 1.6
-    alpha = Image.fromarray((np.repeat(fade, W, 1) * 255).astype(np.uint8))
-    img.paste(linen(), (0, 0), alpha)
+def collage(img, paths, focus):
+    """Whole photos as white-bordered prints, tilted and overlapping, no cropping."""
+    cards = [(-4, 30, 660), (4, 500, 840)]  # (angle, x, y) per photo
+    cw, pad = 520, 16
+    for src, (angle, x, y) in zip(paths, cards):
+        photo = Image.open(src).convert("RGB")
+        ch = round(cw * photo.height / photo.width)
+        card = Image.new("RGB", (cw + 2 * pad, ch + 2 * pad), (252, 251, 249))
+        card.paste(photo.resize((cw, ch), Image.LANCZOS), (pad, pad))
+        mask = Image.new("L", card.size, 255).rotate(angle, Image.BICUBIC, expand=True)
+        card = card.rotate(angle, Image.BICUBIC, expand=True)
+        shadow = Image.new("L", img.size, 0)
+        shadow.paste(mask.point(lambda v: v * 80 // 255), (x + 8, y + 18))
+        shadow = shadow.filter(ImageFilter.GaussianBlur(24))
+        img.paste(Image.new("RGB", img.size, (110, 90, 80)), (0, 0), shadow)
+        img.paste(card, (x, y), mask)
 
 
 def render(i, slide):
     img = linen()
-    if slide.get("layout") == "collage":
-        collage(img, slide["photos"], slide["focus"])
     d = ImageDraw.Draw(img)
     margin = 100
 
@@ -193,7 +195,7 @@ def render(i, slide):
     # Photo block under the text
     top = max(y + 70, 760)
     if slide.get("layout") == "collage":
-        pass  # photos are already the background
+        collage(img, slide["photos"], slide["focus"])
     elif "photos" in slide:
         # Two narrow frames side by side, the second one stepped down
         aw, gap, step = 400, 70, 120
