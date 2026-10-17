@@ -44,6 +44,14 @@ SLIDES = [
         "focus": (0.5, 0.45),
         "layout": "collage",
     },
+    {
+        "photo": f"{UPLOADS}/b41db291-image.png",
+        "title": "ИГРУШКА",
+        "text": "Ну и Агата сама выбрала себе игрушку, а\u00a0кто я\u00a0такая, "
+                "чтобы отказать.",
+        "focus": (0.5, 0.5),
+        "layout": "full",
+    },
 ]
 HEADER_LABEL = "наш уход"
 
@@ -166,8 +174,19 @@ def collage(img, paths, focus):
         img.paste(card, (x, y), mask)
 
 
+def full_bleed(img, path, focus, fade_end=780):
+    """Photo on the whole story, softly washed with paper under the text."""
+    img.paste(cover_crop(path, W, H, focus), (0, 0))
+    ramp = np.zeros((H, 1), np.float32)
+    ramp[:fade_end, 0] = 0.6 * (1 - np.linspace(0, 1, fade_end)) ** 1.4
+    alpha = Image.fromarray((np.repeat(ramp, W, 1) * 255).astype(np.uint8))
+    img.paste(linen(), (0, 0), alpha)
+
+
 def render(i, slide):
     img = linen()
+    if slide.get("layout") == "full":
+        full_bleed(img, slide["photo"], slide["focus"])
     d = ImageDraw.Draw(img)
     margin = 100
 
@@ -194,7 +213,9 @@ def render(i, slide):
 
     # Photo block under the text
     top = max(y + 70, 760)
-    if slide.get("layout") == "collage":
+    if slide.get("layout") == "full":
+        pass  # photo is already the background
+    elif slide.get("layout") == "collage":
         collage(img, slide["photos"], slide["focus"])
     elif "photos" in slide:
         # Two narrow frames side by side, the second one stepped down
