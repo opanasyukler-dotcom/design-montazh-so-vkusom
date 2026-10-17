@@ -486,7 +486,7 @@ def s2():
     img = ImageOps.fit(load_img("surgeon_or.jpg"), (W, H), Image.LANCZOS, centering=(0.5, 0.0))
     col = Column(0, align="left")
     col.head("ОБА РЕЗУЛЬТАТА ВЫГЛЯДЯТ ЕСТЕСТВЕННО, НО ПОЛУЧЕНЫ СОВЕРШЕННО РАЗНЫМИ МЕТОДАМИ!", 0, size=48, gap=16).rule(0, gap=18)
-    body_tail(col, "А вы сможете отличить?", emoji("👀", 44), size=42, wght=600, gap=14)
+    body_tail(col, "А вы смогли отличить?", emoji("👀", 44), size=42, wght=600, gap=14)
     col.body("Ответ оставила в тесте «Липофилинг или импланты»", 0, size=36, wght=400, gap=0)
     col.space(170)                                   # link sticker «Тест» goes here
     col.body("Создала его для тех, кто думает об операции, но выбирает между липофилингом и имплантами", 0, size=32, wght=300, gap=0)
