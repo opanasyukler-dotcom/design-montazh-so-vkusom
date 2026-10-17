@@ -36,6 +36,13 @@ SLIDES = [
                 "ночью всё стало протекать.",
         "focus": (0.45, 0.55),
     },
+    {
+        "photos": [f"{UPLOADS}/9361c464-image.png", f"{UPLOADS}/2c24d1e3-image.png"],
+        "title": "БОДИКИ",
+        "text": "Я не удержалась и взяла девчачьи бодики, а\u00a0то бабушка ругается, "
+                "что мы как пацаны ходим.",
+        "focus": (0.5, 0.45),
+    },
 ]
 HEADER_LABEL = "наш уход"
 
@@ -120,9 +127,18 @@ def render(i, slide):
 
     # Arch photo bleeding off the bottom edge
     top = max(y + 70, 760)
-    aw = 800
-    photo, mask = arch_photo(slide["photo"], aw, H - top, slide["focus"])
-    img.paste(photo, ((W - aw) // 2, top), mask)
+    if "photos" in slide:
+        # Two narrow arches side by side, the second one stepped down
+        aw, gap, step = 420, 40, 120
+        x = (W - 2 * aw - gap) // 2
+        for k, src in enumerate(slide["photos"]):
+            t = top + k * step
+            photo, mask = arch_photo(src, aw, H - t, slide["focus"])
+            img.paste(photo, (x + k * (aw + gap), t), mask)
+    else:
+        aw = 800
+        photo, mask = arch_photo(slide["photo"], aw, H - top, slide["focus"])
+        img.paste(photo, ((W - aw) // 2, top), mask)
 
     path = os.path.join(OUT, f"story_{i + 1:02d}.jpg")
     img.save(path, quality=95)
@@ -133,7 +149,7 @@ if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     paths = [render(i, s) for i, s in enumerate(SLIDES)]
     ims = [Image.open(p).resize((540, 960)) for p in paths]
-    sheet = Image.new("RGB", (540 * len(ims) + 20 * (len(ims) + 1), 1000), (255, 255, 255))
+    sheet = Image.new("RGB", (560 * len(ims) + 20, 1000), (255, 255, 255))
     for k, im in enumerate(ims):
         sheet.paste(im, (20 + k * 560, 20))
     sheet.save(os.path.join(OUT, "00_overview.jpg"), quality=92)
