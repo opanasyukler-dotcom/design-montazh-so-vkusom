@@ -31,7 +31,15 @@ put(SH,21.6,0.16)
 for k in range(4): put(SW,26.3+k*0.28,0.14)
 put(SM,32.75,0.2); put(PP,33.2,0.2); put(PP,33.4,0.2); put(DG,33.8,0.1)          # first collage
 put(SH,36.42,0.2); put(PP,36.9,0.2); put(PP,37.1,0.2); put(SM,37.2,0.16)         # profile collage
-mix=vo[:,None]+sfx[:n,None]*0.55
-mix=np.repeat(mix,2,1); mix/=max(1,np.abs(mix).max()/0.97)
+M0=7.6                                                # the track's drop lands on the ДО -> ПОСЛЕ transition (6.4 s)
+y,_=librosa.load("mus.wav",sr=SR,mono=False,offset=M0,duration=DUR); mus=y.T[:n].copy(); mus/=np.abs(mus).max()
+if len(mus)<n: mus=np.pad(mus,((0,n-len(mus)),(0,0)))
+tt=np.arange(n)/SR; act=np.zeros(n)
+for s,si,so,t0 in SEGS: act[int((t0-0.05)*SR):int((t0+so-si+0.05)*SR)]=1
+d=cv2.GaussianBlur(act.astype(np.float32).reshape(1,-1),(0,0),sigmaX=SR*0.12).ravel()
+fade=np.clip((DUR-0.3-tt)/4.5,0,1)**1.6
+mus*=((0.16-0.12*np.clip(d,0,1))*np.minimum(1,tt/0.3)*fade)[:,None]           # quiet bed, ducked under the voice
+mix=mus+vo[:,None]+sfx[:n,None]*0.55
+mix/=max(1,np.abs(mix).max()/0.97)
 with wave.open("mix.wav","wb") as w:
     w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR); w.writeframes((mix*32767).astype(np.int16).tobytes())

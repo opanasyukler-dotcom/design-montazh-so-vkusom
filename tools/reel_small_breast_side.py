@@ -40,7 +40,18 @@ put(B, sticker(82), 838, 702); put(A, sticker(82), 1012, 714)
 def deepen(img):                                                        # grey studio wall -> close to black, skin untouched
     f = img.astype(np.float32); lum = f.mean(2, keepdims=True); k = np.clip((lum - 40) / 50, 0, 1)
     return np.clip(f * (0.45 + 0.55 * k), 0, 255).astype(np.uint8)
-B = top_cut(deepen(B), 130); A = top_cut(deepen(warm(A, 1.5)), 215)
+from retouch import skin_mask
+def match_skin(src, ref):
+    """bring the skin tone of `src` to the one of `ref` (same light and colour on both sides of the collage)"""
+    ms, mr = skin_mask(src)[..., 0], skin_mask(ref)[..., 0]
+    ls = cv2.cvtColor(src, cv2.COLOR_RGB2LAB).astype(np.float32); lr = cv2.cvtColor(ref, cv2.COLOR_RGB2LAB).astype(np.float32)
+    mu_s = ls[ms > 0.5].mean(0); mu_r = lr[mr > 0.5].mean(0)
+    k = cv2.GaussianBlur((ls[..., 0] > 70).astype(np.float32), (0, 0), 15)[..., None]   # body only, the black background stays black
+    out = ls.copy(); out[..., 0] = ls[..., 0] * (mu_r[0] / mu_s[0]); out[..., 1:] = ls[..., 1:] + (mu_r[1:] - mu_s[1:])
+    out = ls * (1 - k) + out * k
+    return cv2.cvtColor(np.clip(out, 0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB)
+A = match_skin(A, B)
+B = top_cut(deepen(warm(B, 0.6)), 130); A = top_cut(deepen(warm(A, 0.6)), 215)          # same gentle warmth on both
 cv2.imwrite("side_do.png", cv2.cvtColor(B, cv2.COLOR_RGB2BGR)); cv2.imwrite("side_po.png", cv2.cvtColor(A, cv2.COLOR_RGB2BGR))
 # collage in the same layout as the first one: title on top, ДО left, ПОСЛЕ right
 W, H = 1080, 1920; col = np.zeros((H, W, 3), np.uint8); col[:] = (8, 8, 9)
