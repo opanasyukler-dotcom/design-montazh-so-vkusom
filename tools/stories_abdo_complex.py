@@ -2,7 +2,7 @@
 
 Fonts: Inter Bold caps headlines (the bold face from the reference story), Montserrat Light body,
 Montserrat Medium subtitles on the slate plate from the reference.  Brand palette from the surgeon's
-posts (graphite / lilac / powder).  Subtitles are hand-timed cues built from the word timings of
+posts: navy of her logo + white.  Subtitles are hand-timed cues built from the word timings of
 the voice clips; lilac/powder arrows mark the zones on the before/after collages.
 
 usage: python3 stories_abdo_complex.py SRC_DIR OUT_DIR [story numbers...]
@@ -26,6 +26,7 @@ WHITE = (255, 255, 255)
 LILAC = (252, 211, 255)
 POWDER = (233, 207, 199)
 GRAPHITE = (20, 23, 31)
+NAVY = (2, 31, 71)             # the surgeon's colour: navy of her sticker/logo, with white
 SLATE = (78, 86, 112)          # subtitle plate from the reference story
 
 SRC, OUT = sys.argv[1], sys.argv[2]
@@ -117,7 +118,7 @@ class Column:
         self._add(im, pad, t0, gap); return self
 
     def rule(self, t0, length=150, gap=30):
-        im = Image.new("RGBA", (length, 4), LILAC + (255,))
+        im = Image.new("RGBA", (length, 4), WHITE + (255,))
         x = {"left": MARGIN, "right": W - MARGIN - length}.get(self.align, (W - length) // 2)
         self.items.append(Sprite(im, x, self.y, t0, dy=0)); self.y += 4 + gap; self.bottom = self.y; return self
 
@@ -279,7 +280,7 @@ def render(num, slug, dur, bg, sprites, shade=None, subs=None, audio=None, anima
         fr = bg(i, t).astype(np.float32) / 255.0
         if shade is not None:
             sh = shade(t) if callable(shade) else shade
-            fr = fr * (1 - sh) + np.array(GRAPHITE, np.float32) / 255 * sh
+            fr = fr * (1 - sh) + np.array(NAVY, np.float32) / 255 * sh
         for s in sprites: s.draw(fr, t)
         if subs: subs.draw(fr, t)
         o = (np.clip(fr, 0, 1) * 255).astype(np.uint8)
@@ -444,20 +445,19 @@ FIXES = {"грудное оскармливание": "грудное вскар
 
 def s1():
     c = Clip("IMG_9968.MP4", 0.0, 10.0, ct=0.12, zoom=(1.0, 1.03), zc=(0.5, 0.35))     # face is above the window
-    col = Column(0, align="left")
-    col.head("ПАЦИЕНТКА ХОЧЕТ ИЗМЕНИТЬ ФОРМУ ГРУДИ И УБРАТЬ ИЗБЫТКИ КОЖИ НА ЖИВОТЕ", 0, size=50, gap=18).rule(0, gap=20)
-    col.body("Что бы вы предложили?", 0, size=44, wght=600, col=LILAC, gap=0)
-    col.to_bottom(1700)
-    print("s1 top", col.top)
-    # poll «Подтяжка груди + липосакция / Подтяжка и липофилинг + абдомино» goes above the text, over the thighs
-    render(1, "chto_by_vy_predlozhili", 10.0, clip_bg(c), col.items, shade=bottom_shade(col.top - 420, 0.86))
+    col = Column(1290, align="left")
+    col.head("ПАЦИЕНТКА ХОЧЕТ ИЗМЕНИТЬ ФОРМУ ГРУДИ И УБРАТЬ ИЗБЫТКИ КОЖИ НА ЖИВОТЕ", 0, size=44, gap=16).rule(0, gap=16)
+    col.body("Что бы вы предложили?", 0, size=40, wght=600, gap=0)
+    print("s1 text", col.y)
+    # navy band from the hips down: text on top of it, the poll sticker goes under the text (~1530..1780), empty on purpose
+    render(1, "chto_by_vy_predlozhili", 10.0, clip_bg(c), col.items, shade=vgrad(1120, 1280, 0.0, 0.93))
 
 
 def s2():
     a, b = 0.0, 7.6                                    # «У нас комплексная операция большая, абдоминопластика, ... липофилинг груди»
     c = Clip("IMG_3806.MP4", a, b, zoom=(1.0, 1.03), zc=(0.5, 0.3))
     col = Column(0, align="left")
-    col.head("ВЫ ПРАВЫ,", 0, size=50, col=LILAC, gap=10)
+    col.head("ВЫ ПРАВЫ,", 0, size=50, gap=10)
     col.body("мы выполняем большую комплексную операцию:", 0, size=34, wght=400, gap=10)
     col.head("АБДОМИНОПЛАСТИКА, ПОДТЯЖКА И ЛИПОФИЛИНГ ГРУДИ", 0, size=42, gap=0)
     col.to_bottom(1770)
