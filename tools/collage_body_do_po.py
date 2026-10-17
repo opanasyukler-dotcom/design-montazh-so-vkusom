@@ -45,4 +45,12 @@ for ang in ("f", "q", "s"):
     fr[HALF - 3:HALF + 3] = (34, 34, 44)                                              # thin dark divider instead of the white line
     im = Image.fromarray(np.clip(fr, 0, 255).astype(np.uint8)); d = ImageDraw.Draw(im)
     pill(d, 54, 40, "ДО", (232, 212, 206)); pill(d, 54, HALF + 40, "ПОСЛЕ", (233, 214, 242))
+    cap = "4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ"; f = osw(54); tw = f.getlength(cap)                # caption on the seam
+    arr = np.asarray(im).astype(np.float32)
+    lay = Image.new("L", (W, H), 0); ImageDraw.Draw(lay).text((W / 2, HALF + 2), cap, font=f, fill=255, anchor="mm")
+    t = np.asarray(lay).astype(np.float32) / 255
+    sh = np.clip(cv2.GaussianBlur(cv2.dilate(t, np.ones((9, 9), np.uint8)), (0, 0), 10) * 1.6, 0, 1)[..., None]   # soft dark glow, no hard box
+    band = np.zeros((H, W), np.float32); band[HALF - 3:HALF + 3, int(W / 2 - tw / 2 - 26):int(W / 2 + tw / 2 + 26)] = 1   # gap in the divider
+    arr = arr * (1 - sh) ; arr[band > 0] = 0; arr = arr * (1 - t[..., None]) + 255 * t[..., None]
+    im = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
     im.save(f"collage_{ang}.jpg", quality=95)
