@@ -445,12 +445,12 @@ FIXES = {"грудное оскармливание": "грудное вскар
 
 def s1():
     c = Clip("IMG_9968.MP4", 0.0, 10.0, ct=0.12, zoom=(1.0, 1.03), zc=(0.5, 0.35))     # face is above the window
-    col = Column(150, align="left")
+    col = Column(1090, align="left")
     col.head("ПАЦИЕНТКА ХОЧЕТ ИЗМЕНИТЬ ФОРМУ ГРУДИ И УБРАТЬ ИЗБЫТКИ КОЖИ НА ЖИВОТЕ", 0, size=46, gap=16).rule(0, gap=16)
     col.body("Что бы вы предложили?", 0, size=42, wght=600, gap=0)
     print("s1 text ends", col.y)
-    # text at the top on a navy band over the shoulders; the whole lower half (~1150..1780) is left for a big poll sticker
-    shade = np.maximum(vgrad(col.y + 10, col.y + 150, 0.9, 0.0), vgrad(1250, 1700, 0.0, 0.55))
+    # text at the level of the briefs on a navy band; under it (~1360..1780) the poll sticker, as large as it fits
+    shade = vgrad(960, 1080, 0.0, 0.88)
     render(1, "chto_by_vy_predlozhili", 10.0, clip_bg(c), col.items, shade=shade)
 
 
