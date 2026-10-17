@@ -1,5 +1,5 @@
 _b = open("base.py").read()
-for a, b in [("DUR = 41.0", "DUR = 40.8"), ("ease((t - t0) / 0.3))\ndef mblur", "ease((t - t0) / 0.6))\ndef mblur"),
+for a, b in [("DUR = 41.0", "DUR = 40.3"), ("ease((t - t0) / 0.3))\ndef mblur", "ease((t - t0) / 0.6))\ndef mblur"),
              ("if lt > 0.1: return fr", "if lt > 0.18: return fr"), ("(1 - lt / 0.1)", "(1 - lt / 0.18)"),
              ("ti = t0 + k * 0.16; p = ease((t - ti) / 0.45)", "ti = t0 + k * 0.24; p = ease((t - ti) / 0.65)"),
              ("out = 1 - ease((t - t1) / 0.3) if t > t1 else 1.0", "out = 1 - ease((t - t1) / 0.4) if t > t1 else 1.0"),
@@ -10,12 +10,11 @@ exec(_b)
 exec(open("fx.py").read())
 
 # ---------------- voice edit: (source, src_in, src_out, reel_start) ----------------
-SEGS = [("surg", 5.16, 8.72, 0.30),      # у девушки практически не было объёма
-        ("surg", 12.48, 17.45, 4.20),    # она хотела ближе к тройке, но… не очень бросалось всем в глаза
-        ("surg", 0.00, 5.14, 9.50),      # мы сегодня сделали увеличение груди анатомическими имплантами 295
-        ("surg", 23.65, 35.72, 17.60),   # девушки с маленькой грудью… преимущество. …никогда подтяжки
-        ("surg", 37.02, 43.82, 29.90),   # ваше страдание… окупаются с лихвой тем, что у вас не будет птоза
-        ("surg", 53.88, 55.36, 37.00)]   # будем с вами делиться результатами
+SEGS = [("surg", 12.48, 17.45, 0.30),    # она хотела ближе к тройке, но… не очень бросалось всем в глаза  (the reel opens here)
+        ("surg", 0.00, 5.14, 5.60),      # мы сегодня сделали увеличение груди анатомическими имплантами 295
+        ("surg", 23.65, 35.72, 13.60),   # девушки с маленькой грудью… преимущество. …никогда подтяжки
+        ("surg", 37.02, 43.82, 25.90),   # ваше страдание… окупаются с лихвой тем, что у вас не будет птоза
+        ("surg", 53.88, 55.36, 33.00)]   # будем с вами делиться результатами
 def src_of(t):
     best = None
     for s, si, so, t0 in SEGS:
@@ -24,8 +23,8 @@ def src_of(t):
         best = (so, t0 + so - si)
     return best[0] + t - best[1]
 
-BL = [("do", 0, 4.0), ("quote", 4.0, 9.4), ("res", 9.4, 14.8), ("turn", 14.8, 17.6), ("main", 17.6, 25.6),
-      ("wide", 25.6, 29.7), ("final", 29.7, 36.7), ("collage", 36.7, DUR)]
+BL = [("quote", 0, 5.4), ("res", 5.4, 11.0), ("turn", 11.0, 13.6), ("main", 13.6, 21.6),
+      ("wide", 21.6, 25.7), ("final", 25.7, 32.7), ("collage", 32.7, 36.4), ("collage2", 36.4, DUR)]
 XF = 0.35
 def block(t):
     for n, a, b in BL:
@@ -48,6 +47,14 @@ def warm(img, k=1.0):                                                   # gentle
     f *= np.float32([1 + 0.07 * k, 1 + 0.025 * k, 1 - 0.09 * k]); return np.clip(f, 0, 255).astype(np.uint8)
 COLL[560:1660, 552:] = warm(COLL[560:1660, 552:])                        # ПОСЛЕ half of the collage
 DO_IMG = COLL[592:1636, 18:548].copy(); PO_IMG = COLL[592:1636, 556:1078].copy()     # the two halves of the collage
+def feather(img, e=110):                                                # side photos melt into the black frame at their edges
+    h, w = img.shape[:2]; m = (np.clip(np.arange(w) / e, 0, 1) * np.clip((w - 1 - np.arange(w)) / e, 0, 1))[None] * np.clip((h - 1 - np.arange(h)) / e, 0, 1)[:, None]
+    return (img * m[..., None] + np.float32([16, 16, 18]) * (1 - m[..., None])).astype(np.uint8)
+SDO = feather(load("side_do.png")); SPO = feather(load("side_po.png")); COLL2 = load("collage_side.jpg")   # side view, built by side.py
+def side(img, cx, z=1.0): return warp(img, 0.70 * z, cx, 1100, 540, 880)       # torso aligned between ДО and ПОСЛЕ
+def morph(a_, b_, p, f=0.35):
+    edge = (xx_ / W * 0.6 + yy_ / H * 0.4)[..., None]
+    m = np.clip((p * (1 + f) - edge) / f, 0, 1); return a_ * (1 - m) + b_ * m
 def photo_full(img, z=1.0, cy_src=None):
     s = 1640 / img.shape[0] * z; cy = img.shape[0] * 0.5 if cy_src is None else cy_src      # whole body fits, black sides
     return warp(img, s, img.shape[1] / 2, cy, 540, 1000)
@@ -117,32 +124,34 @@ def render_block(t, b=None):
         brackets(fr, 560, 640, 470, 280, t, 0.3, 2.4)
         T1.draw(fr, 1060, t, 1.0, t1 - 0.3)
         if t > 1.9: ablend(fr, T1s, 540 - T1s.shape[1] / 2, 1290, min(1, (t - 1.9) / 0.4) * (1 - ease((t - t1 + 0.3) / 0.35)), WHITE, BLUE)
-    elif n == "quote":                                                  # her request: quote in a frame over ДО
-        fr = mblur(photo_full(DO_IMG, (1.06 + 0.05 * lt / 5.4) * trans(t, t0)), lt); chip(fr, CH_DO, 60, 228, t, t0 + 0.1)
-        T2.draw(fr, 1180, t, t0 + 0.5, t1 - 0.35)
-    elif n == "res":                                                    # first result on video, 295 ml counts up
-        fr = mblur(vframe(src_of(t), (1.0 + 0.06 * lt / 5.4) * trans(t, t0), 540, 960), lt)
-        T3.draw(fr, 560, t, 10.6, t1 - 0.3)
-        counter(fr, t, 12.2, 13.4, 295, 740)
-        if t > 13.8: ablend(fr, T3s, 540 - T3s.shape[1] / 2, 845, min(1, (t - 13.8) / 0.4) * (1 - ease((t - t1 + 0.3) / 0.35)), WHITE, BLUE)
+    elif n == "quote":                                                  # opens straight on her request: quote in a frame over ДО
+        fr = focus(photo_full(DO_IMG, 1.04 + 0.05 * lt / 5.4), lt, 0.7); chip(fr, CH_DO, 60, 228, t, 0.3)
+        T2.draw(fr, 1180, t, 0.35, t1 - 0.35)
+    elif n == "res":                                                    # first result: profile ДО -> ПОСЛЕ, 295 ml counts up
+        z = (1.0 + 0.05 * lt / 5.6) * trans(t, t0); p = ease((t - 6.4) / 1.6)       # ДО -> ПОСЛЕ in profile while she says "сделали увеличение"
+        fr = mblur(morph(side(SDO, 645, z), side(SPO, 702, z), p), lt)
+        chip(fr, CH_DO, 60, 228, t, t0 + 0.1, 6.4); chip(fr, CH_PO, 60, 228, t, 7.4)
+        T3.draw(fr, 1060, t, 7.6, t1 - 0.3)
+        counter(fr, t, 8.4, 9.45, 295, 1205)
+        if t > 9.8: ablend(fr, T3s, 540 - T3s.shape[1] / 2, 1300, min(1, (t - 13.8) / 0.4) * (1 - ease((t - t1 + 0.3) / 0.35)), WHITE, BLUE)
     elif n == "turn":                                                   # beautiful after-shot + the turn of the story
         fr = mblur(photo_full(PO_IMG, (1.02 + 0.05 * lt / 2.8) * trans(t, t0)), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.15)
         T4.draw(fr, 1000, t, t0 + 0.25, t1 - 0.3); flash = 0.25 * max(0, 1 - lt / 0.25)
     elif n == "main":                                                   # close on the surgeon: the main thought
         z = 1.5 - 0.12 * ease(lt / 8)
         fr = mblur(vframe(src_of(t), z * trans(t, t0), 520, 560, 820), lt)
-        T5.draw(fr, 1000, t, 21.3, t1 - 0.35)
+        T5.draw(fr, 1000, t, 17.4, t1 - 0.35)
     elif n == "wide":                                                   # wide: surgeon and the patient, slow push to the chest
         fr = mblur(vframe(src_of(t), (1.0 + 0.12 * ease(lt / 4.1)) * trans(t, t0), 500, 1000, 960), lt)
     elif n == "final":                                                  # final look at the result
-        fr = mblur(photo_full(PO_IMG, (1.04 + 0.06 * lt / 7) * trans(t, t0)), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.15)
-        T6.draw(fr, 990, t, 30.3, t1 - 0.35)
-    else:                                                               # the collage
+        fr = mblur(side(SPO, 702, (1.02 + 0.06 * lt / 7) * trans(t, t0)), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.15)   # the favourable profile
+        T6.draw(fr, 1000, t, 26.3, t1 - 0.35)
+    else:                                                               # the two collages
         z = 1.12 - 0.12 * ease(lt / 1.4)
-        fr = warp(COLL, z, 540, 1110, 540, 1110); chip(fr, CH_DO, 40, 610, t, t0 + 0.5); chip(fr, CH_PO, 580, 610, t, t0 + 0.7)
-        if t > t0 + 1.0: ablend(fr, T7, 540 - T7.shape[1] / 2, 370, min(1, (t - t0 - 1.0) / 0.5), WHITE, BLUE)
-    if not LIGHT[0] and n != "collage": fr = look(fr, t) * (1 - HAZE)
-    if n != "collage": subs2(fr, t, sub_y)
+        fr = mblur(warp(COLL if n == "collage" else COLL2, z, 540, 1110, 540, 1110), lt); chip(fr, CH_DO, 40, 610, t, t0 + 0.5); chip(fr, CH_PO, 580, 610, t, t0 + 0.7)
+        if n == "collage" and t > t0 + 1.0: ablend(fr, T7, 540 - T7.shape[1] / 2, 370, min(1, (t - t0 - 1.0) / 0.5), WHITE, BLUE)
+    if not LIGHT[0] and not n.startswith("collage"): fr = look(fr, t) * (1 - HAZE)
+    if not n.startswith("collage"): subs2(fr, t, sub_y)
     DEFER[0] = False
     for args in PENDING: ablend(fr, *args)
     blend(fr, LOGO_D if LIGHT[0] else LOGO, 540 - LOGO.shape[1] / 2, 120, 0.9)
