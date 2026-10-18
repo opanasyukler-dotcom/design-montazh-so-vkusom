@@ -1,5 +1,5 @@
 import numpy as np, wave, librosa, cv2
-SR=48000; DUR=40.3                                    # no music: voice + sound effects only
+SR=48000; DUR=37.6                                    # no music: voice + sound effects only
 src=open("../v14/audio.py").read(); exec(src[src.index("rng=np.random"):src.index("n=int(DUR*SR)")])
 s2=open("../v15/audio.py").read()
 exec(s2[s2.index("def impact"):s2.index("n=int(DUR*SR)", s2.index("def impact"))])
@@ -18,7 +18,7 @@ WB,PP,IM,RS=whoosh(),pop(),impact(),riser(); SH,BM,SM,DG=shutter(),boom(),shimme
 def tick():                                           # short click for the counter
     k=np.arange(int(0.025*SR))/SR; return np.sin(2*np.pi*2400*k)*np.exp(-k*260)
 TK=tick()
-for c in [5.4,11.0,13.6,21.6,25.7,32.7,36.4]: put(WB,c-0.3,0.24); put(BM,c,0.2)
+for c in [1.6,5.4,11.0,13.6,21.6,25.7,32.7]: put(WB,c-0.3,0.24); put(BM,c,0.2)
 put(SM,0.05,0.2); put(SW,0.35,0.2); put(SH,0.4,0.16); put(SW,0.9,0.14)              # focus pull, quote frame opens
 put(RS,6.4-0.9,0.14); put(SW,6.45,0.24); put(SM,6.6,0.18)                       # ДО -> ПОСЛЕ in profile
 put(PP,7.6,0.2)
@@ -29,8 +29,7 @@ for k in range(3): put(SW,11.25+k*0.24,0.15)
 put(BM,17.4,0.3); put(PP,17.4,0.22); put(PP,17.7,0.22); put(PP,18.0,0.26); put(SM,18.05,0.18)   # "преимущество"
 put(SH,21.6,0.16)
 for k in range(4): put(SW,26.3+k*0.28,0.14)
-put(SM,32.75,0.2); put(PP,33.2,0.2); put(PP,33.4,0.2); put(DG,33.8,0.1)          # first collage
-put(SH,36.42,0.2); put(PP,36.9,0.2); put(PP,37.1,0.2); put(SM,37.2,0.16)         # profile collage
+put(SM,32.75,0.2); put(SH,32.8,0.18); put(PP,33.2,0.2); put(PP,33.4,0.2); put(DG,33.8,0.1)   # profile collage
 M0=7.6                                                # the track's drop lands on the ДО -> ПОСЛЕ transition (6.4 s)
 y,_=librosa.load("mus.wav",sr=SR,mono=False,offset=M0,duration=DUR); mus=y.T[:n].copy(); mus/=np.abs(mus).max()
 if len(mus)<n: mus=np.pad(mus,((0,n-len(mus)),(0,0)))
