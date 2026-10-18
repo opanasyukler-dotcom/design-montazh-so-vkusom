@@ -9,7 +9,7 @@ d = ImageDraw.Draw(im); d.rectangle((0, 120, W, 488), fill=BG)                  
 lines = ["ГЛЯДЯ НА ПРЕДЫДУЩУЮ СТОРИС,", "КАК ДУМАЕТЕ, ГДЕ ГРУДЬ", "УВЕЛИЧЕНА СОБСТВЕННЫМ", "ЖИРОМ, А ГДЕ УСТАНОВЛЕНЫ", "ИМПЛАНТЫ?"]
 size = 60
 while ImageFont.truetype(BOLD, size).getlength(max(lines, key=lambda l: ImageFont.truetype(BOLD, size).getlength(l))) > 1000: size -= 1
-f = ImageFont.truetype(BOLD, size); lh = int(size * 1.17); y0 = 470 - lh * len(lines)
+f = ImageFont.truetype(BOLD, size); lh = int(size * 1.17); y0 = 425 - lh * len(lines)
 txt = Image.new("L", (W, H), 0); dt = ImageDraw.Draw(txt)
 for i, l in enumerate(lines): dt.text((W / 2, y0 + i * lh), l, font=f, fill=255, anchor="mt")
 sh = txt.filter(ImageFilter.GaussianBlur(6)).point(lambda v: int(v * 0.55))
@@ -27,9 +27,9 @@ def arrow(path, col=(255, 255, 255, 255), w=9):
     dl.line([tuple(p) for p in path], fill=col, width=w, joint="curve")
     a, b = path[-4], path[-1]; v = (b - a) / np.linalg.norm(b - a); n = np.float32([-v[1], v[0]])
     dl.polygon([tuple(b + v * 6), tuple(b - v * 34 + n * 20), tuple(b - v * 34 - n * 20)], fill=col)
-target = (812, 1157)                                                                      # sticker of the fuller breast
-arrow(bez((cx0 + 70, cy0 + chh + 12), (cx0 - 10, cy0 + chh + 120), (target[0] + 10, target[1] - 70)))     # down onto the breast
-arrow(bez((cx0 + 210, cy0 + chh + 12), (cx0 + 230, cy0 + chh + 190), (target[0] + 85, target[1] - 10)))    # to its outer side
+target = (1132, 1180)                                                                     # right breast (on the photo): fat already added
+arrow(bez((cx0 + cw - 150, cy0 + chh + 12), (cx0 + cw - 60, cy0 + chh + 140), (target[0] - 5, target[1] - 70)))
+arrow(bez((560, 448), (360, 500), (150, 452)), w=8)                       # under the headline: back to the previous story
 shadow = layer.filter(ImageFilter.GaussianBlur(8)); sa = np.asarray(shadow)[..., 3].astype(np.float32) * 0.35
 base = np.asarray(im).astype(np.float32); base *= 1 - sa[..., None] / 255
 im = Image.fromarray(base.astype(np.uint8)); im.paste(layer, (0, 0), layer)
