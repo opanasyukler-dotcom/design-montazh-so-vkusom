@@ -38,6 +38,10 @@ for s,si,so,t0 in SEGS: act[int((t0-0.05)*SR):int((t0+so-si+0.05)*SR)]=1
 d=cv2.GaussianBlur(act.astype(np.float32).reshape(1,-1),(0,0),sigmaX=SR*0.12).ravel()
 fade=np.clip((DUR-0.3-tt)/4.5,0,1)**1.6
 mus*=((0.16-0.12*np.clip(d,0,1))*np.minimum(1,tt/0.3)*fade)[:,None]           # quiet bed, ducked under the voice
+put(SW,0.2,0.12); put(SH,0.25,0.12)                                              # viewfinder
+for t in (17.55, 20.3, 24.15): put(BM,t,0.18); put(SW,t-0.05,0.12)                  # punch-ins
+put(PP,24.0,0.22); put(SW,24.55,0.2); put(SM,24.6,0.12)                           # ПОДТЯЖКА crossed out
+for t in (11.3, 25.9, 30.4, 34.1): put(SM,t,0.13)                                 # light sweeps
 mix=mus+vo[:,None]+sfx[:n,None]*0.55
 mix/=max(1,np.abs(mix).max()/0.97)
 with wave.open("mix.wav","wb") as w:

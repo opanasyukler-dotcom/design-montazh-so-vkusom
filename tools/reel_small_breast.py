@@ -54,7 +54,33 @@ SDO = feather(load("side_do.png")); SPO = feather(load("side_po.png")); COLL2 = 
 def side(img, cx, z=1.0): return warp(img, 0.70 * z, cx, 1080, 540, 860)       # torso aligned between ДО and ПОСЛЕ
 def morph(a_, b_, p, f=0.35):
     edge = (xx_ / W * 0.6 + yy_ / H * 0.4)[..., None]
-    m = np.clip((p * (1 + f) - edge) / f, 0, 1); return a_ * (1 - m) + b_ * m
+    m = np.clip((p * (1 + f) - edge) / f, 0, 1); out = a_ * (1 - m) + b_ * m
+    if 0.01 < p < 0.99: g = np.exp(-((m - 0.5) / 0.18) ** 2) * 0.45; out = out * (1 - g) + np.float32([1.0, 0.95, 0.93]) * g   # glowing seam
+    return out
+def sweep(fr, t, t0, dur=0.9, k=0.22):
+    """a soft light band glides across the photo (draws the eye to the result)"""
+    p = (t - t0) / dur
+    if not 0 <= p <= 1: return fr
+    pos = -0.3 + 1.6 * ease(p); band = np.exp(-(((xx_ / W) * 0.75 + (yy_ / H) * 0.25 - pos) / 0.06) ** 2)[..., None]
+    return fr + (1 - fr) * band * k * np.sin(np.pi * p)
+def punch(t, hits, amp=0.16, dur=0.5):                                  # quick zoom-in on a key word, eases back
+    z = 1.0
+    for h in hits:
+        if h <= t < h + dur: z += amp * (1 - ease((t - h) / dur))
+    return z
+STRIKE = timg("ПОДТЯЖКА", "H", 130)
+def strike(fr, t, t0, ts, t1):
+    """ПОДТЯЖКА pops in, then a powder line crosses it out"""
+    if t < t0 or t > t1 + 0.4: return
+    out = 1 - ease((t - t1) / 0.4) if t > t1 else 1.0; sc = 1 + 0.4 * (1 - ease((t - t0) / 0.4))
+    im = cv2.resize(STRIKE, (int(STRIKE.shape[1] * sc), int(STRIKE.shape[0] * sc))); y = 830
+    ablend(fr, im, 540 - im.shape[1] / 2, y - im.shape[0] / 2, out * min(1, (t - t0) / 0.2), WHITE, BLUE)
+    p = ease((t - ts) / 0.35)
+    if p > 0:
+        w = STRIKE.shape[1] + 60; bar = np.zeros((22, max(1, int(w * p)), 4), np.float32); bar[..., 3] = 1
+        M = cv2.getRotationMatrix2D((0, 7), -6, 1.0); big = np.zeros((90, w + 10, 4), np.float32); big[34:56, :bar.shape[1]] = bar
+        big = cv2.warpAffine(big, cv2.getRotationMatrix2D((w / 2, 45), 6, 1.0), (big.shape[1], big.shape[0]))
+        ablend(fr, big, 540 - w / 2, y - 45 + 6, out, PINK, ROSE)
 def photo_full(img, z=1.0, cy_src=None):
     s = 1640 / img.shape[0] * z; cy = img.shape[0] * 0.5 if cy_src is None else cy_src      # whole body fits, black sides
     return warp(img, s, img.shape[1] / 2, cy, 540, 1000)
@@ -126,6 +152,7 @@ def render_block(t, b=None):
         if t > 1.9: ablend(fr, T1s, 540 - T1s.shape[1] / 2, 1290, min(1, (t - 1.9) / 0.4) * (1 - ease((t - t1 + 0.3) / 0.35)), WHITE, BLUE)
     elif n == "quote":                                                  # opens straight on her request: quote in a frame over ДО
         fr = focus(side(SDO, 645, 0.97 + 0.02 * lt / 1.6), lt, 0.7); chip(fr, CH_DO, 60, 228, t, 0.3)
+        brackets(fr, 671, 603, 300, 260, t, 0.2, 1.5)                    # viewfinder on the chest
         T2.draw(fr, 1180, t, 0.35, 5.05)
     elif n == "qsurg":                                                  # from "тем не менее": the surgeon, close
         fr = mblur(vframe(src_of(t), 1.5 * (1 - 0.05 * lt / 3.8) * trans(t, t0), 520, 560, 820), lt)
@@ -139,19 +166,22 @@ def render_block(t, b=None):
         if t > 9.8: ablend(fr, T3s, 540 - T3s.shape[1] / 2, 1300, min(1, (t - 13.8) / 0.4) * (1 - ease((t - t1 + 0.3) / 0.35)), WHITE, BLUE)
     elif n == "turn":                                                   # beautiful after-shot + the turn of the story
         fr = mblur(side(SPO, 760, (1.18 + 0.04 * lt / 2.8) * trans(t, t0, 0.03)), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.15)   # profile, closer
-        T4.draw(fr, 1000, t, t0 + 0.25, t1 - 0.3); flash = 0.25 * max(0, 1 - lt / 0.25)
+        fr = sweep(fr, t, t0 + 0.3); T4.draw(fr, 1000, t, t0 + 0.25, t1 - 0.3); flash = 0.25 * max(0, 1 - lt / 0.25)
     elif n == "main":                                                   # close on the surgeon: the main thought
-        z = 1.5 - 0.12 * ease(lt / 8)
+        z = (1.5 - 0.12 * ease(lt / 8)) * punch(t, [17.55, 20.3])       # punch-ins on "преимущество" and "никогда"
         fr = mblur(vframe(src_of(t), z * trans(t, t0), 520, 560, 820), lt)
+        if 17.55 <= t < 17.75: flash = 0.18 * (1 - (t - 17.55) / 0.2)
         T5.draw(fr, 1000, t, 17.4, t1 - 0.35)
     elif n == "wide":                                                   # wide: surgeon and the patient, slow push to the chest
-        fr = mblur(vframe(src_of(t), (1.0 + 0.12 * ease(lt / 4.1)) * trans(t, t0), 500, 1000, 960), lt)
+        fr = mblur(vframe(src_of(t), (1.0 + 0.12 * ease(lt / 4.1)) * trans(t, t0) * punch(t, [24.15], 0.1), 500, 1000, 960), lt)
+        strike(fr, t, 24.0, 24.55, t1 - 0.2)                            # "никогда подтяжки": the word gets crossed out
     elif n == "final":                                                  # final look at the result
         fr = mblur(side(SPO, 702, (0.97 + 0.04 * lt / 7) * trans(t, t0, 0.03)), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.15)   # the favourable profile
+        fr = sweep(fr, t, t0 + 0.2); fr = sweep(fr, t, 30.4)
         T6.draw(fr, 1000, t, 26.3, t1 - 0.35)
     else:                                                               # the two collages
         z = 1.04 - 0.04 * ease(lt / 1.2)
-        fr = mblur(warp(COLL2, z, 540, 1110, 540, 1110), lt); chip(fr, CH_DO, 40, 610, t, t0 + 0.5); chip(fr, CH_PO, 580, 610, t, t0 + 0.7)
+        fr = sweep(mblur(warp(COLL2, z, 540, 1110, 540, 1110), lt), t, t0 + 1.4, 1.1, 0.18); chip(fr, CH_DO, 40, 610, t, t0 + 0.5); chip(fr, CH_PO, 580, 610, t, t0 + 0.7)
         if t > t0 + 1.0: ablend(fr, T7, 540 - T7.shape[1] / 2, 370, min(1, (t - t0 - 1.0) / 0.5), WHITE, BLUE)
     if not LIGHT[0] and not n.startswith("collage"): fr = look(fr, t) * (1 - HAZE)
     if not n.startswith("collage"): subs2(fr, t, sub_y)
