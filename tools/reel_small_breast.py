@@ -1,5 +1,5 @@
 _b = open("base.py").read()
-for a, b in [("DUR = 41.0", "DUR = 37.6"), ("ease((t - t0) / 0.3))\ndef mblur", "ease((t - t0) / 0.6))\ndef mblur"),
+for a, b in [("DUR = 41.0", "DUR = 40.8"), ("ease((t - t0) / 0.3))\ndef mblur", "ease((t - t0) / 0.6))\ndef mblur"),
              ("if lt > 0.1: return fr", "if lt > 0.18: return fr"), ("(1 - lt / 0.1)", "(1 - lt / 0.18)"),
              ("ti = t0 + k * 0.16; p = ease((t - ti) / 0.45)", "ti = t0 + k * 0.24; p = ease((t - ti) / 0.65)"),
              ("out = 1 - ease((t - t1) / 0.3) if t > t1 else 1.0", "out = 1 - ease((t - t1) / 0.4) if t > t1 else 1.0"),
@@ -12,9 +12,10 @@ exec(open("fx.py").read())
 # ---------------- voice edit: (source, src_in, src_out, reel_start) ----------------
 SEGS = [("surg", 12.48, 17.45, 0.30),    # она хотела ближе к тройке, но… не очень бросалось всем в глаза  (the reel opens here)
         ("surg", 0.00, 5.14, 5.60),      # мы сегодня сделали увеличение груди анатомическими имплантами 295
-        ("surg", 23.65, 35.72, 13.60),   # девушки с маленькой грудью… преимущество. …никогда подтяжки
-        ("surg", 37.02, 43.82, 25.90),   # ваше страдание… окупаются с лихвой тем, что у вас не будет птоза
-        ("surg", 53.88, 55.36, 33.00)]   # будем с вами делиться результатами
+        ("surg", 23.65, 31.95, 13.60),   # девушки с маленькой грудью… преимущество. …грудь не опустится
+        ("surg", 32.05, 35.72, 23.90),   # (pause for the schematic) то есть… не нужно будет делать никогда подтяжки
+        ("surg", 37.02, 43.82, 29.20),   # (pause) ваше страдание… окупаются с лихвой тем, что у вас не будет птоза
+        ("surg", 53.88, 55.36, 36.30)]   # будем с вами делиться результатами
 def src_of(t):
     best = None
     for s, si, so, t0 in SEGS:
@@ -23,8 +24,8 @@ def src_of(t):
         best = (so, t0 + so - si)
     return best[0] + t - best[1]
 
-BL = [("quote", 0, 1.6), ("qsurg", 1.6, 5.4), ("res", 5.4, 11.0), ("turn", 11.0, 13.6), ("main", 13.6, 20.0),
-      ("ill1", 20.0, 22.6), ("ill2", 22.6, 25.7), ("final", 25.7, 32.7), ("collage2", 32.7, DUR)]   # schematics illustrate the surgeon's words          # no 3/4 view anywhere
+BL = [("quote", 0, 1.6), ("qsurg", 1.6, 5.4), ("res", 5.4, 11.0), ("turn", 11.0, 13.6), ("main", 13.6, 19.4),
+      ("ill1", 19.4, 24.0), ("ill2", 24.0, 29.0), ("final", 29.0, 36.0), ("collage2", 36.0, DUR)]   # schematics illustrate the surgeon's words          # no 3/4 view anywhere
 XF = 0.35
 def block(t):
     for n, a, b in BL:
@@ -135,7 +136,7 @@ def subs2(fr, t, y):
     for t0, t1, w in SUB:
         if t0 <= t < t1:
             if w not in SW_:
-                f = mont(600, 50); asc, desc = f.getmetrics(); im = Image.new("RGBA", (int(f.getlength(w)) + 20, asc + desc + 10), (0, 0, 0, 0))
+                f = mont(300, 52); asc, desc = f.getmetrics(); im = Image.new("RGBA", (int(f.getlength(w)) + 20, asc + desc + 10), (0, 0, 0, 0))
                 ImageDraw.Draw(im).text((10, 5 + asc), w, font=f, fill=(255, 255, 255, 255), anchor="ls"); SW_[w] = to_np(im)
             im = SW_[w]; sc = 0.55 + 0.45 * back((t - t0) / 0.28)
             im2 = cv2.resize(im, (max(1, int(im.shape[1] * sc)), max(1, int(im.shape[0] * sc))))
@@ -168,9 +169,9 @@ def render_block(t, b=None):
         fr = mblur(side(SPO, 760, (1.18 + 0.04 * lt / 2.8) * trans(t, t0, 0.03)), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.15)   # profile, closer
         T4.draw(fr, 1000, t, t0 + 0.25, t1 - 0.3)
     elif n == "main":                                                   # close on the surgeon: the main thought
-        z = (1.5 - 0.12 * ease(lt / 8)) * punch(t, [17.55, 20.3])       # punch-ins on "преимущество" and "никогда"
+        z = (1.5 - 0.12 * ease(lt / 8)) * punch(t, [17.55])       # punch-ins on "преимущество" and "никогда"
         fr = mblur(vframe(src_of(t), z * trans(t, t0), 520, 560, 820), lt)
-        T5.draw(fr, 1000, t, 17.4, t1 - 0.35)
+        T5.draw(fr, 1000, t, 17.4, t1 - 0.3)
     elif n == "wide":                                                   # wide: surgeon and the patient, slow push to the chest
         fr = mblur(vframe(src_of(t), (1.0 + 0.12 * ease(lt / 4.1)) * trans(t, t0), 500, 1000, 960), lt)
     elif n == "ill1":                                                   # "никогда грудь не опустится": implant under the muscle
@@ -179,7 +180,7 @@ def render_block(t, b=None):
         fr = dark_bg(t); illus_ptosis(fr, t, t0)
     elif n == "final":                                                  # final look at the result
         fr = mblur(side(SPO, 702, (0.97 + 0.04 * lt / 7) * trans(t, t0, 0.03)), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.15)   # the favourable profile
-        T6.draw(fr, 1000, t, 26.3, t1 - 0.35)
+        T6.draw(fr, 1000, t, 29.5, t1 - 0.35)
     else:                                                               # the two collages
         z = 1.04 - 0.04 * ease(lt / 1.2)
         fr = mblur(warp(COLL2, z, 540, 1110, 540, 1110), lt); chip(fr, CH_DO, 40, 610, t, t0 + 0.5); chip(fr, CH_PO, 580, 610, t, t0 + 0.7)

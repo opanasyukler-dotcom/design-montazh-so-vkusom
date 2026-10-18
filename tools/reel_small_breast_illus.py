@@ -1,3 +1,4 @@
+SLOW = 1.5                                                               # schematics draw in slowly enough to be read
 # line-art schematics that illustrate what the surgeon says (drawn in, palette colours, no glow)
 def bez(p0, p1, p2, p3, n=60):
     t = np.linspace(0, 1, n)[:, None]; P = [np.float32(p) for p in (p0, p1, p2, p3)]
@@ -39,7 +40,7 @@ SKIN, MUS, IMP = (228, 210, 210), (184, 128, 146), (228, 196, 200)
 TI1 = Title([("ИМПЛАНТ ПОД МЫШЦЕЙ", "P")], 92); TI2 = Title([("ПОДТЯЖКА НЕ НУЖНА", "P")], 92)
 def illus_muscle(fr, t, t0):
     """profile: chest wall, implant under the muscle, the breast keeps its shape"""
-    P = lambda a, b: ease((t - t0 - a) / b)
+    P = lambda a, b: ease((t - t0 - a * SLOW) / (b * SLOW))
     wall = np.float32([[300, 430], [300, 1260]])
     skin = np.vstack([bez((300, 560), (520, 580), (730, 800), (720, 900)), bez((720, 900), (712, 1020), (520, 1080), (300, 1080))])
     imp = np.vstack([bez((305, 680), (420, 680), (610, 860), (600, 940)), bez((600, 940), (590, 1040), (420, 1050), (305, 1040)), [[305, 680]]])
@@ -52,7 +53,7 @@ def illus_muscle(fr, t, t0):
     arrow(fr, 850, 990, 800, P(1.8, 0.5), MUS, 7)
     label_at(fr, "мышца", 640, 690, P(1.6, 0.4)); stroke(fr, np.float32([[632, 690], [540, 700]]), P(1.6, 0.4), WHITE, 3)
     label_at(fr, "имплант", 640, 1080, P(1.2, 0.4)); stroke(fr, np.float32([[632, 1080], [520, 1010]]), P(1.2, 0.4), WHITE, 3)
-    label_at(fr, "форма держится", 880, 900, P(2.0, 0.4), PINK, 38)
+    label_at(fr, "форма держится", 850, 1170, P(2.0, 0.4), PINK, 38, "mm")
     TI1.draw(fr, 250, t, t0 + 0.1, 1e9)
 def profile(cx, y0, s, ptotic):
     w = cx - 120 * s
@@ -67,7 +68,7 @@ def profile(cx, y0, s, ptotic):
     return np.vstack([up, lo]), w, nip
 def illus_ptosis(fr, t, t0):
     """ptosis (nipple below the fold) vs no ptosis"""
-    P = lambda a, b: ease((t - t0 - a) / b)
+    P = lambda a, b: ease((t - t0 - a * SLOW) / (b * SLOW))
     for k, (cx, pt) in enumerate([(300, True), (800, False)]):
         sh, w, nip = profile(cx, 560, 1.0, pt); d = 0.25 + 0.5 * k
         stroke(fr, np.float32([[w, 470], [w, 1150]]), P(d, 0.4), SKIN, 5, 0.6)
@@ -78,11 +79,11 @@ def illus_ptosis(fr, t, t0):
     label_at(fr, "ПТОЗ", 260, 1200, P(1.5, 0.4), WHITE, 48, "mm")
     label_at(fr, "БЕЗ ПТОЗА", 760, 1200, P(1.7, 0.4), PINK, 48, "mm")
     stroke(fr, np.float32([[140, 1180], [180, 1220]]), P(1.9, 0.2), MUS, 7); stroke(fr, np.float32([[180, 1180], [140, 1220]]), P(2.0, 0.2), MUS, 7)   # small ✕ by ПТОЗ
-    stroke(fr, np.float32([[566, 1200], [588, 1222], [630, 1176]]), P(2.1, 0.3), PINK, 7)                                                    # small ✓ by БЕЗ ПТОЗА
+    stroke(fr, np.float32([[536, 1200], [558, 1222], [600, 1176]]), P(2.1, 0.3), PINK, 7)                                                    # small ✓ by БЕЗ ПТОЗА
     TI2.draw(fr, 250, t, t0 + 0.1, 1e9)
 def implant_icon(fr, t, t0, cx=930, cy=330, s=0.9):
     """anatomical (teardrop) implant, drawn in next to the 295 ml"""
-    P = lambda a, b: ease((t - t0 - a) / b)
+    P = lambda a, b: ease((t - t0 - a * SLOW) / (b * SLOW))
     sh = np.vstack([bez((cx, cy - 90 * s), (cx + 45 * s, cy - 90 * s), (cx + 80 * s, cy + 10 * s), (cx + 70 * s, cy + 60 * s)),
                     bez((cx + 70 * s, cy + 60 * s), (cx + 55 * s, cy + 100 * s), (cx - 55 * s, cy + 100 * s), (cx - 70 * s, cy + 60 * s)),
                     bez((cx - 70 * s, cy + 60 * s), (cx - 80 * s, cy + 10 * s), (cx - 45 * s, cy - 90 * s), (cx, cy - 90 * s))])

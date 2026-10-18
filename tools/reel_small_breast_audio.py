@@ -1,11 +1,11 @@
 import numpy as np, wave, librosa, cv2
-SR=48000; DUR=37.6                                    # no music: voice + sound effects only
+SR=48000; DUR=40.8                                    # no music: voice + sound effects only
 src=open("../v14/audio.py").read(); exec(src[src.index("rng=np.random"):src.index("n=int(DUR*SR)")])
 s2=open("../v15/audio.py").read()
 exec(s2[s2.index("def impact"):s2.index("n=int(DUR*SR)", s2.index("def impact"))])
 exec(s2[s2.index("def shutter"):s2.index("SH,BM,SM,DG=")])
 n=int(DUR*SR)
-SEGS=[("surg",12.48,17.45,0.30),("surg",0.00,5.14,5.60),("surg",23.65,35.72,13.60),("surg",37.02,43.82,25.90),("surg",53.88,55.36,33.00)]
+SEGS=[("surg",12.48,17.45,0.30),("surg",0.00,5.14,5.60),("surg",23.65,31.95,13.60),("surg",32.05,35.72,23.90),("surg",37.02,43.82,29.20),("surg",53.88,55.36,36.30)]
 x,_=librosa.load("a/surg_48.wav",sr=SR,mono=True); x=x/(np.sqrt(np.mean(x[np.abs(x)>1e-3]**2))+1e-6)
 vo=np.zeros(n)
 for s,si,so,t0 in SEGS:
@@ -19,7 +19,7 @@ def tick():                                           # short click for the coun
     k=np.arange(int(0.025*SR))/SR; return np.sin(2*np.pi*2400*k)*np.exp(-k*260)
 TK=tick()
 # sound effects kept few and soft: a light whoosh on the cuts and on the schematics, one soft pop where 295 lands
-for c in [1.6,5.4,11.0,13.6,20.0,22.6,25.7,32.7]: put(WB,c-0.3,0.11)
+for c in [1.6,5.4,11.0,13.6,19.4,24.0,29.0,36.0]: put(WB,c-0.3,0.11)
 put(SW,6.45,0.1); put(PP,9.45,0.12)
 M0=7.6                                                # the track's drop lands on the ДО -> ПОСЛЕ transition (6.4 s)
 y,_=librosa.load("mus.wav",sr=SR,mono=False,offset=M0,duration=DUR); mus=y.T[:n].copy(); mus/=np.abs(mus).max()
