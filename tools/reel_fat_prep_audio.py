@@ -18,7 +18,7 @@ tt=np.arange(n)/SR; act=np.zeros(n)
 for s,si,so,t0 in SEGS: act[int((t0-0.05)*SR):int((t0+so-si+0.05)*SR)]=1
 d=cv2.GaussianBlur(act.astype(np.float32).reshape(1,-1),(0,0),sigmaX=SR*0.12).ravel()
 fade=np.clip((DUR-0.3-tt)/4.5,0,1)**1.6
-mus*=((0.15-0.12*np.clip(d,0,1))*np.minimum(1,tt/0.3)*fade)[:,None]     # music stays soft in the background
+mus*=((0.30-0.19*np.clip(d,0,1))*np.minimum(1,tt/0.3)*fade)[:,None]     # louder music, still under the voice
 sfx=np.zeros(n+SR)
 def put(s,t,g): i=int(max(0,t)*SR); seg=sfx[i:i+len(s)]; seg+=s[:len(seg)]*g
 WB,PP,IM,RS=whoosh(),pop(),impact(),riser(); SH,BM,SM,DG=shutter(),boom(),shimmer(),ding(); SW=whoosh(0.28,800,9000,0.5)
