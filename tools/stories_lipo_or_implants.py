@@ -496,6 +496,30 @@ def s2():
            shade=vgrad(col.top - 260, col.top - 20, 0.0, 0.88))
 
 
-STORIES = {1: s1, 2: s2}
+def s3():
+    # drive/or_patient.jpg: the surgeon at the table; clinic stickers on both nipples (source px), photo as a framed card,
+    # question on top, empty navy band at the bottom for the poll sticker
+    ph = load_img("or_patient.jpg").convert("RGBA")
+    st = Image.open(os.path.join(ROOT, "collage_lipofiling_lift/sticker_anna_tvauri.png")).convert("RGBA")
+    for x, y in [(961, 1155), (1365, 1205)]:
+        d = 92; ph.alpha_composite(st.resize((d, d), Image.LANCZOS), (x - d // 2, y - d // 2))
+    ph = ph.convert("RGB").crop((0, 340, 1536, 1940))                 # from the cap down to the hand
+    bg = Image.new("RGB", (W, H), NAVY)
+    g = np.asarray(bg, np.float32) * vgrad(0, H, 1.0, 0.62)[..., 0][..., None]
+    bg = Image.fromarray(g.astype(np.uint8)).convert("RGBA")
+    col = Column(150, align="center")
+    col.head("КАК ДУМАЕТЕ, ГДЕ ГРУДЬ УВЕЛИЧЕНА СОБСТВЕННЫМ ЖИРОМ, А ГДЕ УСТАНОВЛЕНЫ ИМПЛАНТЫ?", 0, size=48, gap=0)
+    print("s3 title ends", col.y)
+    w = W - 2 * 40; h = int(ph.height * w / ph.width)
+    im = ph.resize((w, h), Image.LANCZOS)
+    m = Image.new("L", (w, h), 0); ImageDraw.Draw(m).rounded_rectangle((0, 0, w - 1, h - 1), 34, fill=255); im.putalpha(m)
+    card = Image.new("RGBA", (w + 8, h + 8), (0, 0, 0, 0))
+    ImageDraw.Draw(card).rounded_rectangle((0, 0, w + 7, h + 7), 38, fill=WHITE + (255,)); card.alpha_composite(im, (4, 4))
+    y = col.y + 40; bg.alpha_composite(card, (36, y))
+    print("s3 photo ends", y + card.height, "-> poll below")
+    render(3, "zhir_ili_implanty", 10.0, still_bg(bg.convert("RGB"), z1=1.0), col.items)
+
+
+STORIES = {1: s1, 2: s2, 3: s3}
 for k, fn in STORIES.items():
     if not ONLY or k in ONLY: fn()
