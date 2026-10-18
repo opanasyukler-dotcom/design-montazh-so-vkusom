@@ -16,20 +16,20 @@ sh = txt.filter(ImageFilter.GaussianBlur(6)).point(lambda v: int(v * 0.55))
 im = Image.composite(Image.new("RGB", (W, H), (0, 8, 25)), im, sh); im = Image.composite(Image.new("RGB", (W, H), (255, 255, 255)), im, txt)
 # caption card on the drape, arrows down to the breast where fat was added
 cap = ["Здесь, кстати, у нас уже", "добавлена жировая ткань", "в одну грудь"]
-fc = ImageFont.truetype(BOLD, 40); cw = int(max(fc.getlength(c) for c in cap)) + 56; chh = 52 * len(cap) + 36
+fc = ImageFont.truetype(SP + "fonts2/M300.ttf", 40); cw = int(max(fc.getlength(c) for c in cap)) + 56; chh = 52 * len(cap) + 36   # thin Montserrat
 cx0, cy0 = W - cw - 70, 690
 layer = Image.new("RGBA", (W, H), (0, 0, 0, 0)); dl = ImageDraw.Draw(layer)
 dl.rounded_rectangle((cx0, cy0, cx0 + cw, cy0 + chh), radius=28, fill=(255, 255, 255, 245))
 for i, c in enumerate(cap): dl.text((cx0 + 28, cy0 + 20 + i * 52), c, font=fc, fill=(16, 30, 60, 255))
 def bez(p0, p1, p2, n=40):
     t = np.linspace(0, 1, n)[:, None]; p0, p1, p2 = map(np.float32, (p0, p1, p2)); return (1 - t) ** 2 * p0 + 2 * (1 - t) * t * p1 + t ** 2 * p2
-def arrow(path, col=(255, 255, 255, 255), w=9):
+def arrow(path, col=(255, 255, 255, 255), w=5, hl=20, hw=11):
     dl.line([tuple(p) for p in path], fill=col, width=w, joint="curve")
     a, b = path[-4], path[-1]; v = (b - a) / np.linalg.norm(b - a); n = np.float32([-v[1], v[0]])
-    dl.polygon([tuple(b + v * 6), tuple(b - v * 34 + n * 20), tuple(b - v * 34 - n * 20)], fill=col)
-target = (1132, 1180)                                                                     # right breast (on the photo): fat already added
-arrow(bez((cx0 + cw - 150, cy0 + chh + 12), (cx0 + cw - 60, cy0 + chh + 140), (target[0] - 5, target[1] - 70)))
-arrow(bez((560, 448), (360, 500), (150, 452)), w=8)                       # under the headline: back to the previous story
+    dl.polygon([tuple(b + v * 4), tuple(b - v * hl + n * hw), tuple(b - v * hl - n * hw)], fill=col)
+target = (812, 1157)                                                                      # left breast (on the photo): fat already added
+arrow(bez((cx0 + 60, cy0 + chh + 14), (cx0 + 20, cy0 + chh + 70), (target[0] + 40, target[1] - 62)))      # small, neat
+arrow(np.float32([[440, 462], [300, 462], [200, 462], [150, 462]]), w=5, hl=22, hw=12)   # straight, under the headline: back to the previous story
 shadow = layer.filter(ImageFilter.GaussianBlur(8)); sa = np.asarray(shadow)[..., 3].astype(np.float32) * 0.35
 base = np.asarray(im).astype(np.float32); base *= 1 - sa[..., None] / 255
 im = Image.fromarray(base.astype(np.uint8)); im.paste(layer, (0, 0), layer)
