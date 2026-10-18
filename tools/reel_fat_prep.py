@@ -1,5 +1,5 @@
 _b = open("base.py").read()
-for a, b in [("DUR = 41.0", "DUR = 47.0"), ("ease((t - t0) / 0.3))\ndef mblur", "ease((t - t0) / 0.6))\ndef mblur"),
+for a, b in [("DUR = 41.0", "DUR = 40.4"), ("ease((t - t0) / 0.3))\ndef mblur", "ease((t - t0) / 0.6))\ndef mblur"),
              ("if lt > 0.1: return fr", "if lt > 0.18: return fr"), ("(1 - lt / 0.1)", "(1 - lt / 0.18)"),
              ("ti = t0 + k * 0.16; p = ease((t - ti) / 0.45)", "ti = t0 + k * 0.24; p = ease((t - ti) / 0.65)"),
              ("out = 1 - ease((t - t1) / 0.3) if t > t1 else 1.0", "out = 1 - ease((t - t1) / 0.4) if t > t1 else 1.0")]:
@@ -23,8 +23,7 @@ def src_of(t, name="surg"):
     return best[0] + t - best[1]
 
 BL = [("hook", 0, 3.4), ("out", 3.4, 6.75), ("ml", 6.75, 10.8), ("close", 10.8, 14.6), ("prep", 14.6, 21.5),
-      ("scheme", 21.5, 27.0), ("hands", 27.0, 30.0), ("equal", 30.0, 35.9), ("outro", 35.9, 40.4),
-      ("exA", 40.4, 43.7), ("exB", 43.7, DUR)]                           # examples: results of her patients
+      ("scheme", 21.5, 27.0), ("hands", 27.0, 30.0), ("equal", 30.0, 35.9), ("outro", 35.9, DUR)]
 XF = 0.35
 def block(t):
     for n, a, b in BL:
@@ -59,8 +58,16 @@ T1 = Pill([("ОБЪЁМ СЧИТАЕМ", "H"), ("В МИЛЛИЛИТРАХ", "P"
 T2 = SlideL([("ПОДГОТОВКА ЖИРА", "H"), ("ЗАВИСИТ", "P"), ("ОТ ЕГО СОСТОЯНИЯ", "H")], 84)
 T3 = Pop([("ОДИНАКОВЫЙ ОБЪЁМ", "H"), ("НЕ ВСЕГДА НУЖЕН", "P")], 92)
 EXA = load("ex/col_lift.jpg"); EXB = load("ex/col_lipo.jpg")
-TXA = Title([("ЛИПОФИЛИНГ + ПОДТЯЖКА ГРУДИ", "P"), ("результат моей пациентки", "S")], 78)
-TXB = Title([("ЛИПОФИЛИНГ ГРУДИ", "P"), ("результат моей пациентки", "S")], 88)
+TXA = Title([("ЛИПОФИЛИНГ + ПОДТЯЖКА ГРУДИ", "P"), ("результат моей пациентки", "S")], 70)
+TXB = Title([("ЛИПОФИЛИНГ ГРУДИ", "P"), ("результат моей пациентки", "S")], 80)
+EXAMPLES = [(11.0, 14.4, EXA, TXA), (27.1, 29.95, EXB, TXB)]           # shown over the speech, as examples
+def example_overlay(fr, t):
+    for a, b, img, tx in EXAMPLES:
+        if a <= t <= b + 0.35:
+            k = min(1, (t - a) / 0.35) * (1 - min(1, max(0, (t - b) / 0.35)))
+            bg = cv2.GaussianBlur(fr, (0, 0), 9) * 0.42; fr[:] = fr * (1 - k) + bg * k          # the video behind dims and softens
+            card(fr, img, t, a, 540, 850, 540, rot0=-4, frm=(0, 260), al=1 - min(1, max(0, (t - b) / 0.35)))
+            tx.draw(fr, 205, t, a + 0.25, b)
 T4 = Title([("ПРИ АСИММЕТРИИ ОБЪЁМ", "H"), ("МОЖЕТ БЫТЬ РАЗНЫМ", "P"), ("всё рассчитывается индивидуально", "S")], 92)
 STEPS = [("СБОР", 21.85), ("ПОДГОТОВКА", 23.0), ("ШПРИЦЫ", 24.3), ("ВВЕДЕНИЕ", 25.8)]
 STEP_IM = {txt: timg(txt, "H", 60) for txt, _ in STEPS}
@@ -122,7 +129,7 @@ def subs2(fr, t, y):
     for t0, t1, w in SUB:
         if t0 <= t < t1:
             if w not in SW_:
-                f = mont(600, 50); asc, desc = f.getmetrics(); im = Image.new("RGBA", (int(f.getlength(w)) + 20, asc + desc + 10), (0, 0, 0, 0))
+                f = mont(300, 52); asc, desc = f.getmetrics(); im = Image.new("RGBA", (int(f.getlength(w)) + 20, asc + desc + 10), (0, 0, 0, 0))
                 ImageDraw.Draw(im).text((10, 5 + asc), w, font=f, fill=(255, 255, 255, 255), anchor="ls"); SW_[w] = to_np(im)
             im = SW_[w]; sc = 0.55 + 0.45 * back((t - t0) / 0.28)
             im2 = cv2.resize(im, (max(1, int(im.shape[1] * sc)), max(1, int(im.shape[0] * sc))))
@@ -165,17 +172,12 @@ def render_block(t, b=None):
         f1 = ease((t - 30.4) / 1.4); asym = ease((t - 33.4) / 1.2)
         gauge(fr, 380, 1030, 1300, 0.68 * f1 - 0.12 * asym, GL, t, 30.3)
         gauge(fr, 700, 1030, 1300, 0.68 * f1 + 0.14 * asym, GR, t, 30.45)
-    elif n in ("exA", "exB"):                                           # patient result collage, title above it
-        img = EXA if n == "exA" else EXB; s = 1540 / img.shape[0] * (1.0 + 0.015 * lt / 3.3)
-        bg = img[5:40, 5:40].reshape(-1, 3).mean(0); y0 = 365
-        M = np.float32([[s, 0, 540 - s * img.shape[1] / 2], [0, s, y0 + 770 - s * img.shape[0] / 2]])
-        fr = cv2.warpAffine(img, M, (W, H), flags=cv2.INTER_AREA, borderValue=tuple(map(float, bg))).astype(np.float32) / 255
-        (TXA if n == "exA" else TXB).draw(fr, 205, t, t0 + 0.25, 1e9); sub_y = -999
     else:                                                               # outro: prepared fat, asymmetry note
         fr = broll(51.3 + lt * 0.85, 1.05 + 0.05 * lt / 4.5)
         T4.draw(fr, 1020, t, t0 + 0.3, 1e9)
-    if not LIGHT[0] and not n.startswith("ex"): fr = look(fr, t) * (1 - HAZE)
-    if not n.startswith("ex"): subs2(fr, t, sub_y)
+    if not LIGHT[0]: fr = look(fr, t) * (1 - HAZE)
+    example_overlay(fr, t)
+    subs2(fr, t, sub_y)
     DEFER[0] = False
     for args in PENDING: ablend(fr, *args)
     blend(fr, LOGO_D if LIGHT[0] else LOGO, 540 - LOGO.shape[1] / 2, 120, 0.9)

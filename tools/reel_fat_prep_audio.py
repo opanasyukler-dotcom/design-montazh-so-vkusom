@@ -1,5 +1,5 @@
 import numpy as np, wave, librosa, cv2
-SR=48000; DUR=47.0; M0=0.86
+SR=48000; DUR=40.4; M0=0.86
 src=open("../v14/audio.py").read(); exec(src[src.index("rng=np.random"):src.index("n=int(DUR*SR)")])
 s2=open("../v15/audio.py").read()
 exec(s2[s2.index("def impact"):s2.index("n=int(DUR*SR)", s2.index("def impact"))])
@@ -22,7 +22,7 @@ mus*=((0.15-0.12*np.clip(d,0,1))*np.minimum(1,tt/0.3)*fade)[:,None]     # music 
 sfx=np.zeros(n+SR)
 def put(s,t,g): i=int(max(0,t)*SR); seg=sfx[i:i+len(s)]; seg+=s[:len(seg)]*g
 WB,PP,IM,RS=whoosh(),pop(),impact(),riser(); SH,BM,SM,DG=shutter(),boom(),shimmer(),ding(); SW=whoosh(0.28,800,9000,0.5)
-for c in [3.4,6.75,10.8,14.6,21.5,27.0,30.0,35.9,40.4,43.7]: put(WB,c-0.3,0.2); put(BM,c,0.16)
+for c in [3.4,6.75,10.8,14.6,21.5,27.0,30.0,35.9]: put(WB,c-0.3,0.2); put(BM,c,0.16)
 put(SM,0.05,0.16); put(RS,3.55-0.9,0.12); put(SW,3.55,0.18)                      # focus pull, pull-back into the card
 for t in [11.1,27.0]: put(SH,t,0.18)                                             # punch-in "camera"
 for t,_ in [(21.85,0),(23.0,0),(24.3,0),(25.8,0)]: put(PP,t,0.22); put(DG,t+0.02,0.05)   # scheme steps
