@@ -23,8 +23,8 @@ def src_of(t):
         best = (so, t0 + so - si)
     return best[0] + t - best[1]
 
-BL = [("quote", 0, 1.6), ("qsurg", 1.6, 5.4), ("res", 5.4, 11.0), ("turn", 11.0, 13.6), ("main", 13.6, 21.6),
-      ("wide", 21.6, 25.7), ("final", 25.7, 32.7), ("collage2", 32.7, DUR)]          # no 3/4 view anywhere
+BL = [("quote", 0, 1.6), ("qsurg", 1.6, 5.4), ("res", 5.4, 11.0), ("turn", 11.0, 13.6), ("main", 13.6, 20.0),
+      ("ill1", 20.0, 22.6), ("ill2", 22.6, 25.7), ("final", 25.7, 32.7), ("collage2", 32.7, DUR)]   # schematics illustrate the surgeon's words          # no 3/4 view anywhere
 XF = 0.35
 def block(t):
     for n, a, b in BL:
@@ -55,7 +55,6 @@ def side(img, cx, z=1.0): return warp(img, 0.70 * z, cx, 1080, 540, 860)       #
 def morph(a_, b_, p, f=0.35):
     edge = (xx_ / W * 0.6 + yy_ / H * 0.4)[..., None]
     m = np.clip((p * (1 + f) - edge) / f, 0, 1); out = a_ * (1 - m) + b_ * m
-    if 0.01 < p < 0.99: g = np.exp(-((m - 0.5) / 0.18) ** 2) * 0.45; out = out * (1 - g) + np.float32([1.0, 0.95, 0.93]) * g   # glowing seam
     return out
 def sweep(fr, t, t0, dur=0.9, k=0.22):
     """a soft light band glides across the photo (draws the eye to the result)"""
@@ -68,6 +67,7 @@ def punch(t, hits, amp=0.16, dur=0.5):                                  # quick 
     for h in hits:
         if h <= t < h + dur: z += amp * (1 - ease((t - h) / dur))
     return z
+exec(open("illus.py").read())
 STRIKE = timg("ПОДТЯЖКА", "H", 130)
 def strike(fr, t, t0, ts, t1):
     """ПОДТЯЖКА pops in, then a powder line crosses it out"""
@@ -162,26 +162,27 @@ def render_block(t, b=None):
         fr = mblur(morph(side(SDO, 645, z), side(SPO, 702, z), p), lt)
         chip(fr, CH_DO, 60, 228, t, t0 + 0.1, 6.4); chip(fr, CH_PO, 60, 228, t, 7.4)
         T3.draw(fr, 1060, t, 7.6, t1 - 0.3)
-        counter(fr, t, 8.4, 9.45, 295, 1205)
+        counter(fr, t, 8.4, 9.45, 295, 1205); implant_icon(fr, t, 7.7)
         if t > 9.8: ablend(fr, T3s, 540 - T3s.shape[1] / 2, 1300, min(1, (t - 13.8) / 0.4) * (1 - ease((t - t1 + 0.3) / 0.35)), WHITE, BLUE)
     elif n == "turn":                                                   # beautiful after-shot + the turn of the story
         fr = mblur(side(SPO, 760, (1.18 + 0.04 * lt / 2.8) * trans(t, t0, 0.03)), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.15)   # profile, closer
-        fr = sweep(fr, t, t0 + 0.3); T4.draw(fr, 1000, t, t0 + 0.25, t1 - 0.3); flash = 0.25 * max(0, 1 - lt / 0.25)
+        T4.draw(fr, 1000, t, t0 + 0.25, t1 - 0.3)
     elif n == "main":                                                   # close on the surgeon: the main thought
         z = (1.5 - 0.12 * ease(lt / 8)) * punch(t, [17.55, 20.3])       # punch-ins on "преимущество" and "никогда"
         fr = mblur(vframe(src_of(t), z * trans(t, t0), 520, 560, 820), lt)
-        if 17.55 <= t < 17.75: flash = 0.18 * (1 - (t - 17.55) / 0.2)
         T5.draw(fr, 1000, t, 17.4, t1 - 0.35)
     elif n == "wide":                                                   # wide: surgeon and the patient, slow push to the chest
-        fr = mblur(vframe(src_of(t), (1.0 + 0.12 * ease(lt / 4.1)) * trans(t, t0) * punch(t, [24.15], 0.1), 500, 1000, 960), lt)
-        strike(fr, t, 24.0, 24.55, t1 - 0.2)                            # "никогда подтяжки": the word gets crossed out
+        fr = mblur(vframe(src_of(t), (1.0 + 0.12 * ease(lt / 4.1)) * trans(t, t0), 500, 1000, 960), lt)
+    elif n == "ill1":                                                   # "никогда грудь не опустится": implant under the muscle
+        fr = dark_bg(t); illus_muscle(fr, t, t0)
+    elif n == "ill2":                                                   # "не нужно будет делать подтяжки": ptosis vs no ptosis
+        fr = dark_bg(t); illus_ptosis(fr, t, t0)
     elif n == "final":                                                  # final look at the result
         fr = mblur(side(SPO, 702, (0.97 + 0.04 * lt / 7) * trans(t, t0, 0.03)), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.15)   # the favourable profile
-        fr = sweep(fr, t, t0 + 0.2); fr = sweep(fr, t, 30.4)
         T6.draw(fr, 1000, t, 26.3, t1 - 0.35)
     else:                                                               # the two collages
         z = 1.04 - 0.04 * ease(lt / 1.2)
-        fr = sweep(mblur(warp(COLL2, z, 540, 1110, 540, 1110), lt), t, t0 + 1.4, 1.1, 0.18); chip(fr, CH_DO, 40, 610, t, t0 + 0.5); chip(fr, CH_PO, 580, 610, t, t0 + 0.7)
+        fr = mblur(warp(COLL2, z, 540, 1110, 540, 1110), lt); chip(fr, CH_DO, 40, 610, t, t0 + 0.5); chip(fr, CH_PO, 580, 610, t, t0 + 0.7)
         if t > t0 + 1.0: ablend(fr, T7, 540 - T7.shape[1] / 2, 370, min(1, (t - t0 - 1.0) / 0.5), WHITE, BLUE)
     if not LIGHT[0] and not n.startswith("collage"): fr = look(fr, t) * (1 - HAZE)
     if not n.startswith("collage"): subs2(fr, t, sub_y)
