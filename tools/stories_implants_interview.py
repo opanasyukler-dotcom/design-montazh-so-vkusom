@@ -624,60 +624,12 @@ def interview(num, slug, clip, header, extra=None, y=None, bottom=1720, align="l
 
 
 # ---------------- stories ----------------
-def s1():
-    # «наше до» in a big circle (the whole torso, shoulders to knees), bottom right; big header above it; poll bottom left
-    D = 560; cx0 = W - 40 - D - 12; cy0 = 1180
-    # the original backdrop, full-width square (no padding, so no frame edges inside the circle), shoulders to thighs
-    circ = VideoCircle("IMG_6358.MOV", 0.0, 14.8, (2160, 2160, 0, 560), D, cx0, cy0)
-    lab = small_label("наше до", 32); lab_sp = Sprite(lab, cx0 + (D + 12 - lab.width) // 2, cy0 + D + 4, 0, dy=0)
-    col = Column(0, align="left")
-    col.head("ТЕЛО ПОСЛЕ РОДОВ,", 0, size=74, gap=0).head("КАКОЕ ОНО?", 0, size=74, gap=0)
-    col.to_bottom(1150)
-    d = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
-                              os.path.join(SRC, "drive", "int1.mp4")], capture_output=True, text=True).stdout)
-    c = Clip("int1.mp4", 0.0, d, zoom=(1.0, 1.03), zc=(0.5, 0.3))
-    print("s1 header", col.items[0].y)
-    render(1, "telo_posle_rodov", d, clip_bg(c), col.items + [circ, lab_sp], shade=black_fade(col.items[0].y + 40, 360, 0.8),
-           subs=WordSubs("int1.mp4", y=870), audio=("int1.mp4", 0.0, d))
-    # poll «У кого такие же изменения, как и у моей пациентки?» — «Моя история.. / Частично про меня»: x 40..470, y ~1220..1700
-
-
 def before_cards():
     """«наше до»: front and profile, same size, side by side"""
     w, h = 490, 653
     front = load_img("IMG_6325.heic").crop((158, 230, 158 + 1700, 230 + 2267)).resize((w, h), Image.LANCZOS)
     prof = load_img("IMG_6340.heic").crop((259, 270, 259 + 1700, 270 + 2267)).resize((w, h), Image.LANCZOS)
     return card(front, w, h), card(prof, w, h)
-
-
-def s2():
-    front, prof = before_cards()
-    y = 1170; fx = 40
-    lay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    lay.alpha_composite(front, (fx, y)); lay.alpha_composite(prof, (W - 40 - prof.width, y))
-    sc = 490 / 1700
-    def P(sx, sy): return (fx + 4 + (sx - 158) * sc, y + 4 + (sy - 230) * sc)
-    for text, (cx, cy), tgt in [("пустой верхний полюс", (290, y + 118), P(1380, 870)),
-                                ("опущение груди", (175, y + 372), P(690, 1262)),
-                                ("потеря объёма", (425, y + 335), P(1545, 1090))]:
-        arrow_from(lay, pill(lay, text, cx, cy, size=22), tgt, width=3, head=11)
-    label_lines(lay, ["наше до"], W // 2, y - 14, size=30, wght=400, anchor="ms")
-    items = [Sprite(lay.crop(lay.getbbox()), *lay.getbbox()[:2], 0, dy=0)]
-    def extra(col):
-        col.body("Должен внутри случиться импульс «я готова»", 0, size=36, wght=500, gap=0)
-    interview(2, "dolgo_reshaetes", "int2.mp4", "КОГДА ВЫ ДОЛГО РЕШАЕТЕСЬ НА ОПЕРАЦИЮ, ЭТО НОРМАЛЬНО", extra,
-              bottom=1110, align="center", sub_y=790, more=items, head_size=48)
-
-
-def s3():
-    interview(3, "strashno", "int3.mp4", "И КОГДА СТРАШНО, ЭТО ТОЖЕ НОРМАЛЬНО",
-              lambda col: col.body("Но я рядом с вами", 0, size=40, wght=500, gap=0), bottom=1700, align="right", width=640)
-
-
-def s4():
-    interview(4, "delyatsya_istoriey", "int4.mp4",
-              "МОИ ПАЦИЕНТКИ ДЕЛЯТСЯ С ВАМИ СВОЕЙ ИСТОРИЕЙ, ЧТОБЫ ПОМОЧЬ ВАМ ПРИНЯТЬ РЕШЕНИЕ",
-              lambda col: col.body("Обязательно включайте звук", 0, size=38, wght=600, gap=0), bottom=1700, align="center")
 
 
 # front photos aligned on the nipple stickers: before (683,1129)-(1476,1083), after (531,838)-(1079,819)
@@ -689,21 +641,6 @@ def front_frame(key, ym=560):
     im = load_img(n); im = im.resize((int(im.width * s), int(im.height * s)), Image.LANCZOS)
     ox, oy = int(540 - mx * s), int(ym - my * s)
     fr = Image.new("RGB", (W, H), (10, 10, 12)); fr.paste(im, (ox, oy)); return np.asarray(fr)
-
-
-def s5():
-    b, a = front_frame("before").astype(np.float32), front_frame("after").astype(np.float32)
-    T1, T2, T3 = 2.0, 3.2, 6.0
-    def bg(i, t):
-        k = min(max((t - T1) / (T2 - T1), 0), 1); k = k * k * (3 - 2 * k)
-        fr = b * (1 - k) + a * k
-        z = 1.0 + 0.03 * t / T3
-        M = cv2.getRotationMatrix2D((W / 2, H * 0.35), 0, z)
-        return cv2.warpAffine(fr.astype(np.uint8), M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
-    col = Column(0, align="center")
-    col.head("УВЕЛИЧЕНИЕ ГРУДИ ИМПЛАНТАМИ", 0, size=50, gap=0)
-    col.to_bottom(1720)
-    render(5, "do_posle_perehod", T3, bg, col.items + [ChipSwap(2.6)], shade=black_fade(col.items[0].y + 30, 300, 0.7))
 
 
 class ChipSwap:
@@ -723,38 +660,6 @@ def cutout(name):
     """photo with the background removed (rembg isnet masks in cut/), on pure black"""
     im = load_img(name); m = Image.open(os.path.join(SRC, "cut", name.split(".")[0] + "_mask.png")).convert("L")
     bg = Image.new("RGB", im.size, (0, 0, 0)); bg.paste(im, (0, 0), m); return bg
-
-
-def s6():
-    # after (front), background removed, the body over the whole story; small white arrows + what was done
-    s = 0.75; ox, oy = int(540 - 770 * s), int(30 - 230 * s)          # body centred
-    im = cutout("IMG_1588.JPG"); im = im.resize((int(im.width * s), int(im.height * s)), Image.LANCZOS)
-    bg = Image.new("RGB", (W, H), (0, 0, 0)); bg.paste(im, (ox, oy))
-    a = np.asarray(bg, np.float32); k = np.clip((np.arange(H, dtype=np.float32) - 30) / 40, 0, 1)[:, None, None]
-    bg = Image.fromarray((a * k).astype(np.uint8)).convert("RGBA")          # clean straight cut under the chin
-    def P(x, y): return (x * s + ox, y * s + oy)
-    for text, (cx, cy), tgt in [("наполненный верхний полюс", (380, 268), P(560, 640)),
-                                ("увеличенный объём", (860, 585), P(1150, 860)),
-                                ("округлая форма", (380, 675), P(590, 985))]:
-        arrow_from(bg, pill(bg, text, cx, cy, size=24), tgt, width=3, head=11)
-    col = Column(0, align="center")
-    col.head("РЕЗУЛЬТАТ: 4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ", 0, size=46, gap=10)
-    col.body("увеличение груди имплантами", 0, size=34, wght=400, gap=0)
-    col.to_bottom(1730)
-    render(6, "rezultat_anfas", 10.0, still_bg(bg.convert("RGB"), z1=1.0), col.items, shade=black_fade(col.items[0].y + 30, 300, 0.75))
-
-
-def s7():
-    interview(7, "krasivyj_rezultat", "int6.mp4", "ВЕСЬ ЭТОТ ПУТЬ ПРИВЁЛ К КРАСИВОМУ РЕЗУЛЬТАТУ",
-              lambda col: col.body("Выполнено увеличение груди имплантами", 0, size=36, wght=500, gap=0), bottom=1700, align="left")
-
-
-def s8():
-    def extra(col):
-        col.body("Он подтянет тело. Но не наполнит грудь, потерявшую объём после ГВ.", 0, size=34, wght=400, gap=8)
-        col.body("Это анатомия.", 0, size=36, wght=600, gap=0)
-    interview(8, "sport_ne_vernet", "int7.mp4", "СПОРТ НЕ ВЕРНЁТ ФОРМУ ГРУДИ ПОСЛЕ РОДОВ", extra, bottom=1700, align="right",
-              width=760, sub_y=1000)
 
 
 # collages: after on top, before below, each cut from the neck (under the chin) to the fingertips, same body height
@@ -809,29 +714,260 @@ def collage(num, key, caption):
         cap = bebas_txt(caption, 54); bg.alpha_composite(cap, ((W - cap.width) // 2, cy - cap.height // 2))
         d.line((MARGIN, cy, (W - cap.width) // 2 - 24, cy), fill=WHITE + (160,), width=2)
         d.line(((W + cap.width) // 2 + 24, cy, W - MARGIN, cy), fill=WHITE + (160,), width=2)
-    render(num, f"kollazh_{key}", 10.0, still_bg(bg.convert("RGB"), z1=1.0), [])
+    f = mont(22, 400); ImageDraw.Draw(bg).text((W / 2, H - 22), "@dr.tvaurianna", font=f, fill=(150, 150, 150, 255), anchor="mm")
+    render(num, f"kollazh_{key}", 10.0, still_bg(bg.convert("RGB"), z1=1.0), [chrome(num)])
 
 
-def s9(): collage(9, "anfas", "4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ")
-def s10(): collage(10, "tri_chetverti", "4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ")
-def s11(): collage(11, "profil", "4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ")
+
+# ================= series style (references: light panels, pills, series navigation, dashed connectors, cards) =================
+LIGHT = (243, 242, 240)          # neutral light panel
+INK = NAVY                        # text on light panels: the surgeon's navy
+GREY = (110, 118, 136)
+HANDLE = "@dr.tvaurianna"
+TAG = "увеличение груди"
+TOTAL = 13
+
+
+def wrap_px(text, f, width):
+    out, line = [], ""
+    for w in text.split(" "):
+        t = (line + " " + w).strip()
+        if f.getlength(t) <= width or not line: line = t
+        else: out.append(line); line = w
+    return out + [line]
+
+
+def chrome(num, dark=True):
+    """series navigation: progress dots top left, topic tag pill top right"""
+    im = Image.new("RGBA", (W, 90), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    c = WHITE if dark else INK
+    for i in range(TOTAL):
+        x = MARGIN + i * 22
+        if i + 1 == num: d.ellipse((x - 7, 38, x + 7, 52), fill=c + (255,))
+        else: d.ellipse((x - 5, 40, x + 5, 50), outline=c + (200,), width=2)
+    f = mont(24, 500); tw = f.getlength(TAG); x1 = W - MARGIN; x0 = x1 - tw - 36
+    d.rounded_rectangle((x0, 26, x1, 64), 19, outline=c + (220,), width=2)
+    d.text(((x0 + x1) / 2, 45), TAG, font=f, fill=c + (255,), anchor="mm")
+    return Sprite(im, 0, 140, 0, dy=0)
+
+
+class Panel:
+    """light card from y0 to the bottom, rounded top corners; text is laid out inside in navy"""
+    def __init__(self, y0, r=56, color=LIGHT, alpha=255, handle=True):
+        self.y0 = y0; self.im = Image.new("RGBA", (W, H - y0), (0, 0, 0, 0)); self.d = ImageDraw.Draw(self.im)
+        self.d.rounded_rectangle((0, 0, W - 1, H - y0 + r), r, fill=color + (alpha,))
+        self.y = 56; self.x = MARGIN
+        if handle:
+            f = mont(22, 400); self.d.text((W / 2, H - y0 - 46), HANDLE, font=f, fill=GREY + (255,), anchor="mm")
+
+    def head(self, text, size=50, gap=16, width=W - 2 * MARGIN, color=INK, align="left"):
+        f = bold(size); lines = wrap_px(text, f, width)
+        for ln in lines:
+            x = self.x if align == "left" else (W - f.getlength(ln)) / 2
+            self.d.text((x, self.y), ln, font=f, fill=color + (255,)); self.y += int(size * 1.12)
+        self.y += gap; return self
+
+    def body(self, text, size=32, wght=400, gap=14, width=W - 2 * MARGIN, color=GREY, align="left"):
+        f = mont(size, wght); lines = wrap_px(text, f, width)
+        for ln in lines:
+            x = self.x if align == "left" else (W - f.getlength(ln)) / 2
+            self.d.text((x, self.y), ln, font=f, fill=color + (255,)); self.y += int(size * 1.35)
+        self.y += gap; return self
+
+    def rule(self, length=110, gap=22):
+        self.d.line((self.x, self.y, self.x + length, self.y), fill=INK + (255,), width=3); self.y += gap; return self
+
+    def sprite(self): return Sprite(self.im, 0, self.y0, 0, dy=0)
+
+
+def pill_img(text, size=30, fill=NAVY, color=WHITE, wght=500, pad=34, outline=None, icon=None):
+    f = mont(size, wght); tw = f.getlength(text); h = int(size * 2.0); iw = (h - 18 + 12) if icon else 0
+    im = Image.new("RGBA", (int(tw + 2 * pad + iw), h), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    if fill: d.rounded_rectangle((0, 0, im.width - 1, h - 1), h // 2, fill=fill + (255,))
+    if outline: d.rounded_rectangle((1, 1, im.width - 2, h - 2), h // 2, outline=outline + (255,), width=2)
+    if icon: icon(d, pad, 9, h - 18, color)
+    d.text((pad + iw + tw / 2, h / 2 + 1), text, font=f, fill=color + (255,), anchor="mm"); return im
+
+
+def sound_icon(d, x, y, s, c):
+    """thin speaker with two waves"""
+    d.polygon([(x, y + s * .35), (x + s * .25, y + s * .35), (x + s * .5, y + s * .12), (x + s * .5, y + s * .88),
+               (x + s * .25, y + s * .65), (x, y + s * .65)], fill=c + (255,))
+    for r in (0.22, 0.4):
+        d.arc((x + s * .5 - s * r, y + s * .5 - s * r * 1.6, x + s * .5 + s * r * 1.4, y + s * .5 + s * r * 1.6), -55, 55, fill=c + (255,), width=3)
+
+
+def swipe_cue():
+    """thin outline pill with an arrow (keep watching)"""
+    im = Image.new("RGBA", (150, 44), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    d.rounded_rectangle((1, 1, 148, 42), 21, outline=INK + (255,), width=2)
+    d.line((34, 22, 112, 22), fill=INK + (255,), width=2); d.line((104, 15, 113, 22), fill=INK + (255,), width=2)
+    d.line((104, 29, 113, 22), fill=INK + (255,), width=2); return im
+
+
+def dashed_curve(im, p0, p1, bend=0.25, col=WHITE, width=3, dash=12, head=12):
+    """thin dashed curved connector with a small arrow head (dark cinematic stories)"""
+    (x0, y0), (x1, y1) = p0, p1; mx, my = (x0 + x1) / 2, (y0 + y1) / 2; dx, dy = x1 - x0, y1 - y0
+    cx, cy = mx - dy * bend, my + dx * bend
+    pts = [((1 - u) ** 2 * x0 + 2 * (1 - u) * u * cx + u * u * x1, (1 - u) ** 2 * y0 + 2 * (1 - u) * u * cy + u * u * y1)
+           for u in np.linspace(0, 1, 200)]
+    d = ImageDraw.Draw(im); acc, on = 0.0, True
+    for a, b in zip(pts, pts[1:]):
+        seg = np.hypot(b[0] - a[0], b[1] - a[1]); acc += seg
+        if acc > dash: acc = 0; on = not on
+        if on: d.line((a, b), fill=col + (230,), width=width)
+    ang = np.arctan2(y1 - pts[-8][1], x1 - pts[-8][0])
+    for s_ in (-0.5, 0.5):
+        d.line(((x1, y1), (x1 - head * np.cos(ang + s_), y1 - head * np.sin(ang + s_))), fill=col + (255,), width=width)
+
+
+def white_card(text, size=36, width=640, wght=600, color=INK, font=None, align="center", pad=(40, 30)):
+    f = font or mont(size, wght); lines = wrap_px(text, f, width - 2 * pad[0])
+    lh = int(f.size * 1.3); h = lh * len(lines) + 2 * pad[1]
+    im = Image.new("RGBA", (width, h), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    d.rounded_rectangle((0, 0, width - 1, h - 1), 26, fill=WHITE + (245,))
+    for i, ln in enumerate(lines):
+        x = width / 2 if align == "center" else pad[0]
+        d.text((x, pad[1] + i * lh + lh / 2), ln, font=f, fill=color + (255,), anchor="mm" if align == "center" else "lm")
+    return im
+
+
+def iv(num, slug, clip, items, sub_y, shade=None, dark_chrome=True):
+    d = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
+                              os.path.join(SRC, "drive", clip)], capture_output=True, text=True).stdout)
+    c = Clip(clip, 0.0, d, zoom=(1.0, 1.03), zc=(0.5, 0.3))
+    render(num, slug, d, clip_bg(c), [chrome(num, dark_chrome)] + items, shade=shade,
+           subs=WordSubs(clip, y=sub_y), audio=(clip, 0.0, d))
+
+
+# ---------------- stories ----------------
+def s1():
+    # video on top, light panel below; «наше до» circle sits on the panel edge; poll goes in the panel (left/bottom)
+    py = 1240; pn = Panel(py)
+    pn.y = 60; pn.head("ТЕЛО ПОСЛЕ", 58, gap=0, width=430).head("РОДОВ,", 58, gap=0, width=430).head("КАКОЕ ОНО?", 58, gap=0, width=430)
+    D = 470; cx0 = W - 50 - D - 12; cy0 = py - 250
+    circ = VideoCircle("IMG_6358.MOV", 0.0, 14.8, (2160, 2160, 0, 560), D, cx0, cy0)
+    f = mont(26, 500); pn.d.text((cx0 + (D + 12) / 2, cy0 + D + 12 - py + 34), "наше до", font=f, fill=GREY + (255,), anchor="mm")
+    iv(1, "telo_posle_rodov", "int1.mp4", [pn.sprite(), circ], sub_y=880)
+    # poll «У кого такие же изменения, как и у моей пациентки?» — «Моя история.. / Частично про меня»: panel, y ~1500..1820
+
+
+def s2():
+    py = 1010; pn = Panel(py)
+    pn.y = 44; pn.head("КОГДА ВЫ ДОЛГО РЕШАЕТЕСЬ НА ОПЕРАЦИЮ, ЭТО НОРМАЛЬНО", 42, gap=8)
+    pn.body("Должен внутри случиться импульс «я готова»", 30, 500, gap=0, color=INK)
+    w, h = 440, 587; y = py + pn.y + 46; fx = MARGIN - 4
+    front = load_img("IMG_6325.heic").crop((158, 230, 1858, 2497)).resize((w, h), Image.LANCZOS)
+    prof = load_img("IMG_6340.heic").crop((259, 270, 1959, 2537)).resize((w, h), Image.LANCZOS)
+    lay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    lay.alpha_composite(card(front, w, h, border=0), (fx, y)); lay.alpha_composite(card(prof, w, h, border=0), (W - fx - w, y))
+    sc = w / 1700
+    def P(sx, sy): return (fx + (sx - 158) * sc, y + (sy - 230) * sc)
+    for text, (cx, cy), tgt in [("пустой верхний полюс", (fx + 230, y + 104), P(1380, 870)),
+                                ("опущение груди", (fx + 120, y + 345), P(690, 1262)),
+                                ("потеря объёма", (fx + 335, y + 312), P(1545, 1090))]:
+        arrow_from(lay, pill(lay, text, cx, cy, size=20), tgt, width=3, head=10)
+    f = mont(24, 500); ImageDraw.Draw(lay).text((W / 2, y - 22), "наше до", font=f, fill=GREY + (255,), anchor="mm")
+    iv(2, "dolgo_reshaetes", "int2.mp4", [pn.sprite(), Sprite(lay, 0, 0, 0, dy=0)], sub_y=870)
+
+
+def s3():
+    # dark cinematic: white caps header, dashed connector, the key line on a white card
+    lay = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(lay)
+    f = bold(56); y = 1270
+    for ln in ["И КОГДА СТРАШНО,", "ЭТО ТОЖЕ НОРМАЛЬНО"]:
+        d.text((MARGIN, y), ln, font=f, fill=WHITE + (255,)); y += 64
+    cardi = white_card("Но я рядом с вами", 38, 520)
+    lay.alpha_composite(cardi, (W - MARGIN - cardi.width, 1560))
+    dashed_curve(lay, (MARGIN + 60, y + 24), (W - MARGIN - cardi.width - 20, 1560 + cardi.height // 2), bend=-0.3)
+    iv(3, "strashno", "int3.mp4", [Sprite(lay, 0, 0, 0, dy=0)], sub_y=1000, shade=black_fade(1250, 380, 0.82))
+
+
+def s4():
+    py = 1360; pn = Panel(py)
+    pn.y = 52; pn.head("МОИ ПАЦИЕНТКИ ДЕЛЯТСЯ С ВАМИ СВОЕЙ ИСТОРИЕЙ, ЧТОБЫ ПОМОЧЬ ВАМ ПРИНЯТЬ РЕШЕНИЕ", 40, gap=26)
+    pl = pill_img("обязательно включайте звук", 28, icon=sound_icon); pn.im.alpha_composite(pl, (MARGIN, pn.y))
+    iv(4, "delyatsya_istoriey", "int4.mp4", [pn.sprite()], sub_y=1010)
+
+
+def s5():
+    b, a = front_frame("before").astype(np.float32), front_frame("after").astype(np.float32)
+    T1, T2, T3 = 2.0, 3.2, 6.0
+    def bg(i, t):
+        k = min(max((t - T1) / (T2 - T1), 0), 1); k = k * k * (3 - 2 * k)
+        fr = b * (1 - k) + a * k
+        z = 1.0 + 0.03 * t / T3
+        M = cv2.getRotationMatrix2D((W / 2, H * 0.35), 0, z)
+        return cv2.warpAffine(fr.astype(np.uint8), M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+    pl = pill_img("увеличение груди имплантами", 32, fill=WHITE, color=INK, wght=600)
+    render(5, "do_posle_perehod", T3, bg, [chrome(5), Sprite(pl, (W - pl.width) // 2, 1660, 0, dy=0), ChipSwap(2.6)])
+
+
+def s6():
+    s = 0.75; ox, oy = int(540 - 770 * s), int(30 - 230 * s)
+    im = cutout("IMG_1588.JPG"); im = im.resize((int(im.width * s), int(im.height * s)), Image.LANCZOS)
+    bg = Image.new("RGB", (W, H), (0, 0, 0)); bg.paste(im, (ox, oy))
+    a = np.asarray(bg, np.float32); k = np.clip((np.arange(H, dtype=np.float32) - 30) / 40, 0, 1)[:, None, None]
+    bg = Image.fromarray((a * k).astype(np.uint8)).convert("RGBA")
+    def P(x, y): return (x * s + ox, y * s + oy)
+    for text, (cx, cy), tgt in [("наполненный верхний полюс", (380, 268), P(560, 640)),
+                                ("увеличенный объём", (860, 585), P(1150, 860)),
+                                ("округлая форма", (380, 675), P(590, 985))]:
+        arrow_from(bg, pill(bg, text, cx, cy, size=24), tgt, width=3, head=11)
+    pn = Panel(1500); pn.y = 60
+    pn.head("РЕЗУЛЬТАТ: 4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ", 44, gap=8).body("увеличение груди имплантами", 30, 500, color=INK)
+    render(6, "rezultat_anfas", 10.0, still_bg(bg.convert("RGB"), z1=1.0), [chrome(6), pn.sprite()])
+
+
+def s7():
+    py = 1430; pn = Panel(py)
+    pn.y = 56; pn.head("ВЕСЬ ЭТОТ ПУТЬ ПРИВЁЛ К КРАСИВОМУ РЕЗУЛЬТАТУ", 44, gap=10).body("выполнено увеличение груди имплантами", 30, 500, color=INK, gap=20)
+    pn.im.alpha_composite(swipe_cue(), (W - MARGIN - 150, pn.y))
+    iv(7, "krasivyj_rezultat", "int6.mp4", [pn.sprite()], sub_y=1040)
+
+
+def s8():
+    # dark: header, two calm lines, dashed connector to the conclusion on a white card
+    lay = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(lay)
+    f = bold(54); y = 1150
+    for ln in wrap_px("СПОРТ НЕ ВЕРНЁТ ФОРМУ ГРУДИ ПОСЛЕ РОДОВ", f, W - 2 * MARGIN):
+        d.text((MARGIN, y), ln, font=f, fill=WHITE + (255,)); y += 62
+    fb = mont(32, 400); y += 18
+    for ln in wrap_px("Он подтянет тело. Но не наполнит грудь, потерявшую объём после ГВ.", fb, 620):
+        d.text((MARGIN, y), ln, font=fb, fill=WHITE + (235,)); y += 44
+    cardi = white_card("Это анатомия.", 38, 420); cy = y + 70
+    lay.alpha_composite(cardi, (W - MARGIN - cardi.width, cy))
+    dashed_curve(lay, (MARGIN + 40, y + 16), (W - MARGIN - cardi.width - 18, cy + cardi.height // 2), bend=-0.25)
+    iv(8, "sport_ne_vernet", "int7.mp4", [Sprite(lay, 0, 0, 0, dy=0)], sub_y=960, shade=black_fade(1130, 380, 0.82))
+
+
+def collage_s(num, key):
+    collage(num, key, "4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ")
+
+
+def s9(): collage_s(9, "anfas")
+def s10(): collage_s(10, "tri_chetverti")
+def s11(): collage_s(11, "profil")
 
 
 def s12():
-    interview(12, "pereborot_strah", "int11.mp4", "«НАДО ПЕРЕБОРОТЬ СВОЙ СТРАХ И ПОТОМ ТОЧНО НЕ ПОЖАЛЕЕТЕ»", bottom=1330, align="center", sub_y=1440)
+    # the key quote on a white card (navy Inter Bold)
+    q = white_card("«НАДО ПЕРЕБОРОТЬ СВОЙ СТРАХ И ПОТОМ ТОЧНО НЕ ПОЖАЛЕЕТЕ»", font=bold(44), width=W - 2 * 60, pad=(48, 40))
+    f = mont(24, 400); lay = Image.new("RGBA", (W, H), (0, 0, 0, 0)); y = 1300
+    lay.alpha_composite(q, (60, y))
+    ImageDraw.Draw(lay).text((W / 2, y + q.height + 36), "— пациентка, 4,5 месяца после операции", font=f, fill=WHITE + (255,), anchor="mm")
+    iv(12, "pereborot_strah", "int11.mp4", [Sprite(lay, 0, 0, 0, dy=0)], sub_y=1150, shade=black_fade(1290, 300, 0.6))
 
 
 def s13():
-    # the surgeon's markup; the patient's chin is cut off (ct), the text sits low on the right over the surgeon's back,
-    # never over a face; the poll goes under it
-    c = Clip("IMG_6362.MOV", 0.0, 12.0, ct=0.05, zoom=(1.0, 1.02), zc=(0.5, 0.6))
-    col = Column(1000, align="left", width=700)
-    col.head("ПОДЕЛИТЕСЬ, ЧТО ВАС СЕЙЧАС ОСТАНАВЛИВАЕТ?", 0, size=56, gap=14)
-    col.body("Почему не решаетесь, если тоже столкнулись с изменениями в теле?", 0, size=38, wght=400, gap=0)
-    for it in col.items: it.x += W - 2 * MARGIN - 700
-    print("s13 text", col.items[0].y)
-    # quiz/poll under the text (~1400..1780, right): Страх наркоза/боли · Не понимаю что мне подойдёт · Восстановление с детьми · Пока просто присматриваюсь
-    render(13, "chto_ostanavlivaet", 12.0, clip_bg(c), col.items, shade=black_fade(col.items[0].y + 30, 300, 0.7))
+    # surgeon's markup on top (her face free), light panel with the question; the poll goes inside the panel
+    c = Clip("IMG_6362.MOV", 0.0, 12.0, ct=0.05, zoom=(1.0, 1.02), zc=(0.5, 0.4))
+    py = 1180; pn = Panel(py)
+    pn.y = 54; pn.head("ПОДЕЛИТЕСЬ, ЧТО ВАС СЕЙЧАС ОСТАНАВЛИВАЕТ?", 46, gap=10)
+    pn.body("Почему не решаетесь, если тоже столкнулись с изменениями в теле?", 30, 400, gap=0)
+    print("s13 poll from", py + pn.y + 20)
+    # quiz/poll in the panel: Страх наркоза/боли · Не понимаю что мне подойдёт · Восстановление с детьми · Пока просто присматриваюсь
+    render(13, "chto_ostanavlivaet", 12.0, clip_bg(c), [chrome(13), pn.sprite()])
 
 
 PHOTO_ONLY = {6, 9, 10, 11}        # static stories are delivered as JPG, not video
