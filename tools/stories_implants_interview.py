@@ -566,6 +566,16 @@ def label_lines(im, lines, x, y, size=26, wght=500, anchor="ls", gap=1.25):
         d.text((x, yy), t, font=f, fill=WHITE + (255,), anchor=anchor)
 
 
+def pill(im, text, cx, cy, size=23):
+    """small dark rounded label right next to the zone it names; returns its box"""
+    f = mont(size, 500); tw = f.getlength(text); w, h = int(tw + 30), int(size * 1.75)
+    x0, y0 = int(cx - w / 2), int(cy - h / 2)
+    lay = Image.new("RGBA", im.size, (0, 0, 0, 0)); d = ImageDraw.Draw(lay)
+    d.rounded_rectangle((x0, y0, x0 + w, y0 + h), h // 2, fill=(0, 0, 0, 150))
+    d.text((cx, cy + 1), text, font=f, fill=WHITE + (255,), anchor="mm")
+    im.alpha_composite(lay); return (x0, y0, x0 + w, y0 + h)
+
+
 def black_fade(top, length=320, a=0.78):
     """light black darkening from `top` down to the bottom (stretched, no tint)"""
     return vgrad(top - length, top + 60, 0.0, a)
@@ -627,11 +637,12 @@ def s2():
     def P(sx, sy): return (fx + 4 + (sx - 158) * sc, y + 4 + (sy - 230) * sc)
     # problems on the front view (source px of IMG_6325): empty upper pole, sagging, lost volume
     probs = [(("пустой", "верхний полюс"), P(1400, 860)), (("опущение", "груди"), P(1470, 1265)), (("потеря объёма", "после ГВ"), P(1590, 1040))]
-    lx = fx + front.width + 34
-    for i, (lines, tgt) in enumerate(probs):
-        ly = y + 36 + i * 92
-        label_lines(lay, lines, lx, ly, size=27)
-        arrow_thin(lay, (lx - 12, ly - 9), (tgt[0] + 6, tgt[1]))
+    # short arrows, labels spread over different zones (pills sit right next to what they name)
+    for text, (cx, cy), p0, tgt in [("пустой верхний полюс", (300, y + 150), (330, y + 168), P(1380, 860)),
+                                    ("опущение груди", (175, y + 445), (185, y + 428), P(690, 1255)),
+                                    ("потеря объёма", (445, y + 420), (455, y + 402), P(1545, 1080))]:
+        pill(lay, text, cx, cy)
+        arrow_thin(lay, p0, tgt, width=3, head=12)
     label_lines(lay, ["наше до"], fx + front.width // 2, y - 14, size=30, wght=400, anchor="ms")
     items = [Sprite(lay.crop(lay.getbbox()), *lay.getbbox()[:2], 0, dy=0)]
     def extra(col):
@@ -704,12 +715,11 @@ def s6():
     a = np.asarray(bg, np.float32); k = np.clip((np.arange(H, dtype=np.float32) - 30) / 40, 0, 1)[:, None, None]
     bg = Image.fromarray((a * k).astype(np.uint8)).convert("RGBA")          # clean straight cut under the chin
     def P(x, y): return (x * s + ox, y * s + oy)
-    done = [(("наполненный", "верхний полюс"), P(560, 640)), (("увеличенный", "объём"), P(430, 860)), (("округлая", "форма"), P(560, 990))]
-    for i, (lines, tgt) in enumerate(done):
-        ly = 300 + i * 170
-        label_lines(bg, lines, 24, ly, size=26)
-        tw = max(mont(26, 500).getlength(t) for t in lines)
-        arrow_thin(bg, (24 + tw + 12, ly - 9), tgt)
+    for text, (cx, cy), p0, tgt in [("наполненный верхний полюс", (450, 235), (455, 255), P(560, 640)),
+                                    ("увеличенный объём", (900, 640), (915, 620), P(1150, 860)),
+                                    ("округлая форма", (470, 720), (478, 700), P(590, 985))]:
+        pill(bg, text, cx, cy, size=24)
+        arrow_thin(bg, p0, tgt, width=3, head=12)
     col = Column(0, align="center")
     col.head("РЕЗУЛЬТАТ: 4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ", 0, size=46, gap=10)
     col.body("увеличение груди имплантами", 0, size=34, wght=400, gap=0)
@@ -758,6 +768,16 @@ def spaced(text, size, wght=400, track=0.22):
     return im
 
 
+BEBAS = os.path.join(ROOT, "skills/montage-svg-typography/Шрифты/Коллекция шрифтов/BebasNeueCyrillic.ttf")
+
+
+def bebas_txt(text, size, track=0.04):
+    f = ImageFont.truetype(BEBAS, size); ws = [f.getlength(c) for c in text]; tw = sum(ws) + track * size * (len(text) - 1)
+    im = Image.new("RGBA", (int(tw) + 8, int(size * 1.1)), (0, 0, 0, 0)); d = ImageDraw.Draw(im); x = 4
+    for c, w in zip(text, ws): d.text((x, size * 0.55), c, font=f, fill=WHITE + (255,), anchor="lm"); x += w + track * size
+    return im
+
+
 def collage(num, key, caption):
     """black, background-free bodies: after on top, before below; thin spaced captions like a premium collage"""
     bspec, aspec = COLL[key]
@@ -765,11 +785,11 @@ def collage(num, key, caption):
     top = 60; seam = top + HALF
     bg.paste(half(aspec), (0, top)); bg.paste(half(bspec), (0, seam + 90))
     bg = bg.convert("RGBA")
-    po, do = spaced("ПОСЛЕ", 28, 500), spaced("ДО", 28, 500)
+    po, do = bebas_txt("ПОСЛЕ", 50), bebas_txt("ДО", 50)
     bg.alpha_composite(po, (MARGIN - 4, seam - po.height - 10)); bg.alpha_composite(do, (MARGIN - 4, seam + 90 + HALF - do.height - 10))
     d = ImageDraw.Draw(bg); cy = seam + 45
     if caption:
-        cap = spaced(caption, 30, 500, 0.16); bg.alpha_composite(cap, ((W - cap.width) // 2, cy - cap.height // 2))
+        cap = bebas_txt(caption, 54); bg.alpha_composite(cap, ((W - cap.width) // 2, cy - cap.height // 2))
         d.line((MARGIN, cy, (W - cap.width) // 2 - 24, cy), fill=WHITE + (160,), width=2)
         d.line(((W + cap.width) // 2 + 24, cy, W - MARGIN, cy), fill=WHITE + (160,), width=2)
     render(num, f"kollazh_{key}", 10.0, still_bg(bg.convert("RGB"), z1=1.0), [])
@@ -781,7 +801,7 @@ def s11(): collage(11, "profil", "4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ")
 
 
 def s12():
-    interview(12, "pereborot_strah", "int11.mp4", "«НАДО ПЕРЕБОРОТЬ СВОЙ СТРАХ И ПОТОМ ТОЧНО НЕ ПОЖАЛЕЕТЕ»", bottom=1700, align="center")
+    interview(12, "pereborot_strah", "int11.mp4", "«НАДО ПЕРЕБОРОТЬ СВОЙ СТРАХ И ПОТОМ ТОЧНО НЕ ПОЖАЛЕЕТЕ»", bottom=1330, align="center", sub_y=1440)
 
 
 def s13():
