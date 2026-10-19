@@ -727,15 +727,15 @@ def cutout(name):
 
 def s6():
     # after (front), background removed, the body over the whole story; small white arrows + what was done
-    s = 0.75; ox, oy = int(210 - 196 * s), int(30 - 230 * s)
+    s = 0.75; ox, oy = int(540 - 770 * s), int(30 - 230 * s)          # body centred
     im = cutout("IMG_1588.JPG"); im = im.resize((int(im.width * s), int(im.height * s)), Image.LANCZOS)
     bg = Image.new("RGB", (W, H), (0, 0, 0)); bg.paste(im, (ox, oy))
     a = np.asarray(bg, np.float32); k = np.clip((np.arange(H, dtype=np.float32) - 30) / 40, 0, 1)[:, None, None]
     bg = Image.fromarray((a * k).astype(np.uint8)).convert("RGBA")          # clean straight cut under the chin
     def P(x, y): return (x * s + ox, y * s + oy)
-    for text, (cx, cy), tgt in [("наполненный верхний полюс", (470, 268), P(560, 640)),
-                                ("увеличенный объём", (930, 585), P(1150, 860)),
-                                ("округлая форма", (470, 675), P(590, 985))]:
+    for text, (cx, cy), tgt in [("наполненный верхний полюс", (380, 268), P(560, 640)),
+                                ("увеличенный объём", (860, 585), P(1150, 860)),
+                                ("округлая форма", (380, 675), P(590, 985))]:
         arrow_from(bg, pill(bg, text, cx, cy, size=24), tgt, width=3, head=11)
     col = Column(0, align="center")
     col.head("РЕЗУЛЬТАТ: 4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ", 0, size=46, gap=10)
@@ -825,10 +825,10 @@ def s13():
     # the surgeon's markup; the patient's chin is cut off (ct), the text sits low on the right over the surgeon's back,
     # never over a face; the poll goes under it
     c = Clip("IMG_6362.MOV", 0.0, 12.0, ct=0.05, zoom=(1.0, 1.02), zc=(0.5, 0.6))
-    col = Column(1060, align="left", width=560)
-    col.head("ПОДЕЛИТЕСЬ, ЧТО ВАС СЕЙЧАС ОСТАНАВЛИВАЕТ?", 0, size=42, gap=12)
-    col.body("Почему не решаетесь, если тоже столкнулись с изменениями в теле?", 0, size=30, wght=400, gap=0)
-    for it in col.items: it.x += W - 2 * MARGIN - 560
+    col = Column(1000, align="left", width=700)
+    col.head("ПОДЕЛИТЕСЬ, ЧТО ВАС СЕЙЧАС ОСТАНАВЛИВАЕТ?", 0, size=56, gap=14)
+    col.body("Почему не решаетесь, если тоже столкнулись с изменениями в теле?", 0, size=38, wght=400, gap=0)
+    for it in col.items: it.x += W - 2 * MARGIN - 700
     print("s13 text", col.items[0].y)
     # quiz/poll under the text (~1400..1780, right): Страх наркоза/боли · Не понимаю что мне подойдёт · Восстановление с детьми · Пока просто присматриваюсь
     render(13, "chto_ostanavlivaet", 12.0, clip_bg(c), col.items, shade=black_fade(col.items[0].y + 30, 300, 0.7))
