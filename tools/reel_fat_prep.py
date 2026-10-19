@@ -59,13 +59,25 @@ T2 = SlideL([("ПОДГОТОВКА ЖИРА", "H"), ("ЗАВИСИТ", "P"), ("
 T3 = Pop([("ОДИНАКОВЫЙ ОБЪЁМ", "H"), ("НЕ ВСЕГДА НУЖЕН", "P")], 92)
 EX = [load(f"ex/lipo{i}.jpg") for i in (1, 2, 3)]                     # one patient after breast lipofilling: 3/4, side, front
 TXL = Title([("ЛИПОФИЛИНГ ГРУДИ", "P"), ("пример моей пациентки", "S")], 80)
-EXAMPLES = [(11.0, 14.4, EX[0], TXL), (17.5, 21.15, EX[1], TXL), (27.1, 29.95, EX[2], TXL)]   # shown over the speech
+EXAMPLES = [(11.0, 14.6, EX, TXL)]                                     # all three angles in one go: click, click, click
+CLICK = 1.2                                                             # each angle stays this long
+def flat_card(fr, img, cx, cy, w, al, sc=1.0):
+    """straight photo card (no tilt), rounded corners + soft shadow"""
+    w = int(w * sc); h = int(img.shape[0] * w / img.shape[1])
+    im = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+    m = np.zeros((h, w), np.uint8); r = 26; cv2.rectangle(m, (r, 0), (w - r, h), 255, -1); cv2.rectangle(m, (0, r), (w, h - r), 255, -1)
+    for x, y in ((r, r), (w - r, r), (r, h - r), (w - r, h - r)): cv2.circle(m, (x, y), r, 255, -1, cv2.LINE_AA)
+    rgba = np.concatenate([im * (m[..., None] / 255.0), m[..., None] / 255.0], -1).astype(np.float32)
+    blend(fr, shadow_of(rgba, 26, 0.4), cx - w / 2, cy - h / 2 + 16, al); blend(fr, rgba, cx - w / 2, cy - h / 2, al)
 def example_overlay(fr, t):
     for a, b, img, tx in EXAMPLES:
         if a <= t <= b + 0.35:
             k = min(1, (t - a) / 0.35) * (1 - min(1, max(0, (t - b) / 0.35)))
             bg = cv2.GaussianBlur(fr, (0, 0), 9) * 0.42; fr[:] = fr * (1 - k) + bg * k          # the video behind dims and softens
-            card(fr, img, t, a, 540, 850, 540, rot0=-4, frm=(0, 260), al=1 - min(1, max(0, (t - b) / 0.35)))
+            i = min(int((t - a) / CLICK), len(img) - 1); lt = t - a - i * CLICK
+            sc = 1.0 + 0.06 * (1 - ease(lt / 0.18))                       # snap-in on every click
+            flat_card(fr, img[i], 540, 965, 690, 1 - min(1, max(0, (t - b) / 0.35)), sc)
+            if lt < 0.08: fr[:] = fr * (1 - 0.25 * (1 - lt / 0.08)) + 0.25 * (1 - lt / 0.08)   # tiny shutter flash
             tx.draw(fr, 205, t, a + 0.25, b)
 T4 = Title([("ПРИ АСИММЕТРИИ ОБЪЁМ", "H"), ("МОЖЕТ БЫТЬ РАЗНЫМ", "P"), ("всё рассчитывается индивидуально", "S")], 92)
 STEPS = [("СБОР", 21.85), ("ПОДГОТОВКА", 23.0), ("ШПРИЦЫ", 24.3), ("ВВЕДЕНИЕ", 25.8)]
@@ -156,7 +168,7 @@ def render_block(t, b=None):
     elif n == "prep":                                                   # slow push-in on the surgeon
         z = 1.0 + 0.3 * ease(lt / 6.9)
         fr = mblur(vframe(src_of(t), z * trans(t, t0), 600, 820, 540, 820), lt)
-        T2.draw(fr, 980, t, 15.1, 17.1)                    # short, the example card follows
+        T2.draw(fr, 980, t, 15.1, t1 - 0.35)
     elif n == "scheme":                                                 # сбор -> подготовка -> шприцы -> введение
         fr = white_bg(t); p = ease(lt / 0.8); card_video(fr, raw(src_of(t)), 0.42 - 0.12 * p, 540, 640 - 140 * p); sub_y = 1420
         for k, (txt, ts) in enumerate(STEPS):
@@ -176,7 +188,7 @@ def render_block(t, b=None):
         T4.draw(fr, 1020, t, t0 + 0.3, 1e9)
     if not LIGHT[0]: fr = look(fr, t) * (1 - HAZE)
     example_overlay(fr, t)
-    subs2(fr, t, sub_y)
+    subs2(fr, t, 1650 if any(a <= t <= b + 0.35 for a, b, _, _ in EXAMPLES) else sub_y)   # under the collage card
     DEFER[0] = False
     for args in PENDING: ablend(fr, *args)
     blend(fr, LOGO_D if LIGHT[0] else LOGO, 540 - LOGO.shape[1] / 2, 120, 0.9)

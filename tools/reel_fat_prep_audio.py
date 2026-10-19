@@ -29,6 +29,7 @@ for t,_ in [(21.85,0),(23.0,0),(24.3,0),(25.8,0)]: put(PP,t,0.22); put(DG,t+0.02
 put(PP,30.3,0.18); put(PP,30.45,0.18); put(SM,30.5,0.14); put(IM,33.4,0.2); put(SM,33.45,0.12)   # gauges fill / asymmetry
 for t0,nl in [(0.35,2),(7.0,2),(15.1,3),(30.2,2),(36.2,3)]:
     for k in range(nl): put(SW,t0+k*0.24-0.05,0.13)
+for t in (11.0, 12.2, 13.4): put(SH,t,0.13)                                      # click, click, click
 mix=mus+vo[:,None]+sfx[:n,None]*0.5
 mix/=max(1,np.abs(mix).max()/0.97)
 with wave.open("mix.wav","wb") as w:
