@@ -57,10 +57,9 @@ T0 = Pop([("ЧТО ПРОИСХОДИТ С ЖИРОМ", "H"), ("ПЕРЕД ЛИ�
 T1 = Pill([("ОБЪЁМ СЧИТАЕМ", "H"), ("В МИЛЛИЛИТРАХ", "P")], 84); T1s = [timg("чтобы точно понимать, сколько ткани", "S", 0), timg("введено в каждую грудь", "S", 0)]
 T2 = SlideL([("ПОДГОТОВКА ЖИРА", "H"), ("ЗАВИСИТ", "P"), ("ОТ ЕГО СОСТОЯНИЯ", "H")], 84)
 T3 = Pop([("ОДИНАКОВЫЙ ОБЪЁМ", "H"), ("НЕ ВСЕГДА НУЖЕН", "P")], 92)
-EXA = load("ex/col_lift.jpg"); EXB = load("ex/col_lipo.jpg")
-TXA = Title([("ЛИПОФИЛИНГ + ПОДТЯЖКА ГРУДИ", "P"), ("результат моей пациентки", "S")], 70)
-TXB = Title([("ЛИПОФИЛИНГ ГРУДИ", "P"), ("результат моей пациентки", "S")], 80)
-EXAMPLES = [(11.0, 14.4, EXA, TXA), (27.1, 29.95, EXB, TXB)]           # shown over the speech, as examples
+EX = [load(f"ex/lipo{i}.jpg") for i in (1, 2, 3)]                     # one patient after breast lipofilling: 3/4, side, front
+TXL = Title([("ЛИПОФИЛИНГ ГРУДИ", "P"), ("пример моей пациентки", "S")], 80)
+EXAMPLES = [(11.0, 14.4, EX[0], TXL), (17.5, 21.15, EX[1], TXL), (27.1, 29.95, EX[2], TXL)]   # shown over the speech
 def example_overlay(fr, t):
     for a, b, img, tx in EXAMPLES:
         if a <= t <= b + 0.35:
@@ -157,7 +156,7 @@ def render_block(t, b=None):
     elif n == "prep":                                                   # slow push-in on the surgeon
         z = 1.0 + 0.3 * ease(lt / 6.9)
         fr = mblur(vframe(src_of(t), z * trans(t, t0), 600, 820, 540, 820), lt)
-        T2.draw(fr, 980, t, 15.1, t1 - 0.35)
+        T2.draw(fr, 980, t, 15.1, 17.1)                    # short, the example card follows
     elif n == "scheme":                                                 # сбор -> подготовка -> шприцы -> введение
         fr = white_bg(t); p = ease(lt / 0.8); card_video(fr, raw(src_of(t)), 0.42 - 0.12 * p, 540, 640 - 140 * p); sub_y = 1420
         for k, (txt, ts) in enumerate(STEPS):
