@@ -1,4 +1,4 @@
-"""12 Instagram stories (1080x1920): a patient after breast augmentation tells her story (interview, before/after, poll).
+"""13 Instagram stories (1080x1920): a patient after breast augmentation tells her story (interview, before/after, poll).
 
 Fonts: Inter Bold caps headlines (the bold face from the reference story), Montserrat Light body,
 Montserrat Medium subtitles on the slate plate from the reference.  Brand palette from the surgeon's
@@ -453,8 +453,8 @@ FIXES = {"попу,": "попа,", "яненькие,": "ямки", "обхаж�
 
 
 class WordSubs:
-    """one word at a time, Montserrat Light, centred at y"""
-    def __init__(self, name, y=990, size=74):
+    """one word at a time, lower case, Montserrat Light, centred at y"""
+    def __init__(self, name, y=990, size=50):
         d = json.load(open(os.path.join(ASR, name + ".json")))
         ws = []
         for s in d:
@@ -464,7 +464,7 @@ class WordSubs:
                 ws.append((a, b, t))
         f = mont(size, 300); self.items = []
         for i, (a, b, t) in enumerate(ws):
-            t = FIXES.get(t, t)
+            t = FIXES.get(t, t).lower()
             e = min(ws[i + 1][0] if i + 1 < len(ws) else b + 0.5, b + 0.45)
             im, pad = text_img([t], f, WHITE, 1.2, "center", W - 120)
             self.items.append((a, e, np.asarray(im, np.float32) / 255.0, (W - im.width) // 2, y - im.height // 2))
@@ -477,17 +477,31 @@ class WordSubs:
                 return
 
 
-def emoji(ch, size):
-    f = ImageFont.truetype(EMOJI, 109)
-    im = Image.new("RGBA", (160, 160), (0, 0, 0, 0))
-    ImageDraw.Draw(im).text((0, 0), ch, font=f, embedded_color=True)
-    im = im.crop(im.getbbox())
-    return im.resize((int(im.width * size / im.height), size), Image.LANCZOS)
+def plate(col, pad=26, alpha=0.8, r=28):
+    """compact navy plate right behind a text block (no haze over the picture)"""
+    ys = [it.y for it in col.items]; ye = [it.y + it.a.shape[0] for it in col.items]
+    xs = [it.x for it in col.items]; xe = [it.x + it.a.shape[1] for it in col.items]
+    x0, y0, x1, y1 = min(xs) + 24 - pad, min(ys) + 24 - pad, max(xe) - 24 + pad, max(ye) - 24 + pad
+    im = Image.new("RGBA", (x1 - x0, y1 - y0), (0, 0, 0, 0))
+    ImageDraw.Draw(im).rounded_rectangle((0, 0, im.width - 1, im.height - 1), r, fill=NAVY + (int(255 * alpha),))
+    col.items.insert(0, Sprite(im, x0, y0, 0, dy=0)); return col
 
 
-def body_tail(col, text, tail, size=40, wght=500, gap=0):
-    f = mont(size, wght); lines = wrap(text, f, col.width - tail.width - 14)
-    im, pad = text_img(lines, f, WHITE, 1.3, col.align, col.width, tail=tail); col._add(im, pad, 0, gap); return col
+def arrow_on(im, p0, p1, col=WHITE, width=6, bend=0.18, head=22):
+    """curved arrow drawn onto an RGBA image (3x supersampled)"""
+    s = 3; lay = Image.new("RGBA", (im.width * s, im.height * s), (0, 0, 0, 0)); d = ImageDraw.Draw(lay)
+    (x0, y0), (x1, y1) = p0, p1
+    mx, my = (x0 + x1) / 2, (y0 + y1) / 2; dx, dy = x1 - x0, y1 - y0
+    cx, cy = mx - dy * bend, my + dx * bend
+    pts = [((1 - u) ** 2 * x0 + 2 * (1 - u) * u * cx + u * u * x1, (1 - u) ** 2 * y0 + 2 * (1 - u) * u * cy + u * u * y1)
+           for u in np.linspace(0, 0.9, 40)]
+    d.line([(x * s + 2 * s, y * s + 2 * s) for x, y in pts], fill=(0, 0, 0, 120), width=(width + 3) * s, joint="curve")
+    d.line([(x * s, y * s) for x, y in pts], fill=col + (255,), width=width * s, joint="curve")
+    tx, ty = pts[-1]; ang = np.arctan2(y1 - ty, x1 - tx)
+    hp = [(x1, y1), (x1 - head * np.cos(ang - 0.45), y1 - head * np.sin(ang - 0.45)),
+          (x1 - head * np.cos(ang + 0.45), y1 - head * np.sin(ang + 0.45))]
+    d.polygon([(x * s, y * s) for x, y in hp], fill=col + (255,))
+    im.alpha_composite(lay.resize(im.size, Image.LANCZOS)); return im
 
 
 class VideoCircle:
@@ -513,7 +527,7 @@ class VideoCircle:
 
 
 def card(img, w, h, radius=26, border=4):
-    im = ImageOps.fit(img.convert("RGB"), (w, h), Image.LANCZOS, centering=(0.5, 0.0))
+    im = img.convert("RGB").resize((w, h), Image.LANCZOS)
     m = Image.new("L", (w, h), 0); ImageDraw.Draw(m).rounded_rectangle((0, 0, w - 1, h - 1), radius, fill=255)
     c = Image.new("RGBA", (w + 2 * border, h + 2 * border), (0, 0, 0, 0))
     ImageDraw.Draw(c).rounded_rectangle((0, 0, c.width - 1, c.height - 1), radius + border, fill=WHITE + (255,))
@@ -527,106 +541,142 @@ def navy_chip(text, size=30):
     d.text((w / 2, (size + 26) / 2 + 1), text, font=f, fill=WHITE + (255,), anchor="mm"); return im
 
 
-def interview(num, slug, clip, header, extra=None, block_top=1150, sub_y=990, more=()):
-    """interview story: blurred-face clip, word-by-word subtitles, navy band with the text at the bottom"""
+def small_label(text, size=30, wght=400):
+    f = mont(size, wght); im, pad = text_img([text], f, WHITE, 1.2, "center", int(f.getlength(text)) + 10); return im
+
+
+def interview(num, slug, clip, header, extra=None, y=1150, align="left", width=W - 2 * MARGIN, bottom=None, sub_y=990, more=()):
+    """interview story: blurred-face clip, word-by-word subtitles, the text on a compact navy plate"""
     name = clip
     d = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
                               os.path.join(SRC, "drive", name)], capture_output=True, text=True).stdout)
     c = Clip(name, 0.0, d, zoom=(1.0, 1.03), zc=(0.5, 0.3))
-    col = Column(block_top, align="left")
-    col.head(header, 0, size=50, gap=16).rule(0, gap=16)
+    col = Column(y, align=align, width=width)
+    col.head(header, 0, size=46, gap=14)
     if extra: extra(col)
-    print(f"s{num} text ends", col.y)
-    items = col.items + list(more)
-    render(num, slug, d, clip_bg(c), items, shade=vgrad(block_top - 260, block_top - 40, 0.0, 0.86),
-           subs=WordSubs(name, y=sub_y), audio=(name, 0.0, d))
+    if bottom: col.to_bottom(bottom)
+    if align == "right":
+        for it in col.items: it.x = W - MARGIN - it.a.shape[1] + 24
+    plate(col)
+    print(f"s{num} text", col.items[0].y, col.items[0].y + col.items[0].a.shape[0])
+    render(num, slug, d, clip_bg(c), col.items + list(more), subs=WordSubs(name, y=sub_y), audio=(name, 0.0, d))
 
 
 # ---------------- stories ----------------
 def s1():
-    # before video in a circle, bottom right (torso square from the 4K frame); poll on the left under the header
-    circ = VideoCircle("IMG_6358.MOV", 0.0, 14.8, (2160, 2160, 0, 700), 360, W - 84 - 372, 1400)
-    interview(1, "telo_posle_rodov", "int1.mp4", "ТЕЛО ПОСЛЕ РОДОВ, КАКОЕ ОНО?", block_top=1180, more=[circ])
-    # poll «У кого такие же изменения, как и у моей пациентки?» — «Моя история.. / Частично про меня»: x 60..600, y ~1400..1760
+    # «наше до» in a big circle, bottom right; header above; the poll goes bottom left
+    D = 440; cx0 = W - 60 - D - 12; cy0 = 1190
+    circ = VideoCircle("IMG_6358.MOV", 0.0, 14.8, (2160, 2160, 0, 700), D, cx0, cy0)
+    lab = small_label("наше до", 32); lab_sp = Sprite(lab, cx0 + (D + 12 - lab.width) // 2, cy0 + D + 12, 0, dy=0)
+    interview(1, "telo_posle_rodov", "int1.mp4", "ТЕЛО ПОСЛЕ РОДОВ, КАКОЕ ОНО?", y=1030, width=560, sub_y=900,
+              more=[circ, lab_sp])
+    # poll «У кого такие же изменения, как и у моей пациентки?» — «Моя история.. / Частично про меня»: x 50..520, y ~1260..1640
+
+
+def before_cards():
+    """«наше до» front + profile, big, white arrows on the problem zones (empty upper pole, sagging)"""
+    W2, H2 = 470, 627; out = []
+    specs = [("IMG_6325.heic", 158, 230, [((24, 70), (125, 160)), ((446, 60), (372, 150)), ((24, 400), (118, 300))]),
+             ("IMG_6340.heic", 259, 270, [((440, 40), (352, 112)), ((452, 380), (362, 272))])]
+    for n, x0, y0, arrows in specs:
+        im = load_img(n).crop((x0, y0, x0 + 1700, y0 + 2267)).resize((W2, H2), Image.LANCZOS).convert("RGBA")
+        for p0, p1 in arrows: arrow_on(im, p0, p1)
+        out.append(card(im, W2, H2))
+    return out
 
 
 def s2():
-    cards = []
-    for k, n in enumerate(("IMG_6325.heic", "IMG_6340.heic")):
-        im = load_img(n); im = im.crop((0, int(im.height * 0.06), im.width, int(im.height * 0.72)))   # neck .. thighs, no face
-        c = card(im, 300, 400); ch = navy_chip("ДО" if k == 0 else "ДО · БОКОМ", 24)
-        c.alpha_composite(ch, (16, c.height - ch.height - 16))
-        cards.append(Sprite(c, 84 + k * 330, 1450, 0))
+    cards = before_cards(); y = 1215
+    items = [Sprite(cards[0], 52, y, 0, dy=0), Sprite(cards[1], W - 52 - cards[1].width, y, 0, dy=0)]
+    lab = small_label("наше до", 32); items.append(Sprite(lab, (W - lab.width) // 2, y - lab.height + 22, 0, dy=0))
     def extra(col):
-        col.body("Должен внутри случиться импульс «я готова»", 0, size=36, wght=500, gap=0)
+        col.body("Должен внутри случиться импульс «я готова»", 0, size=34, wght=500, gap=0)
     interview(2, "dolgo_reshaetes", "int2.mp4", "КОГДА ВЫ ДОЛГО РЕШАЕТЕСЬ НА ОПЕРАЦИЮ, ЭТО НОРМАЛЬНО", extra,
-              block_top=1100, sub_y=940, more=cards)
+              y=960, align="center", sub_y=840, more=items)
 
 
 def s3():
     interview(3, "strashno", "int3.mp4", "И КОГДА СТРАШНО, ЭТО ТОЖЕ НОРМАЛЬНО",
-              lambda col: body_tail(col, "Но я рядом с вами", emoji("🫂", 46), size=40, wght=500), block_top=1300)
+              lambda col: col.body("Но я рядом с вами", 0, size=38, wght=500, gap=0), y=1400, align="right", width=620)
 
 
 def s4():
     interview(4, "delyatsya_istoriey", "int4.mp4",
               "МОИ ПАЦИЕНТКИ ДЕЛЯТСЯ С ВАМИ СВОЕЙ ИСТОРИЕЙ, ЧТОБЫ ПОМОЧЬ ВАМ ПРИНЯТЬ РЕШЕНИЕ",
-              lambda col: body_tail(col, "Обязательно включайте звук", emoji("🔊", 42), size=38, wght=500), block_top=1220)
+              lambda col: col.body("Обязательно включайте звук", 0, size=36, wght=600, gap=0), y=1330, align="center")
 
 
-class Morph:
-    """before video -> crossfade -> after video, aligned on the nipple stickers (both cut under the chin)"""
-    def __init__(self):
-        def grab(name, a, b, vf):
-            p = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(a), "-t", str(b - a), "-i", os.path.join(SRC, "drive", name),
-                                "-vf", vf + f",fps={FPS}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, check=True).stdout
-            return np.frombuffer(p, np.uint8).reshape(-1, H, W, 3)
-        # before 2160x3840: stickers (485,1296),(1577,1249) -> x0.5 ; after 720x1280: (245,461),(480,451) -> x2.31
-        self.b = grab("IMG_6358.MOV", 0.0, 1.8, f"scale={W}:{H}:flags=lanczos")
-        self.a = grab("IMG_1614.MP4", 17.8, 19.9, f"crop=467:830:139:181,scale={W}:{H}:flags=lanczos")
-        self.T1, self.T2, self.T3 = 2.2, 3.0, 6.0
+# front photos aligned on the nipple stickers: before (683,1129)-(1476,1083), after (531,838)-(1079,819)
+FRONT = {"before": ("IMG_6325.heic", 0.66, (1080, 1106)), "after": ("IMG_1588.JPG", 0.956, (805, 828))}
 
-    def __call__(self, i, t):
-        def af(t):
-            k = min(len(self.a) - 1, int((t - self.T1) / (self.T3 - self.T1) * len(self.a)))
-            return self.a[max(k, 0)].astype(np.float32)
-        bf = self.b[min(len(self.b) - 1, i)].astype(np.float32)
-        if t < self.T1: return bf.astype(np.uint8)
-        if t >= self.T2: return af(t).astype(np.uint8)
-        k = (t - self.T1) / (self.T2 - self.T1); k = k * k * (3 - 2 * k)
-        return (bf * (1 - k) + af(t) * k).astype(np.uint8)
+
+def front_frame(key, ym=560):
+    n, s, (mx, my) = FRONT[key]
+    im = load_img(n); im = im.resize((int(im.width * s), int(im.height * s)), Image.LANCZOS)
+    ox, oy = int(540 - mx * s), int(ym - my * s)
+    fr = Image.new("RGB", (W, H), (10, 10, 12)); fr.paste(im, (ox, oy)); return np.asarray(fr)
+
+
+def s5():
+    b, a = front_frame("before").astype(np.float32), front_frame("after").astype(np.float32)
+    T1, T2, T3 = 2.0, 3.2, 6.0
+    def bg(i, t):
+        k = min(max((t - T1) / (T2 - T1), 0), 1); k = k * k * (3 - 2 * k)
+        fr = b * (1 - k) + a * k
+        z = 1.0 + 0.03 * t / T3
+        M = cv2.getRotationMatrix2D((W / 2, H * 0.35), 0, z)
+        return cv2.warpAffine(fr.astype(np.uint8), M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+    col = Column(0, align="center")
+    col.head("УВЕЛИЧЕНИЕ ГРУДИ ИМПЛАНТАМИ", 0, size=44, gap=0)
+    col.to_bottom(1700); plate(col)
+    render(5, "do_posle_perehod", T3, bg, col.items + [ChipSwap(2.6)])
 
 
 class ChipSwap:
     def __init__(self, t_sw):
         self.t0, self.dur, self.t_sw = -1.0, 0.01, t_sw
-        self.do = np.asarray(navy_chip("ДО", 34), np.float32) / 255; self.po = np.asarray(navy_chip("ПОСЛЕ", 34), np.float32) / 255
+        self.do = np.asarray(navy_chip("ДО", 32), np.float32) / 255; self.po = np.asarray(navy_chip("ПОСЛЕ", 32), np.float32) / 255
 
     def draw(self, fr, t):
         a = self.do if t < self.t_sw else self.po
-        h, w = a.shape[:2]; x, y = MARGIN, 1720 - h
+        h, w = a.shape[:2]; x, y = MARGIN, 1540 - h
         al = a[..., 3:4]; fr[y:y + h, x:x + w] = fr[y:y + h, x:x + w] * (1 - al) + a[..., :3] * al
 
 
-def s5():
-    m = Morph()
-    col = Column(150, align="center")
-    col.head("УВЕЛИЧЕНИЕ ГРУДИ ИМПЛАНТАМИ", 0, size=56, gap=0)
-    render(5, "do_posle_perehod", m.T3, m, col.items + [ChipSwap(2.6)], shade=vgrad(col.y + 60, col.y + 260, 0.9, 0.0))
-
-
 def s6():
-    interview(6, "krasivyj_rezultat", "int6.mp4", "ВЕСЬ ЭТОТ ПУТЬ ПРИВЁЛ К КРАСИВОМУ РЕЗУЛЬТАТУ",
-              lambda col: col.body("Выполнено увеличение груди имплантами", 0, size=36, wght=500, gap=0), block_top=1250)
+    # the after photo (front), smaller so the labels sit on the dark backdrop beside the body, arrows to what was done
+    s = 0.6; ym = 340; mx, my = 770, 828
+    im = load_img("IMG_1588.JPG"); im = im.resize((int(im.width * s), int(im.height * s)), Image.LANCZOS)
+    ox, oy = int(540 - mx * s), int(ym - my * s)
+    bg = Image.new("RGB", (W, H), (10, 10, 12)); bg.paste(im, (ox, oy))
+    a = np.asarray(bg, np.float32); yb = oy + im.height                     # fade the floor into the dark
+    k = np.clip((yb - np.arange(H, dtype=np.float32)) / 160, 0, 1)[:, None, None]; a = a * k + 10 * (1 - k)
+    bg = Image.fromarray(a.astype(np.uint8)).convert("RGBA")
+    def px(x, y): return (x * s + ox, y * s + oy)
+    L = [("объём", "в верхней", "части груди"), ("красивая", "округлая", "форма")]
+    f = mont(30, 500)
+    for i, (lines, (lx, ly), tgt) in enumerate(zip(L, [(110, 150), (968, 150)], [px(560, 680), px(1060, 700)])):
+        for j, t in enumerate(lines):
+            ImageDraw.Draw(bg).text((lx, ly + j * 38), t, font=f, fill=WHITE + (255,), anchor="mm")
+        arrow_on(bg, (lx + (40 if i == 0 else -40), ly + 130), tgt, bend=(-0.25 if i == 0 else 0.25), width=6, head=24)
+    col = Column(0, align="center")
+    col.head("РЕЗУЛЬТАТ: 4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ", 0, size=46, gap=12)
+    col.body("Увеличение груди имплантами", 0, size=34, wght=400, gap=0)
+    col.to_bottom(1720)
+    render(6, "rezultat_anfas", 10.0, still_bg(bg.convert("RGB"), z1=1.0), col.items)
 
 
 def s7():
+    interview(7, "krasivyj_rezultat", "int6.mp4", "ВЕСЬ ЭТОТ ПУТЬ ПРИВЁЛ К КРАСИВОМУ РЕЗУЛЬТАТУ",
+              lambda col: col.body("Выполнено увеличение груди имплантами", 0, size=34, wght=500, gap=0), y=1350, align="left")
+
+
+def s8():
     def extra(col):
         col.body("Он подтянет тело. Но не наполнит грудь, потерявшую объём после ГВ.", 0, size=34, wght=400, gap=8)
         col.body("Это анатомия.", 0, size=36, wght=600, gap=0)
-    interview(7, "sport_ne_vernet", "int7.mp4", "СПОРТ НЕ ВЕРНЁТ ФОРМУ ГРУДИ ПОСЛЕ РОДОВ", extra, block_top=1160, sub_y=960)
-
-
+    interview(8, "sport_ne_vernet", "int7.mp4", "СПОРТ НЕ ВЕРНЁТ ФОРМУ ГРУДИ ПОСЛЕ РОДОВ", extra, y=1250, align="right",
+              width=720, sub_y=1020)
 # collages: after on top, before below, each cut from the neck (under the chin) to the fingertips, same body height
 COLL = {  # name: (before file, before neck y, fingertips y, body x0, x1), (after ...)
     "anfas": (("IMG_6325.heic", 230, 2660, 255, 1760), ("IMG_1588.JPG", 260, 1940, 196, 1343)),
@@ -670,25 +720,29 @@ def collage(num, key, caption):
     render(num, f"kollazh_{key}", 10.0, still_bg(bg.convert("RGB"), z1=1.0), items)
 
 
-def s8(): collage(8, "anfas", "4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ")
-def s9(): collage(9, "tri_chetverti", None)
-def s10(): collage(10, "profil", "4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ")
-
-
-def s11():
-    interview(11, "pereborot_strah", "int11.mp4", "«НАДО ПЕРЕБОРОТЬ СВОЙ СТРАХ И ПОТОМ ТОЧНО НЕ ПОЖАЛЕЕТЕ»", block_top=1300)
+def s9(): collage(9, "anfas", "4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ")
+def s10(): collage(10, "tri_chetverti", None)
+def s11(): collage(11, "profil", "4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ")
 
 
 def s12():
-    c = Clip("IMG_6362.MOV", 0.0, 12.0, zoom=(1.0, 1.03), zc=(0.5, 0.4))
-    col = Column(150, align="left")
-    col.head("ПОДЕЛИТЕСЬ, ЧТО ВАС СЕЙЧАС ОСТАНАВЛИВАЕТ?", 0, size=50, gap=14).rule(0, gap=16)
-    col.body("Почему не решаетесь, если тоже столкнулись с изменениями в теле?", 0, size=36, wght=400, gap=0)
-    print("s12 text ends", col.y)
-    # quiz/poll: Страх наркоза/боли · Не понимаю что мне подойдёт · Восстановление с детьми · Пока просто присматриваюсь
-    render(12, "chto_ostanavlivaet", 12.0, clip_bg(c), col.items, shade=vgrad(col.y + 40, col.y + 260, 0.9, 0.0))
+    interview(12, "pereborot_strah", "int11.mp4", "«НАДО ПЕРЕБОРОТЬ СВОЙ СТРАХ И ПОТОМ ТОЧНО НЕ ПОЖАЛЕЕТЕ»", y=1380, align="center")
 
 
-STORIES = {k + 1: f for k, f in enumerate([s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12])}
+def s13():
+    # the surgeon's markup; the patient's chin is cut off (ct), the text sits low on the right over the surgeon's back,
+    # never over a face; the poll goes under it
+    c = Clip("IMG_6362.MOV", 0.0, 12.0, ct=0.05, zoom=(1.0, 1.02), zc=(0.5, 0.6))
+    col = Column(1060, align="left", width=560)
+    col.head("ПОДЕЛИТЕСЬ, ЧТО ВАС СЕЙЧАС ОСТАНАВЛИВАЕТ?", 0, size=42, gap=12)
+    col.body("Почему не решаетесь, если тоже столкнулись с изменениями в теле?", 0, size=30, wght=400, gap=0)
+    for it in col.items: it.x += W - 2 * MARGIN - 560
+    plate(col)
+    print("s13 text", col.items[0].y, col.items[0].y + col.items[0].a.shape[0])
+    # quiz/poll under the text (~1400..1780, right): Страх наркоза/боли · Не понимаю что мне подойдёт · Восстановление с детьми · Пока просто присматриваюсь
+    render(13, "chto_ostanavlivaet", 12.0, clip_bg(c), col.items)
+
+
+STORIES = {k + 1: f for k, f in enumerate([s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13])}
 for k, fn in STORIES.items():
     if not ONLY or k in ONLY: fn()

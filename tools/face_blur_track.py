@@ -49,16 +49,18 @@ for a, b in SEGS:
             misses += 1
         if prev is not None:
             x, y, bw, bh = prev
-            cx, cy = x + bw / 2, y + bh / 2.2
-            ax, ay = int(bw * 1.05), int(bh * 1.25)                      # generous ellipse: forehead to chin, ear to ear
-            x0, y0, x1, y1 = max(int(cx - ax), 0), max(int(cy - ay), 0), min(int(cx + ax), w), min(int(cy + ay), h)
+            cx, cy = x + bw / 2, y + bh / 2.1
+            ax, ay = bw * 0.62, bh * 0.82                                 # the face itself, not the whole head
+            R = int(max(ax, ay) * 1.9)                                    # room for a long soft edge
+            x0, y0, x1, y1 = max(int(cx - R), 0), max(int(cy - R), 0), min(int(cx + R), w), min(int(cy + R), h)
             if x1 > x0 and y1 > y0:
-                roi = fr[y0:y1, x0:x1]
-                small = cv2.resize(roi, (6, 8), interpolation=cv2.INTER_AREA)          # ~6x8 cells whatever the face size
-                bl = cv2.GaussianBlur(cv2.resize(small, (x1 - x0, y1 - y0), interpolation=cv2.INTER_LINEAR), (0, 0), max(8, (x1 - x0) / 12))
+                roi = fr[y0:y1, x0:x1].astype(np.float32)
+                small = cv2.resize(roi, (10, 10), interpolation=cv2.INTER_AREA)
+                bl = cv2.GaussianBlur(cv2.resize(small, (x1 - x0, y1 - y0), interpolation=cv2.INTER_CUBIC), (0, 0), max(6, bw / 7))
                 m = np.zeros((y1 - y0, x1 - x0), np.float32)
-                cv2.ellipse(m, (int(cx - x0), int(cy - y0)), (ax, ay), 0, 0, 360, 1, -1)
-                m = cv2.GaussianBlur(m, (0, 0), 6)[..., None]
+                cv2.ellipse(m, (int(cx - x0), int(cy - y0)), (int(ax), int(ay)), 0, 0, 360, 1, -1)
+                m = cv2.GaussianBlur(m, (0, 0), max(4, bw * 0.16))[..., None]     # soft border, no visible edge
+                m = np.clip(m * 1.35, 0, 1)
                 fr[y0:y1, x0:x1] = (roi * (1 - m) + bl * m).astype(np.uint8)
         enc.stdin.write(fr.tobytes())
     dec.stdout.close(); dec.wait()
