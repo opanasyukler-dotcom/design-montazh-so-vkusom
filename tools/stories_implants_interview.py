@@ -514,9 +514,22 @@ class VideoCircle:
                             "-vf", f"{vf},scale={d}:{d}:flags=lanczos,fps={FPS}", "-f", "rawvideo",
                             "-pix_fmt", "rgb24", "-"], capture_output=True, check=True).stdout
         self.frames = np.frombuffer(p, np.uint8).reshape(-1, d, d, 3)
+        if crop is None: self.frames = self.cut_bg(name, a, b, d)
         D = d + 2 * ring; yy, xx = np.mgrid[:D, :D]; r = np.hypot(xx - D / 2 + 0.5, yy - D / 2 + 0.5)
         self.ring_a = np.clip(D / 2 - r, 0, 1)[..., None].astype(np.float32)
         self.in_a = np.clip(d / 2 - np.hypot(xx[:d, :d] - d / 2 + 0.5, yy[:d, :d] - d / 2 + 0.5), 0, 1)[..., None].astype(np.float32)
+
+    def cut_bg(self, name, a, b, d):
+        """remove the backdrop from every frame (rembg isnet), body on pure black; cached next to the sources"""
+        cache = os.path.join(SRC, "cut", f"{name}_{a}_{b}_{d}.npy")
+        if os.path.exists(cache): return np.load(cache)
+        from rembg import remove, new_session
+        sess = new_session("isnet-general-use"); out = []
+        for f in self.frames:
+            m = np.asarray(remove(Image.fromarray(f), session=sess, only_mask=True), np.float32)[..., None] / 255
+            m = np.clip((m - 0.12) / 0.3, 0, 1)                   # arms/hands fully opaque, soft edge kept
+            out.append((f * m).astype(np.uint8))
+        out = np.stack(out); np.save(cache, out); return out
 
     def draw(self, fr, t):
         i = int(t * FPS) % len(self.frames)
@@ -576,6 +589,15 @@ def pill(im, text, cx, cy, size=23):
     im.alpha_composite(lay); return (x0, y0, x0 + w, y0 + h)
 
 
+def arrow_from(im, box, tgt, gap=7, **kw):
+    """short arrow that starts just outside a label box (never inside the text) and ends at the target"""
+    x0, y0, x1, y1 = box; tx, ty = tgt
+    cx, cy = min(max(tx, x0), x1), min(max(ty, y0), y1)          # nearest point of the box
+    if (cx, cy) == (tx, ty): return im
+    v = np.array([tx - cx, ty - cy], float); v /= np.linalg.norm(v)
+    return arrow_thin(im, (cx + v[0] * gap, cy + v[1] * gap), tgt, **kw)
+
+
 def black_fade(top, length=320, a=0.78):
     """light black darkening from `top` down to the bottom (stretched, no tint)"""
     return vgrad(top - length, top + 60, 0.0, a)
@@ -621,34 +643,30 @@ def s1():
 
 
 def before_cards():
-    """«наше до»: front (big, small white arrows to the problem zones, labels on the right) + profile (no arrows)"""
-    fw, fh = 520, 693
-    front = load_img("IMG_6325.heic").crop((158, 230, 158 + 1700, 230 + 2267)).resize((fw, fh), Image.LANCZOS)
-    prof = load_img("IMG_6340.heic").crop((259, 270, 259 + 1700, 270 + 2267)).resize((300, 400), Image.LANCZOS)
-    return card(front, fw, fh), card(prof, 300, 400)
+    """«наше до»: front and profile, same size, side by side"""
+    w, h = 490, 653
+    front = load_img("IMG_6325.heic").crop((158, 230, 158 + 1700, 230 + 2267)).resize((w, h), Image.LANCZOS)
+    prof = load_img("IMG_6340.heic").crop((259, 270, 259 + 1700, 270 + 2267)).resize((w, h), Image.LANCZOS)
+    return card(front, w, h), card(prof, w, h)
 
 
 def s2():
     front, prof = before_cards()
-    y = 1150; fx = 40
+    y = 1170; fx = 40
     lay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    lay.alpha_composite(front, (fx, y)); lay.alpha_composite(prof, (W - 40 - prof.width, y + front.height - prof.height))
-    sc = 520 / 1700
+    lay.alpha_composite(front, (fx, y)); lay.alpha_composite(prof, (W - 40 - prof.width, y))
+    sc = 490 / 1700
     def P(sx, sy): return (fx + 4 + (sx - 158) * sc, y + 4 + (sy - 230) * sc)
-    # problems on the front view (source px of IMG_6325): empty upper pole, sagging, lost volume
-    probs = [(("пустой", "верхний полюс"), P(1400, 860)), (("опущение", "груди"), P(1470, 1265)), (("потеря объёма", "после ГВ"), P(1590, 1040))]
-    # short arrows, labels spread over different zones (pills sit right next to what they name)
-    for text, (cx, cy), p0, tgt in [("пустой верхний полюс", (300, y + 150), (330, y + 168), P(1380, 860)),
-                                    ("опущение груди", (175, y + 445), (185, y + 428), P(690, 1255)),
-                                    ("потеря объёма", (445, y + 420), (455, y + 402), P(1545, 1080))]:
-        pill(lay, text, cx, cy)
-        arrow_thin(lay, p0, tgt, width=3, head=12)
-    label_lines(lay, ["наше до"], fx + front.width // 2, y - 14, size=30, wght=400, anchor="ms")
+    for text, (cx, cy), tgt in [("пустой верхний полюс", (290, y + 118), P(1380, 870)),
+                                ("опущение груди", (175, y + 372), P(690, 1262)),
+                                ("потеря объёма", (425, y + 335), P(1545, 1090))]:
+        arrow_from(lay, pill(lay, text, cx, cy, size=22), tgt, width=3, head=11)
+    label_lines(lay, ["наше до"], W // 2, y - 14, size=30, wght=400, anchor="ms")
     items = [Sprite(lay.crop(lay.getbbox()), *lay.getbbox()[:2], 0, dy=0)]
     def extra(col):
         col.body("Должен внутри случиться импульс «я готова»", 0, size=36, wght=500, gap=0)
     interview(2, "dolgo_reshaetes", "int2.mp4", "КОГДА ВЫ ДОЛГО РЕШАЕТЕСЬ НА ОПЕРАЦИЮ, ЭТО НОРМАЛЬНО", extra,
-              bottom=1100, align="center", sub_y=780, more=items, head_size=48)
+              bottom=1110, align="center", sub_y=790, more=items, head_size=48)
 
 
 def s3():
@@ -715,11 +733,10 @@ def s6():
     a = np.asarray(bg, np.float32); k = np.clip((np.arange(H, dtype=np.float32) - 30) / 40, 0, 1)[:, None, None]
     bg = Image.fromarray((a * k).astype(np.uint8)).convert("RGBA")          # clean straight cut under the chin
     def P(x, y): return (x * s + ox, y * s + oy)
-    for text, (cx, cy), p0, tgt in [("наполненный верхний полюс", (450, 235), (455, 255), P(560, 640)),
-                                    ("увеличенный объём", (900, 640), (915, 620), P(1150, 860)),
-                                    ("округлая форма", (470, 720), (478, 700), P(590, 985))]:
-        pill(bg, text, cx, cy, size=24)
-        arrow_thin(bg, p0, tgt, width=3, head=12)
+    for text, (cx, cy), tgt in [("наполненный верхний полюс", (470, 268), P(560, 640)),
+                                ("увеличенный объём", (930, 585), P(1150, 860)),
+                                ("округлая форма", (470, 675), P(590, 985))]:
+        arrow_from(bg, pill(bg, text, cx, cy, size=24), tgt, width=3, head=11)
     col = Column(0, align="center")
     col.head("РЕЗУЛЬТАТ: 4,5 МЕСЯЦА ПОСЛЕ ОПЕРАЦИИ", 0, size=46, gap=10)
     col.body("увеличение груди имплантами", 0, size=34, wght=400, gap=0)
@@ -817,6 +834,13 @@ def s13():
     render(13, "chto_ostanavlivaet", 12.0, clip_bg(c), col.items, shade=black_fade(col.items[0].y + 30, 300, 0.7))
 
 
+PHOTO_ONLY = {6, 9, 10, 11}        # static stories are delivered as JPG, not video
+
+
 STORIES = {k + 1: f for k, f in enumerate([s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13])}
 for k, fn in STORIES.items():
-    if not ONLY or k in ONLY: fn()
+    if not ONLY or k in ONLY:
+        fn()
+        if k in PHOTO_ONLY:
+            for f in os.listdir(OUT):
+                if f.startswith(f"{k:02d}_") and f.endswith(".mp4"): os.remove(os.path.join(OUT, f))
