@@ -627,8 +627,8 @@ def interview(num, slug, clip, header, extra=None, y=None, bottom=1720, align="l
 def s1():
     # «наше до» in a big circle (the whole torso, shoulders to knees), bottom right; big header above it; poll bottom left
     D = 560; cx0 = W - 40 - D - 12; cy0 = 1180
-    # 2160x3840 frame padded to 3000 wide, square 3000x3000 from the shoulders: much more of the body in the circle
-    circ = VideoCircle("IMG_6358.MOV", 0.0, 14.8, None, D, cx0, cy0)
+    # the original backdrop, full-width square (no padding, so no frame edges inside the circle), shoulders to thighs
+    circ = VideoCircle("IMG_6358.MOV", 0.0, 14.8, (2160, 2160, 0, 560), D, cx0, cy0)
     lab = small_label("наше до", 32); lab_sp = Sprite(lab, cx0 + (D + 12 - lab.width) // 2, cy0 + D + 4, 0, dy=0)
     col = Column(0, align="left")
     col.head("ТЕЛО ПОСЛЕ РОДОВ,", 0, size=74, gap=0).head("КАКОЕ ОНО?", 0, size=74, gap=0)
