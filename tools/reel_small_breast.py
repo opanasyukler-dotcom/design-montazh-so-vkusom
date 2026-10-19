@@ -1,5 +1,5 @@
 _b = open("base.py").read()
-for a, b in [("DUR = 41.0", "DUR = 40.8"), ("ease((t - t0) / 0.3))\ndef mblur", "ease((t - t0) / 0.6))\ndef mblur"),
+for a, b in [("DUR = 41.0", "DUR = 44.2"), ("ease((t - t0) / 0.3))\ndef mblur", "ease((t - t0) / 0.6))\ndef mblur"),
              ("if lt > 0.1: return fr", "if lt > 0.18: return fr"), ("(1 - lt / 0.1)", "(1 - lt / 0.18)"),
              ("ti = t0 + k * 0.16; p = ease((t - ti) / 0.45)", "ti = t0 + k * 0.24; p = ease((t - ti) / 0.65)"),
              ("out = 1 - ease((t - t1) / 0.3) if t > t1 else 1.0", "out = 1 - ease((t - t1) / 0.4) if t > t1 else 1.0"),
@@ -25,7 +25,7 @@ def src_of(t):
     return best[0] + t - best[1]
 
 BL = [("quote", 0, 1.6), ("qsurg", 1.6, 5.4), ("res", 5.4, 11.0), ("turn", 11.0, 13.6), ("main", 13.6, 19.4),
-      ("ill1", 19.4, 24.0), ("ill2", 24.0, 29.0), ("final", 29.0, 36.0), ("collage2", 36.0, DUR)]   # schematics illustrate the surgeon's words          # no 3/4 view anywhere
+      ("ill1", 19.4, 24.0), ("ill2", 24.0, 29.0), ("final", 29.0, 36.0), ("collage2", 36.0, 40.0), ("collage3", 40.0, DUR)]   # schematics illustrate the surgeon's words          # no 3/4 view anywhere
 XF = 0.35
 def block(t):
     for n, a, b in BL:
@@ -52,6 +52,8 @@ def feather(img, e=110):                                                # side p
     h, w = img.shape[:2]; m = (np.clip(np.arange(w) / e, 0, 1) * np.clip((w - 1 - np.arange(w)) / e, 0, 1))[None] * np.clip((h - 1 - np.arange(h)) / e, 0, 1)[:, None]
     return (img * m[..., None] + np.float32([16, 16, 18]) * (1 - m[..., None])).astype(np.uint8)
 SDO = feather(load("side_do.png")); SPO = feather(load("side_po.png")); COLL2 = load("collage_side.jpg")   # side view, built by side.py
+QDO = feather(load("q_do.png")); QPO = feather(load("q_po.png")); COLL3 = load("collage_q.jpg")   # 3/4 view, built by quarter.py
+def quarter(img, z=1.0): return warp(img, 0.86 * z, 690, 1000, 540, 900)      # neck (~150) to fingertips (~1860) fill the frame
 def side(img, cx, z=1.0): return warp(img, 0.70 * z, cx, 1080, 540, 860)       # torso aligned between ДО and ПОСЛЕ
 def morph(a_, b_, p, f=0.35):
     edge = (xx_ / W * 0.6 + yy_ / H * 0.4)[..., None]
@@ -179,12 +181,14 @@ def render_block(t, b=None):
     elif n == "ill2":                                                   # "не нужно будет делать подтяжки": ptosis vs no ptosis
         fr = dark_bg(t); illus_ptosis(fr, t, t0)
     elif n == "final":                                                  # final look at the result
-        fr = mblur(side(SPO, 702, (0.97 + 0.04 * lt / 7) * trans(t, t0, 0.03)), lt); chip(fr, CH_PO, 60, 228, t, t0 + 0.15)   # the favourable profile
+        z = (0.97 + 0.03 * lt / 7) * trans(t, t0, 0.03); p = ease((t - 30.0) / 1.6)          # 3/4 view: ДО -> ПОСЛЕ
+        fr = mblur(morph(quarter(QDO, z), quarter(QPO, z), p), lt)
+        chip(fr, CH_DO, 60, 228, t, t0 + 0.1, 30.0); chip(fr, CH_PO, 60, 228, t, 31.0)
         T6.draw(fr, 1000, t, 29.5, t1 - 0.35)
     else:                                                               # the two collages
         z = 1.04 - 0.04 * ease(lt / 1.2)
-        fr = mblur(warp(COLL2, z, 540, 1110, 540, 1110), lt); chip(fr, CH_DO, 40, 610, t, t0 + 0.5); chip(fr, CH_PO, 580, 610, t, t0 + 0.7)
-        if t > t0 + 1.0: ablend(fr, T7, 540 - T7.shape[1] / 2, 370, min(1, (t - t0 - 1.0) / 0.5), WHITE, BLUE)
+        fr = mblur(warp(COLL2 if n == "collage2" else COLL3, z, 540, 1110, 540, 1110), lt); chip(fr, CH_DO, 40, 610, t, t0 + 0.5); chip(fr, CH_PO, 580, 610, t, t0 + 0.7)
+        if n == "collage3" and t > t0 + 1.0: ablend(fr, T7, 540 - T7.shape[1] / 2, 370, min(1, (t - t0 - 1.0) / 0.5), WHITE, BLUE)
     if not LIGHT[0] and not n.startswith("collage"): fr = look(fr, t) * (1 - HAZE)
     if not n.startswith("collage"): subs2(fr, t, sub_y)
     DEFER[0] = False
