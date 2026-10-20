@@ -138,6 +138,7 @@ def subs2(fr, t, y):
             c = (PINK, ROSE) if w.strip(",") in KEY else (WHITE, BLUE)
             ablend(fr, im2, 540 - im2.shape[1] / 2, y - im2.shape[0] / 2, min(1, (t - t0) / 0.08), *c)
 
+_r2 = np.clip((np.arange(H) - 620) / 760, 0, 1); HAZE2 = (0.93 * _r2 ** 1.05)[:, None, None].astype(np.float32)   # deeper black from the bottom
 def render_block(t, b=None):
     n, t0, t1 = b or block(t); lt = t - t0; DEFER[0] = True; PENDING.clear(); LIGHT[0] = False; sub_y = 1440; vid = True
     if n == "hook":                                                     # wide: the question on the dark wall above her head
@@ -151,7 +152,7 @@ def render_block(t, b=None):
         label_at(fr, "КАК СИДЕТЬ ПОСЛЕ ОПЕРАЦИИ", 540, 300, min(1, lt / 0.5), WHITE, 46, "mm")
     elif n == "piano":                                                  # "садитесь как пианист" + keys pressed one by one
         fr = mblur(WIDE(t, lt), lt); fr = fr * (1 - 0.35 * np.clip((yy_[..., None] - 900) / 500, 0, 1) * 0)
-        TP.draw(fr, 220, t, 19.95, 1e9); piano_keys(fr, t, t0)
+        TP.draw(fr, 220, t, 19.95, 1e9)
     elif n == "sleep":
         fr = mblur(CLOSE(t, lt) if t < 30.1 else WIDE(t, t - 30.1), min(lt, abs(t - 30.1) + (0 if t >= 30.1 else 1)))
         if t < 30.1: TL1.draw(fr, 300, t, 26.5, 29.75)
@@ -162,7 +163,8 @@ def render_block(t, b=None):
         fr = mblur(WIDE(t, lt), lt) if t < 39.4 else dark_bg(t)
         if t >= 39.4: heart(fr, t, 39.45); TN.draw(fr, 1160, t, 39.9, 1e9); vid = False; sub_y = 1500
         else: TN.draw(fr, 250, t, 37.9, 39.2)
-    if vid: fr = look(fr, t) * (1 - HAZE)
+    if vid: fr = look(fr, t) * (1 - HAZE2)
+    if n == "piano": piano_keys(fr, t, t0)                              # keys stay bright over the haze
     subs2(fr, t, sub_y)
     DEFER[0] = False
     for args in PENDING: ablend(fr, *args)
