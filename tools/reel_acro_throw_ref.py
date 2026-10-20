@@ -6,6 +6,7 @@ import numpy as np, cv2, subprocess, sys
 from scipy.interpolate import PchipInterpolator
 
 SRC, MUS, OUT = sys.argv[1:4]
+GRADE = "--grade" in sys.argv                          # moody colour filter + grain; off by default (natural colours)
 W, H, FPS, SFPS = 1080, 1920, 60, 30.0
 P, T0 = 0.462, 0.025                                   # beat grid of the track: kicks at T0 + P*b, drop at b = 15
 DUR = 13.478; NF = int(DUR * FPS)
@@ -120,7 +121,7 @@ for fi in range(NF):
         acc = f if acc is None else acc + f
     img = (acc / len(poses)).astype(np.uint8)
     img = cv2.addWeighted(img, 1.4, cv2.GaussianBlur(img, (0, 0), 2.0), -0.4, 0)                           # crisp detail after upscale
-    img = grade(img)
+    img = grade(img) if GRADE else img.astype(np.float32)
     hd = t - tb(HERO)
     if 0 <= hd < 0.3: img = img + (255 - img) * 0.85 * np.exp(-hd / 0.05)                                   # drop flash
     if 0 <= hd < 0.5:                                                                                     # chromatic kick on the drop
@@ -128,7 +129,7 @@ for fi in range(NF):
         img[..., 2] = cv2.warpAffine(img[..., 2], np.float32([[1 + k / 700, 0, -W * k / 1400 + k], [0, 1 + k / 700, -H * k / 1400]]), (W, H), borderMode=cv2.BORDER_REFLECT)
         img[..., 0] = cv2.warpAffine(img[..., 0], np.float32([[1 - k / 700, 0, W * k / 1400 - k], [0, 1 - k / 700, H * k / 1400]]), (W, H), borderMode=cv2.BORDER_REFLECT)
     if tb(14) <= t < tb(HERO): img *= 1 - 0.25 * ease((t - tb(14)) / P)                                    # sink into the drop
-    img = img + rng.randn(H // 3, W // 3, 1).repeat(3, 0).repeat(3, 1) * 4
+    if GRADE: img = img + rng.randn(H // 3, W // 3, 1).repeat(3, 0).repeat(3, 1) * 4
     if t < 0.2: img *= t / 0.2
     if t > DUR - 0.3: img *= max(0, (DUR - t) / 0.3)
     ff.stdin.write(np.clip(img, 0, 255).astype(np.uint8).tobytes())
