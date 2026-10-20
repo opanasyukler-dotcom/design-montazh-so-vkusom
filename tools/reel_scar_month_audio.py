@@ -1,5 +1,5 @@
 import numpy as np, wave, librosa, cv2
-SR=48000; DUR=35.4; M0=7.6; n=int(DUR*SR)
+SR=48000; DUR=35.4; M0=1.0; n=int(DUR*SR)
 SEGS=[(70.72,77.62,1.60),(80.55,88.62,9.10),(88.60,91.98,17.90),(101.60,107.05,21.80)]
 x,_=librosa.load("a/8294_48.wav",sr=SR,mono=True); x=x/(np.sqrt(np.mean(x[np.abs(x)>1e-3]**2))+1e-6)
 vo=np.zeros(n)
@@ -7,7 +7,7 @@ for si,so,t0 in SEGS:
     seg=x[int(si*SR):int(so*SR)].copy(); f=int(0.015*SR); seg[:f]*=np.linspace(0,1,f); seg[-f:]*=np.linspace(1,0,f)
     i=int(t0*SR); vo[i:i+len(seg)]+=seg[:n-i]
 vo*=0.14
-y,_=librosa.load("../v19/mus.wav",sr=SR,mono=False,offset=M0,duration=DUR); mus=y.T[:n].copy(); mus/=np.abs(mus).max()
+y,_=librosa.load("mus_scar.wav",sr=SR,mono=False,offset=M0,duration=DUR); mus=y.T[:n].copy(); mus/=np.abs(mus).max()
 if len(mus)<n: mus=np.pad(mus,((0,n-len(mus)),(0,0)))
 tt=np.arange(n)/SR; act=np.zeros(n)
 for si,so,t0 in SEGS: act[int((t0-0.05)*SR):int((t0+so-si+0.05)*SR)]=1
