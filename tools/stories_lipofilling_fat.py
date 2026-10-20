@@ -636,6 +636,26 @@ def s1():
            subs=WordSubs("lipo_blur.mp4", y=1180), audio=("lipo_blur.mp4", 0.0, d))
 
 
+def s_breast(num):
+    # three breast lipofilling cases (cropped from drive/cases.jpg): ДО | ПОСЛЕ rows on black
+    src = load_img("cases.jpg")
+    rows = [(213, 607), (962, 1356), (1712, 2105)]; cols = [(96, 639), (680, 1223)]
+    bg = Image.new("RGB", (W, H), (0, 0, 0)).convert("RGBA"); d = ImageDraw.Draw(bg)
+    f = bold(54); y = 150
+    for ln in wrap("ЖИР С ЖИВОТА И БЁДЕР МОЖЕТ СТАТЬ ОБЪЁМОМ ВАШЕЙ ГРУДИ!", f, W - 2 * MARGIN):
+        d.text((W / 2, y), ln, font=f, fill=WHITE + (255,), anchor="mt"); y += 64
+    pw, gap = 490, 20; x0 = (W - 2 * pw - gap) // 2; y += 50
+    fl = mont(26, 500)
+    d.text((x0, y), "до", font=fl, fill=WHITE + (255,)); d.text((x0 + pw + gap, y), "после", font=fl, fill=WHITE + (255,)); y += 46
+    for ya, yb in rows:
+        for j, (xa, xb) in enumerate(cols):
+            ph = src.crop((xa, ya, xb, yb)); ph_h = int(pw * ph.height / ph.width)
+            bg.alpha_composite(card(ph, pw, ph_h, radius=18, border=0), (x0 + j * (pw + gap), y))
+        y += ph_h + gap
+    d.text((W / 2, y + 40), "липофилинг груди собственным жиром", font=mont(30, 400), fill=WHITE + (255,), anchor="mt")
+    render(num, "zhir_v_grud", 10.0, still_bg(bg.convert("RGB"), z1=1.0), [])
+
+
 def s2():
     bg = Image.new("RGB", (W, H), (0, 0, 0)).convert("RGBA")
     f = bold(72); d = ImageDraw.Draw(bg)
@@ -644,12 +664,12 @@ def s2():
     for i, n in enumerate(["IMG_8256.JPG", "IMG_8257.JPG", "IMG_8258.JPG", "IMG_8259.JPG"]):
         c = card(load_img(n), sz, sz, radius=22, border=0)
         bg.alpha_composite(c, (x0 + (i % 2) * (sz + gap), y0 + (i // 2) * (sz + gap)))
-    render(2, "yagodicy", 10.0, still_bg(bg.convert("RGB"), z1=1.0), [])
+    render(3, "yagodicy", 10.0, still_bg(bg.convert("RGB"), z1=1.0), [])
 
 
 def s3():
     # repost: the finished reel, full screen, with its own sound and captions
-    out = os.path.join(OUT, "03_repost_rolika.mp4")
+    out = os.path.join(OUT, "04_repost_rolika.mp4")
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", os.path.join(SRC, "drive", "IMG_4755.MP4"),
                     "-vf", f"scale={W}:{H}:flags=lanczos,fps={FPS}", "-c:v", "libx264", "-crf", "18", "-preset", "medium",
                     "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", out], check=True)
@@ -665,11 +685,11 @@ def s4():
     col.body("чтобы разобрать именно ваш случай и то, подойдёт ли вам липофилинг", 0, size=38, wght=500, gap=30)
     col.body("жду вас", 0, size=46, wght=300, gap=0)
     col.to_bottom(1720)
-    render(4, "konsultaciya", 10.0, still_bg(img, z1=1.0), col.items, shade=black_fade(col.items[0].y + 40, 380, 0.82))
+    render(5, "konsultaciya", 10.0, still_bg(img, z1=1.0), col.items, shade=black_fade(col.items[0].y + 40, 380, 0.82))
 
 
-PHOTO_ONLY = {2, 4}
-STORIES = {1: s1, 2: s2, 3: s3, 4: s4}
+PHOTO_ONLY = {2, 3, 5}
+STORIES = {1: s1, 2: lambda: s_breast(2), 3: s2, 4: s3, 5: s4}
 for k, fn in STORIES.items():
     if not ONLY or k in ONLY:
         fn()
