@@ -41,17 +41,6 @@ def raw(i):
         x, y = NIP[j, :2]; h, w = STK.shape[:2]; x0, y0 = int(x - w / 2), int(y - h / 2)
         a = STK[..., 3:4]; reg = f[y0:y0 + h, x0:x0 + w].astype(np.float32); f[y0:y0 + h, x0:x0 + w] = (reg * (1 - a) + STK[..., :3] * 255 * a).astype(np.uint8)
     return f
-def tablet_mask(t, z, cx, cy, oy):
-    """soft ellipse over the tablet screen (in output pixels): kept bright, no haze / vignette there"""
-    j = int(round(src_of(t) * 30)) - 66 * 30
-    if not 0 <= j < len(NIP): return None
-    x, y = NIP[j, :2]; ox, oy_ = 540 + z * (x - cx), oy + z * (y + 70 - cy)
-    m = np.clip(1 - (((xx_ - ox) / (230 * z)) ** 2 + ((yy_ - oy_) / (330 * z)) ** 2), 0, 1)
-    return np.clip(m * 2.2, 0, 1)[..., None]
-def look_tablet(fr, t, z, cx, cy, oy):
-    plain = fr.copy(); graded = look(fr, t) * (1 - HAZE); m = tablet_mask(t, z, cx, cy, oy)
-    if m is None: return graded
-    return graded * (1 - m) + (plain * 0.97 + 0.02) * m
 def vframe(ts, z, cx, cy, oy): return warp(raw(int(round(ts * 30))), z, cx, cy, 540, oy)
 SHOTS = {"m1": (1.35, 560, 800, 1150), "m2": (1.6, 555, 720, 1180), "m3": (1.35, 560, 800, 1150), "m6": (1.55, 555, 730, 1170)}
 
@@ -157,7 +146,7 @@ def render_block(t, b=None):
         fr = vframe(src_of(t), z * (1 + 0.03 * lt / 6) * trans(t, t0, 0.05), cx, cy, oy)
         if n == "m1": fr = focus(fr, lt, 0.7)
         else: fr = mblur(fr, lt)
-        fr = look_tablet(fr, t, z * (1 + 0.03 * lt / 6) * trans(t, t0, 0.05), cx, cy, oy)
+        fr = look(fr, t) * (1 - HAZE)
         if n == "m1" and t < 1.9: T_INTRO.draw(fr, 1180, t, 0.1, 1.55)
         scar_card(fr, t, 0.2)
         if n == "m2": T_RED.draw(fr, 1190, t, 13.6, 16.9)
