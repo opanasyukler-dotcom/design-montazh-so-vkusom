@@ -683,7 +683,8 @@ def s4():
 # front photos aligned on the nipple stickers: before (683,1129)-(1476,1083), after (531,838)-(1079,819)
 FRONT = {"before": ("IMG_6325.heic", 0.66, (1080, 1106)), "after": ("IMG_1588.JPG", 0.956, (805, 828))}
 # 3/4 photos aligned on the near nipple sticker; scales equalise sticker -> fingertips (before 1811 px, after 1189 px)
-TQ = {"before": ("IMG_6331.heic", 0.628, (1224, 1149)), "after": ("IMG_1592.JPG", 0.956, (994, 961))}
+# before placement found by maximising the overlap of the two body silhouettes (rembg masks), IoU 0.95
+TQ = {"before": ("IMG_6331.heic", 0.56, (1224, 1149)), "after": ("IMG_1592.JPG", 0.956, (994, 961))}
 
 
 def front_frame(key, ym=560, spec=FRONT, xm=540):
@@ -694,7 +695,7 @@ def front_frame(key, ym=560, spec=FRONT, xm=540):
 
 
 def s5():
-    b = front_frame("before", 600, TQ, 600).astype(np.float32); a = front_frame("after", 600, TQ, 600).astype(np.float32)
+    b = front_frame("before", 606, TQ, 454).astype(np.float32); a = front_frame("after", 600, TQ, 600).astype(np.float32)
     T1, T2, T3 = 2.0, 3.2, 6.0
     def bg(i, t):
         k = min(max((t - T1) / (T2 - T1), 0), 1); k = k * k * (3 - 2 * k)
@@ -729,12 +730,16 @@ def cutout(name):
 
 def s6():
     # after (front), background removed, the body over the whole story; small white arrows + what was done
-    s = 0.75; ox, oy = int(540 - 770 * s), int(30 - 230 * s)          # body centred
-    im = cutout("IMG_1588.JPG"); im = im.resize((int(im.width * s), int(im.height * s)), Image.LANCZOS)
+    # drive/after_front2.jpg (the client's new after photo); geometry mapped from IMG_1588 via the nipple stickers
+    k0 = 512 / 548; s = 0.75 / k0
+    def M(x, y): return ((x - 531) * k0 + 505, (y - 838) * k0 + 786)
+    cx0, ny = M(770, 230)
+    ox, oy = int(540 - cx0 * s), int(30 - ny * s)                        # body centred, straight cut under the chin
+    im = cutout("after_front2.jpg"); im = im.resize((int(im.width * s), int(im.height * s)), Image.LANCZOS)
     bg = Image.new("RGB", (W, H), (0, 0, 0)); bg.paste(im, (ox, oy))
     a = np.asarray(bg, np.float32); k = np.clip((np.arange(H, dtype=np.float32) - 30) / 40, 0, 1)[:, None, None]
     bg = Image.fromarray((a * k).astype(np.uint8)).convert("RGBA")          # clean straight cut under the chin
-    def P(x, y): return (x * s + ox, y * s + oy)
+    def P(x, y): x, y = M(x, y); return (x * s + ox, y * s + oy)
     for text, (cx, cy), tgt in [("наполненный верхний полюс", (380, 268), P(560, 640)),
                                 ("увеличенный объём", (860, 585), P(1150, 860)),
                                 ("округлая форма", (380, 675), P(590, 985))]:
