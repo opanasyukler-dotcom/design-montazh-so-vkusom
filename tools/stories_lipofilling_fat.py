@@ -627,9 +627,7 @@ def emoji(ch, size):
 
 def s1():
     col = Column(0, align="left")
-    f = bold(62); tail = emoji("😍", 58)
-    im, pad = text_img(wrap("ПОСМОТРИТЕ, КАКОЙ ДРАГОЦЕННЫЙ ЖИР!", f, col.width - tail.width - 14), f, WHITE, 1.14, "left", col.width, tail=tail)
-    col._add(im, pad, 0, 18)
+    col.head("ПОСМОТРИТЕ, КАКОЙ ДРАГОЦЕННЫЙ ЖИР!", 0, size=62, gap=18)
     col.body("Не надо худеть, если хотите липофилинг", 0, size=40, wght=500, gap=0)
     col.to_bottom(1720)
     d = 29.0
@@ -660,22 +658,17 @@ def s3():
 
 
 def s4():
-    # cover video (3.8 s of 4K, slowed down to 7.7 s), no sound; CTA low on the gown, face free
-    p = subprocess.run(["ffmpeg", "-v", "error", "-i", os.path.join(SRC, "drive", "C0595.MP4"),
-                        "-vf", f"scale={W}:{H}:flags=lanczos,setpts=2.0*PTS,fps={FPS}", "-an", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
-                       capture_output=True, check=True).stdout
-    frames = np.frombuffer(p, np.uint8).reshape(-1, H, W, 3)
+    # the surgeon in the OR (drive/surgeon_or_photo.jpg), photo story; CTA low on the gown, face free
+    img = ImageOps.fit(load_img("surgeon_or_photo.jpg"), (W, H), Image.LANCZOS, centering=(0.5, 0.0))
     col = Column(0, align="center")
     col.head("ПИШИТЕ «КОНСУЛЬТАЦИЯ»,", 0, size=58, gap=14)
-    col.body("чтобы разобрать именно ваш случай и то, подойдёт ли вам липофилинг", 0, size=38, wght=500, gap=36)
-    col.body("жду вас", 0, size=44, wght=300, gap=6)
-    em = emoji("🫂", 70); col.items.append(Sprite(em, (W - em.width) // 2, col.y, 0, dy=0)); col.y += em.height; col.bottom = col.y
+    col.body("чтобы разобрать именно ваш случай и то, подойдёт ли вам липофилинг", 0, size=38, wght=500, gap=30)
+    col.body("жду вас", 0, size=46, wght=300, gap=0)
     col.to_bottom(1720)
-    render(4, "konsultaciya", len(frames) / FPS, lambda i, t: frames[min(i, len(frames) - 1)], col.items,
-           shade=black_fade(col.items[0].y + 40, 380, 0.82))
+    render(4, "konsultaciya", 10.0, still_bg(img, z1=1.0), col.items, shade=black_fade(col.items[0].y + 40, 380, 0.82))
 
 
-PHOTO_ONLY = {2}
+PHOTO_ONLY = {2, 4}
 STORIES = {1: s1, 2: s2, 3: s3, 4: s4}
 for k, fn in STORIES.items():
     if not ONLY or k in ONLY:
