@@ -138,7 +138,7 @@ def subs2(fr, t, y):
             c = (PINK, ROSE) if w.strip(",") in KEY else (WHITE, BLUE)
             ablend(fr, im2, 540 - im2.shape[1] / 2, y - im2.shape[0] / 2, min(1, (t - t0) / 0.08), *c)
 
-_r2 = np.clip((np.arange(H) - 560) / 1100, 0, 1); HAZE2 = (0.84 * _r2 * _r2 * (3 - 2 * _r2))[:, None, None].astype(np.float32)   # soft, gradual black from the bottom (no visible edge)
+_r2 = np.clip((np.arange(H) - 520) / 1050, 0, 1); HAZE2 = (0.9 * _r2 * _r2 * (3 - 2 * _r2))[:, None, None].astype(np.float32)   # soft, gradual black from the bottom (no visible edge)
 def render_block(t, b=None):
     n, t0, t1 = b or block(t); lt = t - t0; DEFER[0] = True; PENDING.clear(); LIGHT[0] = False; sub_y = 1440; vid = True
     if n == "hook":                                                     # wide: the question on the dark wall above her head
