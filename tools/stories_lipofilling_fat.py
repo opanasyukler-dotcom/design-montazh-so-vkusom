@@ -678,8 +678,8 @@ def s3():
 
 
 def s4():
-    # the surgeon in the OR (drive/surgeon_or_photo.jpg), photo story; CTA low on the gown, face free
-    img = ImageOps.fit(load_img("surgeon_or_photo.jpg"), (W, H), Image.LANCZOS, centering=(0.5, 0.0))
+    # the surgeon in the OR (drive/surgeon_or_photo2.jpg), photo story; CTA low on the gown, face free
+    img = ImageOps.fit(load_img("surgeon_or_photo2.jpg"), (W, H), Image.LANCZOS, centering=(0.5, 0.0))
     col = Column(0, align="center")
     col.head("ПИШИТЕ «КОНСУЛЬТАЦИЯ»,", 0, size=58, gap=14)
     col.body("чтобы разобрать именно ваш случай и то, подойдёт ли вам липофилинг", 0, size=38, wght=500, gap=30)
