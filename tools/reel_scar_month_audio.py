@@ -1,5 +1,5 @@
 import numpy as np, wave, librosa, cv2
-SR=48000; DUR=35.4; M0=1.0; n=int(DUR*SR)
+SR=48000; DUR=35.4; M0=0.7; n=int(DUR*SR)
 SEGS=[(70.72,77.62,1.60),(80.55,88.62,9.10),(88.60,91.98,17.90),(101.60,107.05,21.80)]
 x,_=librosa.load("a/8294_48.wav",sr=SR,mono=True); x=x/(np.sqrt(np.mean(x[np.abs(x)>1e-3]**2))+1e-6)
 vo=np.zeros(n)
