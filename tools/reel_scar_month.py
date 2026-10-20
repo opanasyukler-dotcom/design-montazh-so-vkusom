@@ -87,7 +87,10 @@ def scar_card(fr, t, t0card=0.15, y0=215):
         cv2.circle(fr, (int(x), yl), r, tuple(float(c) / 255 for c in (PINK if on else (120, 120, 140))), -1, cv2.LINE_AA)
         label_at(fr, f"{m} мес" if m < 12 else "год", x, yl + 34, al * (1 if on else 0.55), WHITE if on else (170, 170, 185), 26, "mm")
     if t >= 0: pass
-T_INTRO = Pill([("1 МЕСЯЦ", "H"), ("ПОСЛЕ ОПЕРАЦИИ", "P")], 96)
+exec(open("examples.py").read())
+CH_DO, CH_PO = label("ДО", WHITE), label("ПОСЛЕ", PINK)
+SHIFT = 1.35                                                            # the reel now starts right on the voice
+T_HEAD = Title([("ВОТ ЧТО НАДО ЗНАТЬ", "H"), ("ПЕРЕД ОПЕРАЦИЕЙ", "H"), ("О РУБЦАХ:", "P")], 84)
 T_RED = Pop([("КРАСНОТА —", "H"), ("НОРМАЛЬНЫЙ ЭТАП", "P")], 92)
 T_POST = [timg(l, "S", 0) for l in ("в этом посте вы сможете наглядно увидеть",)]
 T_POST_H = Title([("ПРИМЕР ЗАЖИВЛЕНИЯ", "H"), ("РУБЦОВ НА ГРУДИ", "P")], 88)
@@ -147,10 +150,15 @@ def render_block(t, b=None):
         if n == "m1": fr = focus(fr, lt, 0.7)
         else: fr = mblur(fr, lt)
         fr = look(fr, t) * (1 - HAZE)
-        if n == "m1" and t < 1.9: T_INTRO.draw(fr, 1180, t, 0.1, 1.55)
         scar_card(fr, t, 0.2)
+        if n == "m1": T_HEAD.draw(fr, 1040, t, SHIFT + 0.05, SHIFT + 3.9)
         if n == "m2": T_RED.draw(fr, 1190, t, 13.6, 16.9)
-        subs2(fr, t, 1440)
+        if (6.1 <= t <= 9.35) or (22.6 <= t <= 27.55):                  # flush the card's text first so the example sits on top of it
+            DEFER[0] = False
+            for args in PENDING: ablend(fr, *args)
+            PENDING.clear(); DEFER[0] = True
+        on = slider_overlay(fr, t, 6.1, 9.0, 6.7, 8.2) or collage_overlay(fr, t, 22.6, 27.2)   # patient examples over the speech
+        subs2(fr, t, 1640 if on else 1440)
     elif n == "post":                                                   # freeze on the last frame of the speech
         z, cx, cy, oy = SHOTS["m6"]; ts = 27.55
         still = look(vframe(src_of(ts), z * (1 + 0.03 * (ts - 21.6) / 6), cx, cy, oy), ts) * (1 - HAZE)
@@ -161,7 +169,8 @@ def render_block(t, b=None):
     for args in PENDING: ablend(fr, *args)
     blend(fr, LOGO, 540 - LOGO.shape[1] / 2, 120, 0.9)
     return np.clip(fr, 0, 1)
-def render(t):
+def render(t): return render_orig(t + SHIFT)
+def render_orig(t):
     n, t0, t1 = block(t); i = BL.index((n, t0, t1)); fr = render_block(t)
     if i > 0 and t < t0 + XF:
         a = ease((t - t0) / XF); fr = render_block(t, BL[i - 1]) * (1 - a) + fr * a
@@ -175,6 +184,6 @@ if __name__ == "__main__":
         sys.exit()
     enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
                             "-c:v", "libx264", "-crf", "17", "-preset", "medium", "-pix_fmt", "yuv420p", "video_scar.mp4"], stdin=subprocess.PIPE)
-    for i in range(int(DUR * FPS)):
+    for i in range(int((DUR - SHIFT) * FPS)):
         enc.stdin.write((render(i / FPS) * 255).astype(np.uint8).tobytes())
     enc.stdin.close(); enc.wait()

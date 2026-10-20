@@ -26,7 +26,9 @@ put(pencil(),0.45,0.05)
 for t,f in [(0.15,659),(8.6,587),(17.6,698),(21.6,784),(24.2,880)]: put(kalimba(f),t,0.11)          # one note per month on the timeline
 put(kalimba(988,0.8),27.62,0.08)                                                                    # freeze
 put(kalimba(523,2.0),31.45,0.09); put(kalimba(659,2.0),31.45,0.07); put(kalimba(784,2.0),31.5,0.07)  # gentle chord on the takeaway
+put(kalimba(740,0.9),6.12,0.08); put(kalimba(740,0.9),22.62,0.08)                          # patient examples appear
 mix=mus+vo[:,None]+sfx[:n,None]*0.6
 mix/=max(1,np.abs(mix).max()/0.97)
+SHIFT=1.35; mix=mix[int(SHIFT*SR):]; f=int(0.04*SR); mix[:f]*=np.linspace(0,1,f)[:,None]          # reel starts on the voice
 with wave.open("mix_scar.wav","wb") as w:
     w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR); w.writeframes((mix*32767).astype(np.int16).tobytes())
