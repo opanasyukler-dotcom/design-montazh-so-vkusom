@@ -1,6 +1,6 @@
 import numpy as np, wave, librosa, cv2
-SR=48000; DUR=35.4; M0=0.7; n=int(DUR*SR)
-SEGS=[(70.72,77.62,1.60),(80.55,88.62,9.10),(88.62,91.98,17.17),(101.60,107.05,21.80)]
+SR=48000; DUR=34.2; M0=0.7; n=int(DUR*SR)
+SEGS=[(70.72,77.62,1.60),(80.55,88.62,9.10),(88.62,91.98,17.17),(101.60,107.05,20.60)]
 x,_=librosa.load("a/8294_48.wav",sr=SR,mono=True); x=x/(np.sqrt(np.mean(x[np.abs(x)>1e-3]**2))+1e-6)
 vo=np.zeros(n)
 for si,so,t0 in SEGS:
@@ -23,10 +23,10 @@ def pencil(dur=0.9):                       # soft pencil line while the scar is 
 sfx=np.zeros(n+2*SR)
 def put(s,t,g): i=int(max(0,t)*SR); seg=sfx[i:i+len(s)]; seg+=s[:len(seg)]/np.abs(s).max()*g
 put(pencil(),0.45,0.05)
-for t,f in [(0.15,659),(8.6,587),(17.6,698),(21.6,784),(24.2,880)]: put(kalimba(f),t,0.11)          # one note per month on the timeline
-put(kalimba(988,0.8),27.62,0.08)                                                                    # freeze
-put(kalimba(523,2.0),31.45,0.09); put(kalimba(659,2.0),31.45,0.07); put(kalimba(784,2.0),31.5,0.07)  # gentle chord on the takeaway
-put(kalimba(740,0.9),6.12,0.08); put(kalimba(740,0.9),22.62,0.08)                          # patient examples appear
+for t,f in [(0.15,659),(8.6,587),(17.6,698),(20.55,784),(23.0,880)]: put(kalimba(f),t,0.11)          # one note per month on the timeline
+put(kalimba(988,0.8),26.42,0.08)                                                                    # freeze
+put(kalimba(523,2.0),30.25,0.09); put(kalimba(659,2.0),30.25,0.07); put(kalimba(784,2.0),30.3,0.07)  # gentle chord on the takeaway
+put(kalimba(740,0.9),6.12,0.08); put(kalimba(740,0.9),21.42,0.08)                          # patient examples appear
 mix=mus+vo[:,None]+sfx[:n,None]*0.6
 mix/=max(1,np.abs(mix).max()/0.97)
 SHIFT=1.35; mix=mix[int(SHIFT*SR):]; f=int(0.04*SR); mix[:f]*=np.linspace(0,1,f)[:,None]          # reel starts on the voice

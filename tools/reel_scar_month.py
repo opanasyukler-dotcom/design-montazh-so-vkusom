@@ -1,16 +1,30 @@
 _b = open("base.py").read()
-for a, b in [("DUR = 41.0", "DUR = 35.4"), ("ease((t - t0) / 0.3))\ndef mblur", "ease((t - t0) / 0.6))\ndef mblur"),
+for a, b in [("DUR = 41.0", "DUR = 34.2"), ("ease((t - t0) / 0.3))\ndef mblur", "ease((t - t0) / 0.6))\ndef mblur"),
              ("if lt > 0.1: return fr", "if lt > 0.18: return fr"), ("(1 - lt / 0.1)", "(1 - lt / 0.18)"),
              ("ti = t0 + k * 0.24; p = ease((t - ti) / 0.65)" if False else "ti = t0 + k * 0.16; p = ease((t - ti) / 0.45)", "ti = t0 + k * 0.24; p = ease((t - ti) / 0.65)"),
              ("out = 1 - ease((t - t1) / 0.3) if t > t1 else 1.0", "out = 1 - ease((t - t1) / 0.4) if t > t1 else 1.0")]:
     assert _b.count(a) == 1, a; _b = _b.replace(a, b)
 exec(_b)
 exec(open("fx.py").read()); exec(open("draw.py").read())
+class Src:
+    """frame-exact reader: never seeks with CAP_PROP_POS_FRAMES (inexact on H.264 -> frozen frames / lip-sync drift), decodes forward instead"""
+    def __init__(s, p): s.p = p; s.cap = cv2.VideoCapture(p); s.pos = -1; s.c = {}; s.last = None
+    def get(s, i):
+        if i in s.c: return s.c[i]
+        if i <= s.pos: s.cap.release(); s.cap = cv2.VideoCapture(s.p); s.pos = -1
+        while s.pos < i - 1:
+            if not s.cap.grab(): break
+            s.pos += 1
+        ok, f = s.cap.read(); s.pos = i
+        if not ok: return s.last
+        f = cv2.cvtColor(f, cv2.COLOR_BGR2RGB); s.last = f
+        if len(s.c) > 60: s.c.pop(next(iter(s.c)))
+        s.c[i] = f; return f
 
 SEGS = [(70.72, 77.62, 1.60),    # в первый месяц рубец всегда выглядит хорошо… хороший тоненький рубец, хорошо заживший
         (80.55, 88.62, 9.10),    # но со второго месяца образуется больше коллагена… нормальным его состоянием
         (88.62, 91.98, 17.17),   # и только с третьего месяца рубец начинает белеть
-        (101.60, 107.05, 21.80)] # если он зажил хорошо, он сам побелеет… к шестому примерно, или к году
+        (101.60, 107.05, 20.60)] # если он зажил хорошо, он сам побелеет… к шестому примерно, или к году
 def src_of(t):
     best = None
     for si, so, t0 in SEGS:
@@ -18,7 +32,7 @@ def src_of(t):
         if t < t0: return max(0.0, si - (t0 - t)) if best is None else min(best[0] + t - best[1], si)
         best = (so, t0 + so - si)
     return best[0] + t - best[1]
-BL = [("m1", 0, 8.6), ("m2", 8.6, 17.6), ("m3", 17.6, 21.6), ("m6", 21.6, 27.6), ("post", 27.6, 31.4), ("end", 31.4, DUR)]
+BL = [("m1", 0, 8.6), ("m2", 8.6, 17.6), ("m3", 17.6, 20.55), ("m6", 20.55, 26.4), ("post", 26.4, 30.2), ("end", 30.2, DUR)]
 XF = 0.35
 def block(t):
     for n, a, b in BL:
@@ -45,11 +59,11 @@ def vframe(ts, z, cx, cy, oy): return warp(raw(int(round(ts * 30))), z, cx, cy, 
 SHOTS = {"m1": (1.35, 560, 800, 1150), "m2": (1.6, 555, 720, 1180), "m3": (1.35, 560, 800, 1150), "m6": (1.55, 555, 730, 1170)}
 
 # ---------------- the scar card: phase label, skin strip with a scar whose colour follows the months, timeline ----------------
-PH = [(0.0, "1 МЕСЯЦ", "после операции"), (8.6, "2 МЕСЯЦ", "больше коллагена"), (17.6, "3 МЕСЯЦ", "и дальше"), (21.6, "6 МЕСЯЦЕВ — 1 ГОД", "")]
+PH = [(0.0, "1 МЕСЯЦ", "после операции"), (8.6, "2 МЕСЯЦ", "больше коллагена"), (17.6, "3 МЕСЯЦ", "и дальше"), (20.55, "6 МЕСЯЦЕВ — 1 ГОД", "")]
 PHI = {lab: (timg(lab, "H", 76), timg(sub, "S", 0) if sub else None) for _, lab, sub in PH}
 # scar colour / width / redness per reel time (key points)
 KF = [(0.0, (214, 150, 150), 6), (8.6, (214, 150, 150), 6), (13.2, (196, 62, 70), 11), (17.6, (196, 62, 70), 11),
-      (21.0, (214, 138, 138), 8), (25.0, (242, 226, 220), 5), (DUR, (242, 226, 220), 5)]
+      (20.2, (214, 138, 138), 8), (23.8, (242, 226, 220), 5), (DUR, (242, 226, 220), 5)]
 def scar_state(t):
     for (a, ca, wa), (b, cb, wb) in zip(KF, KF[1:]):
         if a <= t <= b:
@@ -79,7 +93,7 @@ def scar_card(fr, t, t0card=0.15, y0=215):
     ablend(fr, lab, 190 + dx, y0 + 28, pa, WHITE, BLUE)
     if sub is not None: ablend(fr, sub, 200 + lab.shape[1] + 18 + dx, y0 + 62, pa, PINK, ROSE)
     # timeline: 1 · 2 · 3 · 6 · 12 months
-    marks = [(1, 0.0), (2, 8.6), (3, 17.6), (6, 21.6), (12, 24.2)]
+    marks = [(1, 0.0), (2, 8.6), (3, 17.6), (6, 20.55), (12, 23.0)]
     xs = np.linspace(240, 840, len(marks)); yl = y0 + 318
     stroke(fr, np.float32([[xs[0], yl], [xs[-1], yl]]), al, (120, 120, 140), 3)
     for (m, tm), x in zip(marks, xs):
@@ -153,15 +167,15 @@ def render_block(t, b=None):
         scar_card(fr, t, 0.2)
         if n == "m1": T_HEAD.draw(fr, 1040, t, SHIFT + 0.05, SHIFT + 3.9)
         if n == "m2": T_RED.draw(fr, 1190, t, 13.6, 16.9)
-        if (6.1 <= t <= 9.55) or (22.6 <= t <= 27.55):                  # flush the card's text first so the example sits on top of it
+        if (6.1 <= t <= 9.55) or (21.4 <= t <= 26.35):                  # flush the card's text first so the example sits on top of it
             DEFER[0] = False
             for args in PENDING: ablend(fr, *args)
             PENDING.clear(); DEFER[0] = True
-        on = video_overlay(fr, t, 6.1, 9.2, 0.6, 1.4) or slider_overlay(fr, t, 22.6, 27.2, 23.3, 25.0)   # patient examples over the speech
+        on = video_overlay(fr, t, 6.1, 9.2, 0.6, 1.4) or slider_overlay(fr, t, 21.4, 26.0, 22.1, 23.8)   # patient examples over the speech
         subs2(fr, t, 1640 if on else 1440)
     elif n == "post":                                                   # freeze on the last frame of the speech
-        z, cx, cy, oy = SHOTS["m6"]; ts = 27.55
-        still = look(vframe(src_of(ts), z * (1 + 0.03 * (ts - 21.6) / 6), cx, cy, oy), ts) * (1 - HAZE)
+        z, cx, cy, oy = SHOTS["m6"]; ts = 26.35
+        still = look(vframe(src_of(ts), z * (1 + 0.03 * (ts - 20.55) / 6), cx, cy, oy), ts) * (1 - HAZE)
         fr = post_freeze(still, t, t0)
     else:                                                               # end card: the whole timeline + the takeaway
         fr = dark_bg(t); scar_card(fr, t, -10, 620); T_END.draw(fr, 1130, t, t0 + 0.4, 1e9)
