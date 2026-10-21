@@ -1,18 +1,26 @@
 """Tight speech edit: keep only the spoken words (every pause and «а/э/м» hesitation dropped), soft micro-crossfades
 at the joins, and an optional voice change for chosen speaker intervals (the patient) so she cannot be recognised.
 
-usage: python3 clean_speech.py SRC ASR.json OUT WINDOWS [--disguise a-b,a-b,...]
+usage: python3 clean_speech.py SRC ASR.json OUT WINDOWS [--disguise a-b,...] [--cut a-b,...] [--drawn]
   WINDOWS: comma-separated source ranges to take words from, e.g. 4.2-33.0  or 37.5-44.8,52.3-61.9
   --disguise: source ranges spoken by the patient -> pitch + formant shift (rubberband), the surgeon stays natural
+  --cut: source ranges to drop by hand (an «ага», a drawn «а-а» the ASR glued to a word)
+  --drawn: also drop over-long steady vowels («ааа», «мыыы») found by voice_tools.drawn_vowels (first 0.10 s kept)
 Writes OUT (video+audio) and OUT.words.json (word timings mapped to the new timeline, for the subtitles).
 """
 import json, os, subprocess, sys
 import numpy as np
 
 SRC, ASRJ, OUT, WIN = sys.argv[1:5]
-DIS = []
-if "--disguise" in sys.argv:
-    DIS = [tuple(map(float, r.split("-"))) for r in sys.argv[sys.argv.index("--disguise") + 1].split(",") if r]
+
+
+def ranges(flag):
+    if flag not in sys.argv: return []
+    return [tuple(map(float, r.split("-"))) for r in sys.argv[sys.argv.index(flag) + 1].split(",") if r]
+
+
+DIS, CUT = ranges("--disguise"), ranges("--cut")
+HAND = list(CUT)                                          # words under these go from the subtitles too
 WINS = [tuple(map(float, r.split("-"))) for r in WIN.split(",")]
 FPS, SR = 30.0, 48000
 PRE, POST, MERGE = 0.06, 0.14, 0.12          # kept around each word; joins closer than MERGE are not cut
@@ -52,6 +60,23 @@ for a, b in segs:
             j = k2
         else: j += 1
     refined.append([cur, b])
+if "--drawn" in sys.argv:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import voice_tools as vt
+    lm, _, en = vt.features(_x)
+    dv = []
+    for a, b in vt.drawn_vowels(lm, en, min_len=0.22, keep=0.10):      # one stretched vowel split in two -> one cut
+        if dv and a - dv[-1][1] < 0.3: dv[-1][1] = b
+        else: dv.append([a, b])
+    CUT += [tuple(r) for r in dv]
+for c0, c1 in CUT:                                        # subtract the dropped ranges from the kept pieces
+    nxt = []
+    for a, b in refined:
+        if c1 <= a or c0 >= b: nxt.append([a, b]); continue
+        if c0 > a: nxt.append([a, c0])
+        if c1 < b: nxt.append([c1, b])
+    refined = nxt
+print("cut:", " ".join(f"{a:.2f}-{b:.2f}" for a, b in CUT))
 segs = [s_ for s_ in refined if s_[1] - s_[0] > 0.08]
 # snap to frames so picture and sound stay in sync
 segs = [[round(a * FPS) / FPS, round(b * FPS) / FPS] for a, b in segs]
@@ -89,6 +114,7 @@ offs, off = [], 0.0
 for a0, b0 in segs: offs.append(off); off += b0 - a0
 mapped = []
 for a, b, t in words:                                     # a word may span a removed silence: place it where it sounds
+    if b - a > 0.02 and sum(max(0, min(b, c1) - max(a, c0)) for c0, c1 in HAND) >= 0.8 * (b - a): continue
     best = max(range(len(segs)), key=lambda i: min(b, segs[i][1]) - max(a, segs[i][0]))
     (a0, b0), o = segs[best], offs[best]
     if min(b, b0) - max(a, a0) > -0.1: mapped.append([max(a, a0) - a0 + o, max(min(b, b0), max(a, a0) + 0.05) - a0 + o, t])

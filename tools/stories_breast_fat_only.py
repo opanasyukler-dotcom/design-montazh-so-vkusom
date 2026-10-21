@@ -618,7 +618,9 @@ def interview(num, slug, clip, header, extra=None, y=None, bottom=1720, align="l
 #   c1 = v2 4.2-33.0   c2 = v1 1.3-27.4   c3 = v1 37.5-44.8 47.4-49.8 52.3-61.9 94.6-97.2 100.6-102.0
 #   c4 = v3 without pauses (1.44-8.83 9.02-20.51 20.88-26.51)   c5 = v4 0-31.4
 # FINAL: d1..d5 = the same pieces through tools/clean_speech.py — every pause and «а/э» removed, 12 ms fades at the
-#   joins, the patient's voice pitch+formant shifted (d1: 4.2-14.75 18.4-23.5 29.15-33.0, d2: 8.9-23.0, d3: 49.3-49.8 52.7-54.6)
+#   joins, drawn vowels / «ага» / «ммм» / a false start cut (--drawn --cut), the patient's voice pitch+formant
+#   shifted wherever she speaks (d1: 4.2-14.75 18.4-23.5 29.15-33.0, d2: 8.9-27.6,
+#   d3: 41.55-41.95 48.25-49.8 52.7-54.6 96.85-97.3 100.6-102.0) — exact commands in README
 # subtitles: word timings of the ORIGINAL take mapped through the cuts (cleaner than re-recognising the cut), except c2
 CUTS = {"c1.mp4": ("v2.mp4", [(4.2, 33.0)]), "c3.mp4": ("v1.mp4", [(37.5, 44.8), (47.4, 49.8), (52.3, 61.9), (94.6, 97.2), (100.6, 102.0)]),
         "c4.mp4": ("v3.mp4", [(1.44, 8.83), (9.02, 20.51), (20.88, 26.51)]), "c5.mp4": ("v4.mp4", [(0.0, 31.4)])}
@@ -704,9 +706,9 @@ def s3():
     col = Column(0, align="left")
     col.head("ОТКУДА ЗАБИРАЕМ ЖИР:", 0, size=56, gap=16)
     for i, t in enumerate(["внутренняя поверхность бёдер", "колени", "галифе", "фланги"]):
-        col.body("—  " + t, 0.4 + i * 0.35, size=38, wght=500, gap=4)
+        col.body(t, 0.4 + i * 0.35, size=38, wght=500, gap=4)
     col.space(18)
-    col.body("Колени: жир забираем не спереди — иначе кожа станет морщинистой, а по контуру, чтобы линия была ровнее",
+    col.body("Колени: жир забираем не спереди, иначе кожа станет морщинистой, а по контуру, чтобы линия была ровнее",
              1.9, size=30, wght=400, gap=0)
     col.to_bottom(1740)
     for it in col.items[:1]: it.t0, it.dur = -1.0, 0.01
@@ -715,7 +717,7 @@ def s3():
 
 def s4():
     col = Column(0, align="left")
-    col.head("СЕГОДНЯ — ЛИПОФИЛИНГ ГРУДИ", 0, size=56, gap=12)
+    col.head("СЕГОДНЯ ЛИПОФИЛИНГ ГРУДИ", 0, size=56, gap=12)
     col.body("жир забираем из жировых ловушек и переносим в грудь", 0, size=34, wght=400, gap=0)
     col.to_bottom(1720)
     story(4, "segodnya_lipofiling", "d4.mp4", col, sub_y=1250)
@@ -724,7 +726,7 @@ def s4():
 def s5():
     col = Column(0, align="left")
     col.head("ОПЕРАЦИЯ ЗАВЕРШЕНА", 0, size=60, gap=12)
-    col.body("грудь исправили только с помощью липофилинга — без подтяжки и рубцов", 0, size=34, wght=400, gap=0)
+    col.body("грудь исправили только с помощью липофилинга, без подтяжки и рубцов", 0, size=34, wght=400, gap=0)
     col.to_bottom(1720)
     story(5, "operaciya_zavershena", "d5.mp4", col, sub_y=1250)
 
