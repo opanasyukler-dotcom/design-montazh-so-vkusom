@@ -13,7 +13,7 @@ confirms the words (strike-through «импланты»/«подтяжку», ma
 ticked as they are named, asymmetry bars, a drawn check mark).  Sound effects are synthesised (whoosh, pop, tick,
 swipe, ding) and mixed under the voice.
 
-usage: python3 reels_no_implants_no_lift.py SRC_DIR OUT_DIR [cover|reel]
+usage: python3 reels_no_implants_no_lift.py SRC_DIR OUT_DIR [cover|reel|remix]   (remix: new sound on the rendered picture)
 """
 import json, os, subprocess, sys, zlib
 import numpy as np, cv2
@@ -474,6 +474,9 @@ def reel():
         if not s["card"]: s["shade"] = top_fade(s["card_y"] - 30)
     total = t; print(f"reel {total:.1f}s", flush=True)
     tmp = os.path.join(OUT, "reel.v.mp4")
+    if "remix" in WHAT:                                      # only the sound: keep the rendered picture
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", os.path.join(OUT, "reels.mp4"), "-map", "0:v", "-c", "copy", tmp], check=True)
+        return mix_audio(sc, total, tmp)
     enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS),
                             "-i", "-", "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", tmp], stdin=subprocess.PIPE)
     for si, s in enumerate(sc):
@@ -498,17 +501,55 @@ def reel():
         main.close()
         if ex: ex.close()
     enc.stdin.close(); enc.wait()
-    # voice (silence under held / extra / tail footage) + sound effects under it
-    voice = np.zeros(int(total * SR) + SR, np.float32); fx = np.zeros_like(voice)
+    mix_audio(sc, total, tmp)
+
+
+# background music: a screen recording of «Affection» (vibessmusic); from ~27 s the recording is clipped, so only the
+# clean part is used: the intro, then its vocal loop again, joined with crossfades
+MUSIC = ("music_affection.wav", [(1.2, 26.9), (8.62, 26.9), (8.62, 26.9)])
+MUSIC_DB, DUCK_DB = -25.0, -10.0         # music RMS against full scale; extra drop while somebody speaks
+
+
+def music_bed(n):
+    path, parts = MUSIC
+    x = np.frombuffer(subprocess.run(["ffmpeg", "-v", "error", "-i", os.path.join(DRIVE, path), "-ac", "2", "-ar", str(SR), "-f", "f32le", "-"],
+                                     capture_output=True, check=True).stdout, np.float32).reshape(-1, 2)
+    X = int(0.6 * SR); out = np.zeros((0, 2), np.float32)
+    for a, b in parts:
+        seg = x[int(a * SR):int(b * SR)].copy()
+        if len(out) >= X:
+            r = np.linspace(0, 1, X)[:, None]
+            seg[:X] = out[-X:] * np.cos(r * np.pi / 2) + seg[:X] * np.sin(r * np.pi / 2); out = out[:-X]   # equal-power crossfade
+        out = np.concatenate([out, seg])
+        if len(out) >= n: break
+    out = out[:n]
+    if len(out) < n: out = np.pad(out, ((0, n - len(out)), (0, 0)))
+    out *= 10 ** (MUSIC_DB / 20) / (np.sqrt((out ** 2).mean()) + 1e-9)
+    f = int(0.5 * SR); out[:f] *= np.linspace(0, 1, f)[:, None]; g = int(1.8 * SR); out[-g:] *= np.linspace(1, 0, g)[:, None]
+    return out
+
+
+def mix_audio(sc, total, tmp):
+    """voice (silence under held / extra / tail footage) + sound effects + the music bed ducked under speech"""
+    n = int(total * SR)
+    voice = np.zeros(n + SR, np.float32); fx = np.zeros_like(voice)
     for s in sc:
         a = pcm(os.path.join(DRIVE, s["piece"]))[:int(s["voice"] * SR)]; i0 = int(s["t0"] * SR); voice[i0:i0 + len(a)] = a
         for tt, kind in s["sfx"] + ([(-0.5, "riser")] if s["t0"] > 0 else []):
             x = sfx(kind); j = int((s["t0"] + tt) * SR); fx[j:j + len(x)] += x[:len(fx) - j]
-    voice /= max(1e-6, np.abs(voice).max()); mix = voice * 0.9 + fx * 0.55
-    mix = mix[:int(total * SR)] / max(1.0, np.abs(mix).max() / 0.98)
+    voice /= max(1e-6, np.abs(voice).max()); voice, fx = voice[:n], fx[:n]
+    # ducking: speech envelope (50 ms RMS), held and smoothed so the music breathes between phrases, not per syllable
+    env = np.sqrt(np.convolve(voice ** 2, np.ones(2400) / 2400, "same"))
+    talk = (env > 0.02).astype(np.float32)
+    talk = np.convolve(talk, np.ones(int(0.35 * SR)), "same") > 0
+    k = int(0.25 * SR); duck = np.convolve(talk.astype(np.float32), np.ones(k) / k, "same")
+    gain = 10 ** (DUCK_DB * duck / 20)
+    mus = music_bed(n) * gain[:, None]
+    mix = (voice * 0.9 + fx * 0.55)[:, None] + mus
+    mix /= max(1.0, np.abs(mix).max() / 0.98)
     wav = os.path.join(OUT, "reel.f32"); mix.astype(np.float32).tofile(wav)
     out = os.path.join(OUT, "reels.mp4")
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", tmp, "-f", "f32le", "-ar", str(SR), "-ac", "1", "-i", wav,
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", tmp, "-f", "f32le", "-ar", str(SR), "-ac", "2", "-i", wav,
                     "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-af", "loudnorm=I=-14:TP=-1.5", "-c:a", "aac", "-b:a", "192k",
                     "-ar", "48000", "-shortest", "-movflags", "+faststart", out], check=True)
     os.remove(tmp); os.remove(wav); print("wrote", out, flush=True)
@@ -530,4 +571,4 @@ def cover():
 
 
 if "cover" in WHAT: cover()
-if "reel" in WHAT: reel()
+if "reel" in WHAT or "remix" in WHAT: reel()
