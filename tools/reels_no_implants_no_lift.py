@@ -412,11 +412,11 @@ def sfx(kind):
 def scenes():
     M = mont
     return [
-        dict(piece="rA.mp4", card=False,
+        dict(piece="rA.mp4", card=False, patient=True,
              band=[Chip("ДО", bebas(46), 0.15, h=64),
                    Headline(["ИМПЛАНТЫ НЕ ХОЧУ"], 124, "drop", strike=("ИМПЛАНТЫ", 0.75))],
              sfx=[(0, "hit"), (0.15, "tap"), (0.75, "swoosh")]),
-        dict(piece="rB.mp4", card=False, hold=0.7,
+        dict(piece="rB.mp4", card=False, hold=0.7, patient=True,
              band=[Slot(Headline(["ПОДТЯЖКУ", "ТОЖЕ НЕ ХОЧУ"], 112, "pop", out=4.0, strike=("ПОДТЯЖКУ", 3.15)),
                         Headline(["ТОГДА ЧТО", "МОЖНО СДЕЛАТЬ?"], 112, "type", t0=4.2))],
              sfx=[(0, "hit"), (0.05, "tap"), (0.3, "tap"), (3.15, "swoosh"), (4.2, "shimmer")]),
@@ -507,7 +507,7 @@ def reel():
 # background music: a screen recording of «Affection» (vibessmusic); from ~27 s the recording is clipped, so only the
 # clean part is used: the intro, then its vocal loop again, joined with crossfades
 MUSIC = ("music_affection.wav", [(1.2, 26.9), (8.62, 26.9), (8.62, 26.9)])
-MUSIC_DB, DUCK_DB = -25.0, -10.0         # music RMS against full scale; extra drop while somebody speaks
+MUSIC_DB, DUCK_DB = -18.0, -7.0          # music RMS against full scale; extra drop while somebody speaks
 
 
 def music_bed(n):
@@ -543,7 +543,11 @@ def mix_audio(sc, total, tmp):
     talk = (env > 0.02).astype(np.float32)
     talk = np.convolve(talk, np.ones(int(0.35 * SR)), "same") > 0
     k = int(0.25 * SR); duck = np.convolve(talk.astype(np.float32), np.ones(k) / k, "same")
-    gain = 10 ** (DUCK_DB * duck / 20)
+    depth = np.full(n, DUCK_DB, np.float32)
+    for s in sc:                                             # the patient's (changed) voice is quieter: duck deeper
+        if s.get("patient"): depth[int(s["t0"] * SR):int((s["t0"] + s["voice"]) * SR)] = DUCK_DB - 6
+    k = int(0.3 * SR); depth = np.convolve(depth, np.ones(k) / k, "same")
+    gain = 10 ** (depth * duck / 20)
     mus = music_bed(n) * gain[:, None]
     mix = (voice * 0.9 + fx * 0.55)[:, None] + mus
     mix /= max(1.0, np.abs(mix).max() / 0.98)
