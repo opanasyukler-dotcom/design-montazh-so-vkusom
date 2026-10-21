@@ -621,12 +621,15 @@ def interview(num, slug, clip, header, extra=None, y=None, bottom=1720, align="l
 #   joins, drawn vowels / «ага» / «ммм» / a false start cut (--drawn --cut), the patient's voice pitch+formant
 #   shifted wherever she speaks (d1: 4.2-14.75 18.4-23.5 29.15-33.0, d2: 8.9-27.6,
 #   d3: 41.55-41.95 48.25-49.8 52.7-54.6 96.85-97.3 100.6-102.0) — exact commands in README
+# d2 starts at «она будет чуть наполненнее» (v1 20.45-27.4), its subtitles are hand-timed (d2.mp4.subs.json)
 # subtitles: word timings of the ORIGINAL take mapped through the cuts (cleaner than re-recognising the cut), except c2
 CUTS = {"c1.mp4": ("v2.mp4", [(4.2, 33.0)]), "c3.mp4": ("v1.mp4", [(37.5, 44.8), (47.4, 49.8), (52.3, 61.9), (94.6, 97.2), (100.6, 102.0)]),
         "c4.mp4": ("v3.mp4", [(1.44, 8.83), (9.02, 20.51), (20.88, 26.51)]), "c5.mp4": ("v4.mp4", [(0.0, 31.4)])}
 
 
 def words_for(clip):
+    sj = os.path.join(SRC, "drive", clip + ".subs.json")           # exact text on those timings (subs_retext.py)
+    if os.path.exists(sj): return [(a, b, t) for a, b, t in json.load(open(sj))[0]["w"]]
     wj = os.path.join(SRC, "drive", clip + ".words.json")          # clean_speech.py output: words on the edited timeline
     if os.path.exists(wj): return [(a, b, t) for a, b, t in json.load(open(wj))[0]["w"]]
     if clip not in CUTS:
@@ -712,7 +715,7 @@ def s3():
              1.9, size=30, wght=400, gap=0)
     col.to_bottom(1740)
     for it in col.items[:1]: it.t0, it.dur = -1.0, 0.01
-    story(3, "otkuda_zhir", "d3.mp4", col, sub_y=1020, ct=0.10, animate=True)
+    story(3, "otkuda_zhir", "d3.mp4", col, sub_y=1020, ct=0.10, animate=True, fade=False)   # no darkening
 
 
 def s4():
@@ -732,7 +735,7 @@ def s5():
 
 
 def s6():
-    # first look after surgery + «наше до» in a circle (top right), CTA at the bottom
+    # first look after surgery + «наше до» in a circle (top right), text top left: the result lies low in the frame
     d = dur_of("v5.mp4")
     c = Clip("v5.mp4", 0.0, d, zoom=(1.0, 1.04), zc=(0.5, 0.6))
     D = 380; ph = load_img("IMG_1708.JPG").crop((180, 220, 1360, 1400)).resize((D, D), Image.LANCZOS)
@@ -743,13 +746,11 @@ def s6():
     cx, cy = W - 60 - circ.width, 150
     lab = small_label("наше до", 30)
     items = [Sprite(circ, cx, cy, 0, dy=0), Sprite(lab, cx + (circ.width - lab.width) // 2, cy + circ.height + 2, 0, dy=0)]
-    col = Column(0, align="left")
-    col.head("КОРРЕКЦИЯ ГРУДИ БЕЗ ИМПЛАНТОВ", 0, size=58, gap=12)
-    col.body("встретимся на перевязке", 0, size=36, wght=400, gap=24)
-    col.body("Напишите, как вам первый результат?", 0, size=38, wght=600, gap=0)
-    col.to_bottom(1720)
-    render(6, "bez_implantov", d, clip_bg(c), items + col.items, shade=black_fade(col.items[0].y + 40, 380, 0.82),
-           audio=("v5.mp4", 0.0, d))
+    col = Column(170, align="left", width=cx - MARGIN - 30)
+    col.head("КОРРЕКЦИЯ ГРУДИ БЕЗ ИМПЛАНТОВ", 0, size=52, gap=14)
+    col.body("встретимся на перевязке", 0, size=34, wght=400, gap=22)
+    col.body("Напишите, как вам первый результат?", 0, size=36, wght=600, gap=0)
+    render(6, "bez_implantov", d, clip_bg(c), items + col.items, audio=("v5.mp4", 0.0, d))
 
 
 STORIES = {1: s1, 2: s2, 3: s3, 4: s4, 5: s5, 6: s6}

@@ -3,7 +3,7 @@ at the joins, and an optional voice change for chosen speaker intervals (the pat
 
 usage: python3 clean_speech.py SRC ASR.json OUT WINDOWS [--disguise a-b,...] [--cut a-b,...] [--drawn]
   WINDOWS: comma-separated source ranges to take words from, e.g. 4.2-33.0  or 37.5-44.8,52.3-61.9
-  --disguise: source ranges spoken by the patient -> pitch + formant shift (rubberband), the surgeon stays natural
+  --disguise: source ranges spoken by the patient -> formant + slight pitch shift (rubberband, see VOICE), the surgeon stays natural
   --cut: source ranges to drop by hand (an «ага», a drawn «а-а» the ASR glued to a word)
   --drawn: also drop over-long steady vowels («ааа», «мыыы») found by voice_tools.drawn_vowels (first 0.10 s kept)
 Writes OUT (video+audio) and OUT.words.json (word timings mapped to the new timeline, for the subtitles).
@@ -20,6 +20,10 @@ def ranges(flag):
 
 
 DIS, CUT = ranges("--disguise"), ranges("--cut")
+# disguise: formants up 10 % (another timbre), pitch up only 6 % -> a lighter, natural-sounding voice instead of the
+# low «monster» of a plain pitch drop; the second pass brings the pitch back down with the formants kept
+VOICE = ("rubberband=pitch=1.10:formant=shifted:transients=smooth,"
+         "rubberband=pitch=0.964:formant=preserved:transients=smooth")
 HAND = list(CUT)                                          # words under these go from the subtitles too
 WINS = [tuple(map(float, r.split("-"))) for r in WIN.split(",")]
 FPS, SR = 30.0, 48000
@@ -87,7 +91,7 @@ tmp = OUT + ".tmp"; os.makedirs(tmp, exist_ok=True)
 nat, dis = os.path.join(tmp, "nat.f32"), os.path.join(tmp, "dis.f32")
 subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", SRC, "-vn", "-ac", "1", "-ar", str(SR), "-f", "f32le", nat], check=True)
 subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", SRC, "-vn", "-ac", "1", "-ar", str(SR),
-                "-af", "rubberband=pitch=0.82:formant=shifted:transients=smooth", "-f", "f32le", dis], check=True)
+                "-af", VOICE, "-f", "f32le", dis], check=True)
 A, D = np.fromfile(nat, np.float32), np.fromfile(dis, np.float32)
 n = min(len(A), len(D)); A, D = A[:n], D[:n]
 mask = np.zeros(n, np.float32)
