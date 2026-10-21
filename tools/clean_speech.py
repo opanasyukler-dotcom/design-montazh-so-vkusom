@@ -20,10 +20,10 @@ def ranges(flag):
 
 
 DIS, CUT = ranges("--disguise"), ranges("--cut")
-# disguise: formants up 10 % (another timbre), pitch up only 6 % -> a lighter, natural-sounding voice instead of the
-# low «monster» of a plain pitch drop; the second pass brings the pitch back down with the formants kept
-VOICE = ("rubberband=pitch=1.10:formant=shifted:transients=smooth,"
-         "rubberband=pitch=0.964:formant=preserved:transients=smooth")
+# disguise: formants up 16 % (clearly another timbre), pitch up 11 % -> a different, lighter female voice, still
+# natural (no low «monster» of a pitch drop); the second pass brings the pitch back down with the formants kept
+VOICE = ("rubberband=pitch=1.16:formant=shifted:transients=smooth,"
+         "rubberband=pitch=0.957:formant=preserved:transients=smooth")
 HAND = list(CUT)                                          # words under these go from the subtitles too
 WINS = [tuple(map(float, r.split("-"))) for r in WIN.split(",")]
 FPS, SR = 30.0, 48000
