@@ -15,7 +15,7 @@ swipe, ding) and mixed under the voice.
 
 usage: python3 reels_no_implants_no_lift.py SRC_DIR OUT_DIR [cover|reel]
 """
-import json, os, subprocess, sys
+import json, os, subprocess, sys, zlib
 import numpy as np, cv2
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
@@ -334,6 +334,21 @@ def card_frame(src, y0, lt, zoom):
     return bg
 
 
+def full_frame(src, shift, lt, zoom):
+    """the whole frame, full width, moved down by `shift` so the body sits under the text band; above it a blurred
+    stretch of the frame's own top that melts into it.  Each scene starts with a short punch-in (1.06 -> 1)"""
+    z = zoom + 0.06 * (1 - ease(lt / 0.3))
+    M = cv2.getRotationMatrix2D((W / 2, H * 0.5), 0, z); M[1, 2] += shift
+    fr = cv2.warpAffine(src, M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT).astype(np.float32) / 255
+    top = int(M[1, 2] + 0 * M[1, 1])                          # first row of the picture
+    if top > 0:
+        strip = cv2.resize(src[:max(8, H // 6)], (W // 10, max(2, top // 10 + 1)), interpolation=cv2.INTER_AREA)
+        fill = cv2.resize(cv2.GaussianBlur(strip, (0, 0), 3), (W, top + 120)).astype(np.float32) / 255 * 0.6
+        g = np.clip((np.arange(top + 120) - top) / 120.0, 0, 1)[:, None, None]
+        fr[:top + 120] = fill * (1 - g) + fr[:top + 120] * g
+    return fr
+
+
 def top_fade(bottom, a=0.85):
     ys = np.arange(H, dtype=np.float32); p = np.clip((bottom + 160 - ys) / 360, 0, 1); p = p * p * (3 - 2 * p)
     return (a * p)[:, None, None]
@@ -345,28 +360,50 @@ def _env(n, att, dec):
     e[a:] = np.exp(-np.arange(n - a) / (dec * SR)); return e
 
 
+def _lp(x, a):
+    """one-pole low-pass, a: per-sample coefficient (array or scalar)"""
+    a = np.broadcast_to(np.asarray(a, np.float32), x.shape); out = np.empty_like(x); y = 0.0
+    for k in range(len(x)): y += a[k] * (x[k] - y); out[k] = y
+    return out
+
+
+def _tone(f, n, dec, harm=((1, 1.0),)):
+    tt = np.arange(n) / SR
+    return sum(g * np.sin(2 * np.pi * f * h * tt) * np.exp(-tt * h / dec) for h, g in harm).astype(np.float32)
+
+
 def sfx(kind):
-    rng = np.random.default_rng({"whoosh": 1, "pop": 2, "tick": 3, "swipe": 4, "ding": 5}[kind])
-    if kind == "whoosh":                       # band-limited noise, the band sweeping up then down
-        n = int(0.55 * SR); x = rng.standard_normal(n).astype(np.float32); out = np.zeros(n, np.float32); y = 0.0
-        cut = 0.02 + 0.25 * np.sin(np.linspace(0, np.pi, n)) ** 2
-        for i in range(n): y += cut[i] * (x[i] - y); out[i] = y
-        return out * np.sin(np.linspace(0, np.pi, n)) ** 2 * 0.5
-    if kind == "swipe":
-        n = int(0.28 * SR); x = rng.standard_normal(n).astype(np.float32); out = np.zeros(n, np.float32); y = 0.0
-        cut = np.linspace(0.08, 0.5, n)
-        for i in range(n): y += cut[i] * (x[i] - y); out[i] = x[i] - y           # high-passed, brightening
-        return out * _env(n, 0.03, 0.08) * 0.35
-    if kind == "pop":
-        n = int(0.12 * SR); tt = np.arange(n) / SR; f = 880 * np.exp(-tt * 22) + 300
-        return np.sin(2 * np.pi * np.cumsum(f) / SR).astype(np.float32) * _env(n, 0.002, 0.03) * 0.5
-    if kind == "tick":
-        n = int(0.018 * SR); x = rng.standard_normal(n).astype(np.float32); x = np.diff(np.r_[0, x]).astype(np.float32)
-        return x * _env(n, 0.0005, 0.004) * 0.22
-    if kind == "ding":
-        n = int(1.1 * SR); tt = np.arange(n) / SR
-        s = np.sin(2 * np.pi * 1318.5 * tt) + 0.45 * np.sin(2 * np.pi * 1975.5 * tt) + 0.2 * np.sin(2 * np.pi * 2637 * tt)
-        return (s * _env(n, 0.002, 0.28) * 0.22).astype(np.float32)
+    """riser: airy swell that ends on the cut; hit: soft sub thump + muffled body (scene change); tap: soft UI click;
+    swoosh: short paper-like air (strike, marker, arrow); shimmer: bright sparkle (typing); marimba: one wooden note
+    (ВАЖНО); success: two rising marimba notes (final check)"""
+    rng = np.random.default_rng(zlib.crc32(kind.encode()))
+    if kind == "riser":
+        n = int(0.5 * SR); x = rng.standard_normal(n).astype(np.float32); r = np.linspace(0, 1, n)
+        y = _lp(x, 0.01 + 0.2 * r ** 2) - _lp(x, 0.004)
+        return y * r ** 2.5 * 0.55
+    if kind == "hit":
+        n = int(0.45 * SR); tt = np.arange(n) / SR; f = 38 + 60 * np.exp(-tt * 30)
+        sub = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-tt * 9)
+        body = _lp(rng.standard_normal(n).astype(np.float32), 0.05) * np.exp(-tt * 40)
+        return (sub * 0.7 + body * 0.5).astype(np.float32)
+    if kind == "tap":
+        n = int(0.06 * SR); tt = np.arange(n) / SR
+        return (np.sin(2 * np.pi * 1450 * tt) * np.exp(-tt * 110) * 0.28 + _lp(rng.standard_normal(n).astype(np.float32), 0.3) * np.exp(-tt * 400) * 0.15).astype(np.float32)
+    if kind == "swoosh":
+        n = int(0.22 * SR); x = rng.standard_normal(n).astype(np.float32); r = np.linspace(0, 1, n)
+        y = _lp(x, 0.35) - _lp(x, 0.08)
+        return y * np.sin(np.pi * r) ** 1.5 * 0.5
+    if kind == "shimmer":
+        n = int(0.6 * SR); out = np.zeros(n, np.float32)
+        for k, f in enumerate([2093, 2637, 3136, 3951, 3136, 4186]):
+            j = int(k * 0.07 * SR); b = _tone(f, n - j, 0.09); out[j:] += b * 0.07
+        return out
+    if kind == "marimba":
+        return _tone(392, int(0.9 * SR), 0.22, ((1, 1.0), (4, 0.25), (10, 0.06))) * 0.4
+    if kind == "success":
+        a = _tone(659.3, int(0.9 * SR), 0.2, ((1, 1.0), (4, 0.25))); b = _tone(987.8, int(0.9 * SR), 0.25, ((1, 1.0), (4, 0.25)))
+        out = np.zeros(int(1.05 * SR), np.float32); out[:len(a)] += a * 0.35; k = int(0.13 * SR); out[k:k + len(b)] += b * 0.35
+        return out
 
 
 # ---------------- scenes ----------------
@@ -375,36 +412,36 @@ def sfx(kind):
 def scenes():
     M = mont
     return [
-        dict(piece="rA.mp4", card=True,
+        dict(piece="rA.mp4", card=False,
              band=[Chip("ДО", bebas(46), 0.15, h=64),
                    Headline(["ИМПЛАНТЫ НЕ ХОЧУ"], 124, "drop", strike=("ИМПЛАНТЫ", 0.75))],
-             sfx=[(0, "whoosh"), (0.15, "pop"), (0.75, "swipe")]),
-        dict(piece="rB.mp4", card=True, hold=0.7,
+             sfx=[(0, "hit"), (0.15, "tap"), (0.75, "swoosh")]),
+        dict(piece="rB.mp4", card=False, hold=0.7,
              band=[Slot(Headline(["ПОДТЯЖКУ", "ТОЖЕ НЕ ХОЧУ"], 112, "pop", out=4.0, strike=("ПОДТЯЖКУ", 3.15)),
                         Headline(["ТОГДА ЧТО", "МОЖНО СДЕЛАТЬ?"], 112, "type", t0=4.2))],
-             sfx=[(0, "whoosh"), (0.0, "pop"), (0.26, "pop"), (3.15, "swipe")] + [(4.2 + 0.034 * i, "tick") for i in range(0, 22, 2)]),
-        dict(piece="rC.mp4", card=True,
+             sfx=[(0, "hit"), (0.05, "tap"), (0.3, "tap"), (3.15, "swoosh"), (4.2, "shimmer")]),
+        dict(piece="rC.mp4", card=False, shift=180,
              band=[Headline(["ВЫБРАЛИ", "ЛИПОФИЛИНГ"], 116, "wipe", marker=("ЛИПОФИЛИНГ", 0.85)),
                    Slot(Line("собственная жировая ткань", 40, t0=1.5, out=5.6), Flow("жир", "грудь", 5.85))],
-             sfx=[(0, "whoosh"), (0.85, "swipe"), (5.85, "pop"), (6.05, "swipe"), (6.4, "pop")]),
+             sfx=[(0, "hit"), (0.85, "swoosh"), (5.85, "tap"), (6.05, "swoosh"), (6.4, "tap")]),
         dict(piece="rD.mp4", card=True, extra=("v1.mp4", 48.35, 1.8),
              band=[Headline(["ДАЖЕ У СТРОЙНОЙ ПАЦИЕНТКИ", "МОЖНО НАЙТИ ДОНОРСКИЕ ЗОНЫ"], 84, "slide"),
                    ChipRow([("внутренние бёдра", 0.1), ("колени", 1.45), ("галифе", 2.5)])],
-             sfx=[(0, "whoosh"), (0.1, "pop"), (1.45, "pop"), (2.5, "pop")]),
-        dict(piece="rE.mp4", card=False, picture=("v5.mp4", 1.0),
+             sfx=[(0, "hit"), (0.1, "tap"), (1.45, "tap"), (2.5, "tap")]),
+        dict(piece="rE.mp4", card=False, shift=170, picture=("v5.mp4", 1.0),
              band=[Headline(["ОБЪЁМ ДОБАВЛЯЕМ", "НЕ ВСЕГДА ОДИНАКОВО"], 104, "blur"),
                    Line("можно учитывать асимметрию", 38, t0=0.9),
                    Bars([("с одной стороны · побольше", 2.8, 4.3, 700), ("с другой · поменьше", 4.8, 5.13, 380)])],
-             sfx=[(0, "whoosh"), (4.3, "pop"), (5.13, "pop")]),
+             sfx=[(0, "hit"), (0.05, "swoosh"), (4.3, "tap"), (5.13, "tap")]),
         dict(piece="rF.mp4", card=True,
              band=[Chip("ВАЖНО", bebas(50), 0.0, pulse=True, h=70),
                    Headline(["ЛИПОФИЛИНГ", "НЕ ЗАМЕНЯЕТ ПОДТЯЖКУ"], 100, "slide_alt", t0=0.25),
                    Line("но может помочь добавить наполненность, если пациентка не готова к более объёмной операции", 34, t0=4.4, width=880)],
-             sfx=[(0, "ding"), (0.25, "whoosh"), (4.4, "whoosh")]),
-        dict(piece="rG.mp4", card=False, picture=("v5.mp4", 7.4), tail=2.0,
+             sfx=[(0, "hit"), (0.02, "marimba"), (0.25, "swoosh"), (4.4, "swoosh")]),
+        dict(piece="rG.mp4", card=False, shift=170, picture=("v5.mp4", 7.4), tail=2.0,
              band=[CheckMark(0.15), Headline(["ИМЕННО ЭТУ ЗАДАЧУ", "И РЕШАЛИ"], 104, "track", t0=0.1),
                    Chip("Подробнее в актуальном «Липофилинг»", M(36, 300), 3.6, h=72)],
-             sfx=[(0, "whoosh"), (0.75, "ding"), (3.6, "pop")]),
+             sfx=[(0, "hit"), (0.75, "success"), (3.6, "tap")]),
     ]
 
 
@@ -452,10 +489,7 @@ def reel():
             else: src = ex.frame()
             zoom = 1.0 + 0.04 * i / max(n, 1)
             if s["card"]: fr = card_frame(src, s["card_y"], lt, zoom)
-            else:
-                M = cv2.getRotationMatrix2D((W / 2, H * 0.7), 0, zoom); M[1, 2] += 170   # the body lower, clear of the text
-                fr = cv2.warpAffine(src, M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT).astype(np.float32) / 255
-                fr = fr * (1 - s["shade"])
+            else: fr = full_frame(src, s.get("shift", s["card_y"] - 50), lt, zoom) * (1 - s["shade"])
             for e, y in zip(s["band"], s["ys"]): e.draw(fr, lt, y)
             s["subs"].draw(fr, lt, s["sub_y"])
             o = (np.clip(fr, 0, 1) * 255).astype(np.uint8); enc.stdin.write(o.tobytes())
@@ -468,7 +502,7 @@ def reel():
     voice = np.zeros(int(total * SR) + SR, np.float32); fx = np.zeros_like(voice)
     for s in sc:
         a = pcm(os.path.join(DRIVE, s["piece"]))[:int(s["voice"] * SR)]; i0 = int(s["t0"] * SR); voice[i0:i0 + len(a)] = a
-        for tt, kind in s["sfx"]:
+        for tt, kind in s["sfx"] + ([(-0.5, "riser")] if s["t0"] > 0 else []):
             x = sfx(kind); j = int((s["t0"] + tt) * SR); fx[j:j + len(x)] += x[:len(fx) - j]
     voice /= max(1e-6, np.abs(voice).max()); mix = voice * 0.9 + fx * 0.55
     mix = mix[:int(total * SR)] / max(1.0, np.abs(mix).max() / 0.98)
