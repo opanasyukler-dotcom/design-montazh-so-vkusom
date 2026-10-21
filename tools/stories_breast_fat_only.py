@@ -617,12 +617,16 @@ def interview(num, slug, clip, header, extra=None, y=None, bottom=1720, align="l
 # cut with tools/cut_segments.py (every cut sits inside a pause, no word clipped):
 #   c1 = v2 4.2-33.0   c2 = v1 1.3-27.4   c3 = v1 37.5-44.8 47.4-49.8 52.3-61.9 94.6-97.2 100.6-102.0
 #   c4 = v3 without pauses (1.44-8.83 9.02-20.51 20.88-26.51)   c5 = v4 0-31.4
+# FINAL: d1..d5 = the same pieces through tools/clean_speech.py — every pause and «а/э» removed, 12 ms fades at the
+#   joins, the patient's voice pitch+formant shifted (d1: 4.2-14.75 18.4-23.5 29.15-33.0, d2: 8.9-23.0, d3: 49.3-49.8 52.7-54.6)
 # subtitles: word timings of the ORIGINAL take mapped through the cuts (cleaner than re-recognising the cut), except c2
 CUTS = {"c1.mp4": ("v2.mp4", [(4.2, 33.0)]), "c3.mp4": ("v1.mp4", [(37.5, 44.8), (47.4, 49.8), (52.3, 61.9), (94.6, 97.2), (100.6, 102.0)]),
         "c4.mp4": ("v3.mp4", [(1.44, 8.83), (9.02, 20.51), (20.88, 26.51)]), "c5.mp4": ("v4.mp4", [(0.0, 31.4)])}
 
 
 def words_for(clip):
+    wj = os.path.join(SRC, "drive", clip + ".words.json")          # clean_speech.py output: words on the edited timeline
+    if os.path.exists(wj): return [(a, b, t) for a, b, t in json.load(open(wj))[0]["w"]]
     if clip not in CUTS:
         d = json.load(open(os.path.join(ASR, clip + ".json")))
         return [(a, b, t.strip()) for s in d for a, b, t in s["w"]]
@@ -683,7 +687,7 @@ def s1():
     col.head("ПОЧЕМУ БЕЗ ПОДТЯЖКИ?", 0, size=64, gap=14)
     col.body("история пациентки", 0, size=36, wght=400, gap=0)
     col.to_bottom(1720)
-    story(1, "pochemu_bez_podtyazhki", "c1.mp4", col, sub_y=1240)
+    story(1, "pochemu_bez_podtyazhki", "d1.mp4", col, sub_y=1240)
 
 
 def s2():
@@ -692,7 +696,7 @@ def s2():
     col.body("таково желание пациентки", 0, size=36, wght=500, gap=26)
     col.body("работать будем только за счёт жировой ткани  >>>", 0, size=36, wght=400, gap=0)
     col.to_bottom(1720)
-    story(2, "podtyazhki_ne_budet", "c2.mp4", col, sub_y=1180)
+    story(2, "podtyazhki_ne_budet", "d2.mp4", col, sub_y=1180)
 
 
 def s3():
@@ -706,7 +710,7 @@ def s3():
              1.9, size=30, wght=400, gap=0)
     col.to_bottom(1740)
     for it in col.items[:1]: it.t0, it.dur = -1.0, 0.01
-    story(3, "otkuda_zhir", "c3.mp4", col, sub_y=1020, ct=0.10, animate=True)
+    story(3, "otkuda_zhir", "d3.mp4", col, sub_y=1020, ct=0.10, animate=True)
 
 
 def s4():
@@ -714,7 +718,7 @@ def s4():
     col.head("СЕГОДНЯ — ЛИПОФИЛИНГ ГРУДИ", 0, size=56, gap=12)
     col.body("жир забираем из жировых ловушек и переносим в грудь", 0, size=34, wght=400, gap=0)
     col.to_bottom(1720)
-    story(4, "segodnya_lipofiling", "c4.mp4", col, sub_y=1250)
+    story(4, "segodnya_lipofiling", "d4.mp4", col, sub_y=1250)
 
 
 def s5():
@@ -722,7 +726,7 @@ def s5():
     col.head("ОПЕРАЦИЯ ЗАВЕРШЕНА", 0, size=60, gap=12)
     col.body("грудь исправили только с помощью липофилинга — без подтяжки и рубцов", 0, size=34, wght=400, gap=0)
     col.to_bottom(1720)
-    story(5, "operaciya_zavershena", "c5.mp4", col, sub_y=1250)
+    story(5, "operaciya_zavershena", "d5.mp4", col, sub_y=1250)
 
 
 def s6():
