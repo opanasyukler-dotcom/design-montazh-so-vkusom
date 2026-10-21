@@ -153,11 +153,11 @@ def render_block(t, b=None):
         scar_card(fr, t, 0.2)
         if n == "m1": T_HEAD.draw(fr, 1040, t, SHIFT + 0.05, SHIFT + 3.9)
         if n == "m2": T_RED.draw(fr, 1190, t, 13.6, 16.9)
-        if (6.1 <= t <= 9.35) or (22.6 <= t <= 27.55):                  # flush the card's text first so the example sits on top of it
+        if (6.1 <= t <= 9.55) or (22.6 <= t <= 27.55):                  # flush the card's text first so the example sits on top of it
             DEFER[0] = False
             for args in PENDING: ablend(fr, *args)
             PENDING.clear(); DEFER[0] = True
-        on = slider_overlay(fr, t, 6.1, 9.0, 6.7, 8.2) or collage_overlay(fr, t, 22.6, 27.2)   # patient examples over the speech
+        on = video_overlay(fr, t, 6.1, 9.2, 0.6, 1.4) or slider_overlay(fr, t, 22.6, 27.2, 23.3, 25.0)   # patient examples over the speech
         subs2(fr, t, 1640 if on else 1440)
     elif n == "post":                                                   # freeze on the last frame of the speech
         z, cx, cy, oy = SHOTS["m6"]; ts = 27.55

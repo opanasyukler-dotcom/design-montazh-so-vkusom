@@ -47,3 +47,14 @@ def collage_overlay(fr, t, a, b):
     chip(fr, CH_DO, x0 + 20, y0 + 20, t, a + 0.25); chip(fr, CH_PO, x0 + w + gap + 20, y0 + 20, t, a + 0.45)
     ablend(fr, T_EX, 540 - T_EX.shape[1] / 2, y0 - 70, k, WHITE, BLUE)
     return True
+EXV = Src("exv/ex30.mp4"); EXV_N = int(EXV.cap.get(cv2.CAP_PROP_FRAME_COUNT)) - 2
+def video_overlay(fr, t, a, b, v0, speed):
+    """patient video (36 days after augmentation + lift) as a rounded card over the speech"""
+    if not a <= t <= b + 0.35: return False
+    k = min(1, (t - a) / 0.35) * (1 - min(1, max(0, (t - b) / 0.35))); dim_bg(fr, k)
+    i = min(int((v0 + (min(t, b) - a) * speed) * 30), EXV_N); f = EXV.get(i)
+    img = cv2.resize(f, (SL_W, int(f.shape[0] * SL_W / f.shape[1])), interpolation=cv2.INTER_AREA)[:SL_H].astype(np.float32) / 255
+    rgba = rounded(img); x0, y0 = 540 - SL_W / 2, 925 - SL_H / 2 + 40 * (1 - ease((t - a) / 0.45))
+    blend(fr, shadow_of(rgba, 24, 0.4), x0, y0 + 14, k); blend(fr, rgba, x0, y0, k)
+    ablend(fr, T_EX, 540 - T_EX.shape[1] / 2, y0 - 70, k, WHITE, BLUE)
+    return True
