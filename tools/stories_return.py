@@ -7,7 +7,7 @@ Fonts (stories_kit): main = Inter Bold (IG Classic look), second = thin Montserr
 subtitles = Manrope Light.
 Work dir: dl/IMG_8334.MOV, dl/IMG_8335.MOV, dl/DSC01327.JPG, heic_full.jpg (IMG_8332), w8334.json, w8335.json,
 Manrope-Light.ttf.
-  python3 -I stories_return.py all out_dir
+  python3 -I stories_return.py all out_dir [--subs-only]   (--subs-only: the cut clips with subtitles, no text cards)
 """
 import json, os, subprocess, sys, wave
 import numpy as np
@@ -219,20 +219,22 @@ def spoons_story(out):
     d.text((W / 2, y + 16), "Потом покажу, что в итоге набрала.", font=font("detail", 38), fill=GREY, anchor="mm")
     img.save(out, quality=95, subsampling=0)
 
-def build(k, od, tmp):
+def build(k, od, tmp, subs_only=False):
     name, src, ranges, groups = STORIES[k]
+    if subs_only: groups = []                                            # cut + subtitles only, no text cards
     iv = intervals(src, ranges)
     wav = os.path.join(tmp, f"{name}.wav"); cut_audio(src, iv, wav)
     cut = os.path.join(tmp, f"{name}_cut.mp4"); cut_video(src, iv, wav, cut)
     gc = [(0.0 if g0 is None else src_to_cut(iv, g0), None if g1 is None else src_to_cut(iv, g1), layout(items))
           for g0, g1, items in groups]
-    overlay(cut, gc, subtitles(src, iv), os.path.join(od, f"{name}.mp4"))
+    overlay(cut, gc, subtitles(src, iv), os.path.join(od, f"{name}{'_subs' if subs_only else ''}.mp4"))
     print(name, round(sum(b - a for a, b in iv), 2), "s,", len(iv), "pieces")
 
 if __name__ == "__main__":
     od = sys.argv[2]; tmp = os.path.join(od, "_tmp"); os.makedirs(tmp, exist_ok=True)
-    sel = sys.argv[1]
+    sel = sys.argv[1]; subs_only = "--subs-only" in sys.argv
     for k, s in enumerate(STORIES):
-        if sel == "all" or s[0] in sel.split(","): build(k, od, tmp)
+        if sel == "all" or s[0] in sel.split(","): build(k, od, tmp, subs_only)
+    if subs_only: sys.exit()
     if sel == "all" or "story_4" in sel: tongue_story(os.path.join(od, "story_4.jpg"))
     if sel == "all" or "story_7" in sel: spoons_story(os.path.join(od, "story_7.jpg"))
