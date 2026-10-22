@@ -114,7 +114,7 @@ def place(canvas, img, box):
 
 
 # ---------------- video with a static overlay ----------------
-def render_video(name, src, a, dur, overlay, shade, shift=0, subs=None, audio=None):
+def render_video(name, src, a, dur, overlay, shade, shift=0, subs=None, audio=None, on_frame=None, fill_k=0.6):
     out = os.path.join(OUT, name); tmp = out + ".v.mp4"
     ov = np.asarray(overlay, np.float32) / 255.0; oa = ov[..., 3:4]
     p = subprocess.Popen(["ffmpeg", "-v", "error", "-ss", str(a), "-t", str(dur), "-i", os.path.join(DRIVE, src),
@@ -124,14 +124,16 @@ def render_video(name, src, a, dur, overlay, shade, shift=0, subs=None, audio=No
     n = int(round(dur * FPS)); last = None
     for i in range(n):
         buf = p.stdout.read(W * H * 3)
-        if len(buf) == W * H * 3: last = np.frombuffer(buf, np.uint8).reshape(H, W, 3)
+        if len(buf) == W * H * 3:
+            last = np.frombuffer(buf, np.uint8).reshape(H, W, 3)
+            if on_frame: last = on_frame(last.copy(), i)
         z = 1.0 + 0.03 * i / n
         M = cv2.getRotationMatrix2D((W / 2, H / 2), 0, z); M[1, 2] += shift
         fr = cv2.warpAffine(last, M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT).astype(np.float32) / 255
         if shift > 0:                                      # blurred stretch of the frame's own top above it
             top = int(M[1, 2]) + 1
             strip = cv2.resize(last[:H // 6], (W // 10, max(2, top // 10 + 1)), interpolation=cv2.INTER_AREA)
-            fill = cv2.resize(cv2.GaussianBlur(strip, (0, 0), 3), (W, top + 120)).astype(np.float32) / 255 * 0.6
+            fill = cv2.resize(cv2.GaussianBlur(strip, (0, 0), 3), (W, top + 120)).astype(np.float32) / 255 * fill_k
             g = np.clip((np.arange(top + 120) - top) / 120.0, 0, 1)[:, None, None]
             fr[:top + 120] = fill * (1 - g) + fr[:top + 120] * g
         fr = fr * (1 - shade); fr = fr * (1 - oa) + ov[..., :3] * oa
@@ -169,35 +171,74 @@ class PillSubs:
                 return
 
 
+# ---------------- clinic stickers on the nipples of a moving video ----------------
+def sticker_rgba(d):
+    """the clinic's round sticker (navy, white lettering) cut out of its black square"""
+    im = Image.open(os.path.join(DRIVE, "sticker_navy.png")).convert("RGB").resize((d, d), Image.LANCZOS).convert("RGBA")
+    m = Image.new("L", (d * 4, d * 4), 0); ImageDraw.Draw(m).ellipse((6, 6, d * 4 - 7, d * 4 - 7), fill=255)
+    im.putalpha(m.resize((d, d), Image.LANCZOS)); return np.asarray(im, np.float32) / 255.0
+
+
+def frames_of(src, dur):
+    b = subprocess.run(["ffmpeg", "-v", "error", "-i", os.path.join(DRIVE, src), "-t", str(dur), "-vf", f"scale={W}:{H},fps={FPS}",
+                        "-f", "rawvideo", "-pix_fmt", "gray", "-"], capture_output=True, check=True).stdout
+    return np.frombuffer(b, np.uint8).reshape(-1, H, W)
+
+
+def track(src, dur, inits):
+    """positions of points through the clip: optical flow of the texture around each point (median shift),
+    re-initialised from hand-placed `inits` (one list of points per shot) at every hard cut"""
+    g = frames_of(src, dur); cuts = [0] + [i for i in range(1, len(g)) if np.abs(g[i].astype(np.int16) - g[i - 1]).mean() > 18]
+    pos = np.zeros((len(g), len(inits[0]), 2), np.float32)
+    for si, c0 in enumerate(cuts):
+        c1 = cuts[si + 1] if si + 1 < len(cuts) else len(g); pts = np.array(inits[min(si, len(inits) - 1)], np.float32)
+        pos[c0] = pts
+        for i in range(c0 + 1, c1):
+            for k, (x, y) in enumerate(pts):
+                x0, y0 = int(max(x - 90, 0)), int(max(y - 90, 0)); roi = np.zeros_like(g[i - 1]); roi[y0:int(y + 90), x0:int(x + 90)] = 255
+                f = cv2.goodFeaturesToTrack(g[i - 1], 60, 0.01, 6, mask=roi)
+                if f is None: continue
+                nf, st, _ = cv2.calcOpticalFlowPyrLK(g[i - 1], g[i], f, None, winSize=(31, 31), maxLevel=3)
+                ok = st[:, 0] == 1
+                if ok.sum() >= 5: pts[k] += np.median((nf - f)[ok, 0], axis=0)
+            pos[i] = pts
+    print("cuts at frames", cuts, flush=True)
+    return pos
+
+
 # ---------------- stories ----------------
 def s1():
-    """before front on black; text on top, room for the poll between the text and the body"""
-    cv = Image.new("RGBA", (W, H), (0, 0, 0, 255))
-    b = (Block().head("«ПОСЛЕ РОДОВ Я ВРОДЕ ВЕРНУЛАСЬ В СВОЙ ВЕС… НО ТЕЛО УЖЕ СТАЛО ДРУГИМ»", 48, gap=20)
-         .body("Живот не собирается так, как раньше.", 32, gap=2).body("Грудь потеряла форму.", 32, gap=2)
-         .body("Появилось ощущение, что ты стараешься, а тело всё равно не возвращается назад.", 32, gap=0))
-    top = 150; poll = (top + b.h + 20, top + b.h + 290)            # free band for «Узнаёте себя?»
-    im = photo("IMG_8392.JPG"); im = im.crop((0, 8, im.width, int(im.height * 0.9)))   # shoulders .. the briefs (no light top edge)
-    place(cv, im, (0, poll[1], W, H))
+    """before video (3/4); text and the poll room on top, the body moved down under them — nothing on the body"""
+    b = (Block().head("«ПОСЛЕ РОДОВ Я ВРОДЕ ВЕРНУЛАСЬ В СВОЙ ВЕС… НО ТЕЛО УЖЕ СТАЛО ДРУГИМ»", 46, gap=18)
+         .body("Живот не собирается так, как раньше.", 31, gap=2).body("Грудь потеряла форму.", 31, gap=2)
+         .body("Появилось ощущение, что ты стараешься, а тело всё равно не возвращается назад.", 31, gap=0))
+    top = 140; poll_end = top + b.h + 260                          # free band for «Узнаёте себя? Очень / Частично»
     ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top)
-    cv.alpha_composite(ly); save_jpg(cv, "01_posle_rodov.jpg")
+    render_video("01_posle_rodov.mp4", "IMG_0336.MOV", 0.0, 8.1, ly, np.zeros((H, 1, 1), np.float32), shift=poll_end, fill_k=0.55)
 
 
 def s2():
-    """before (belly) video: the body moved down, the text on top over a dark fade"""
+    """before (belly) video moved down under the text: the text sits on the blurred top, not on the body; no gradient"""
     b = (Block().body("У нашей пациентки после родов и кормления ослабла передняя брюшная стенка, был выраженный диастаз, "
-                      "растяжки и старый рубец после полостной операции.", 31, gap=22)
-         .body("И вот здесь очень важно понять:", 31, wght=500, gap=8)
-         .head("ЭТО УЖЕ НЕ ИСТОРИЯ ПРО «ЕЩЁ НЕМНОГО ПОХУДЕТЬ»", 44, gap=18)
-         .body("Некоторые изменения спортом просто не убрать.", 34, wght=600, gap=0))
-    top = 150; ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top)
-    render_video("02_diastaz.mp4", "IMG_0337.MOV", 0.0, 9.9, ly, fade(top + b.h + 40, 330, 0.82, up=True), shift=330)
+                      "растяжки и старый рубец после полостной операции.", 30, gap=18)
+         .body("И вот здесь очень важно понять:", 30, wght=500, gap=6)
+         .head("ЭТО УЖЕ НЕ ИСТОРИЯ ПРО «ЕЩЁ НЕМНОГО ПОХУДЕТЬ»", 42, gap=14)
+         .body("Некоторые изменения спортом просто не убрать.", 32, wght=600, gap=0))
+    top = 130; ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top)
+    render_video("02_diastaz.mp4", "IMG_0337.MOV", 0.0, 9.9, ly, np.zeros((H, 1, 1), np.float32), shift=top + b.h + 30, fill_k=0.5)
+
+
+def arrow(d, p0, p1, width=3, head=14):
+    """short thin white arrow p0 -> p1 (with a soft dark edge so it reads on skin)"""
+    (x0, y0), (x1, y1) = p0, p1; a = np.arctan2(y1 - y0, x1 - x0)
+    pts = [(x1 - head * np.cos(a - 0.45), y1 - head * np.sin(a - 0.45)), (x1, y1), (x1 - head * np.cos(a + 0.45), y1 - head * np.sin(a + 0.45))]
+    for col, w in [((20, 23, 31, 110), width + 3), ((255, 255, 255, 255), width)]:
+        d.line([p0, p1], fill=col, width=w); d.line(pts, fill=col, width=w, joint="curve")
 
 
 def s3():
-    """before 3/4: the breast stays clear, text below it, poll room at the bottom"""
-    im = photo("IMG_8390.JPG").resize((W, H), Image.LANCZOS)                            # whole frame: both stickers in
-    cv = im.convert("RGBA")
+    """before 3/4: «наше до» label on the chest with two short arrows to the breasts; text below, poll room at the bottom"""
+    cv = photo("IMG_8390.JPG").resize((W, H), Image.LANCZOS).convert("RGBA")
     b = (Block().head("ГРУДЬ ТОЖЕ ИЗМЕНИЛАСЬ", 54, gap=16)
          .body("Появилось небольшое опущение и асимметрия.", 33, gap=12)
          .body("При этом пациентка не хотела дополнительных разрезов на груди.", 33, gap=12)
@@ -205,8 +246,13 @@ def s3():
     poll_h = 300; top = H - 60 - poll_h - b.h
     sh = fade(top + 40, 360, 0.85)
     cv = Image.fromarray((np.asarray(cv.convert("RGB"), np.float32) * (1 - sh)).astype(np.uint8)).convert("RGBA")
-    ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top); cv.alpha_composite(ly)
-    save_jpg(cv, "03_grud.jpg")
+    ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top)
+    lab = pill("наше до", 30); cx, cy = 775, 455                   # on the sternum, above and between the breasts
+    ly.alpha_composite(lab, (cx - lab.width // 2, cy - lab.height // 2))
+    d = ImageDraw.Draw(ly)
+    arrow(d, (cx - 70, cy + lab.height // 2 + 12), (668, 610))     # to the near breast (sticker at 616, 700)
+    arrow(d, (cx + 70, cy + lab.height // 2 + 12), (888, 612))     # to the far breast (sticker at 930, 700)
+    cv.alpha_composite(ly); save_jpg(cv, "03_grud.jpg")
 
 
 def s4():
@@ -214,8 +260,7 @@ def s4():
     cv = photo("5223F1B9-E4B1-4ABB-8DB1-EDB2B7955A04.png").resize((W, H), Image.LANCZOS)
     b = (Block().head("МЫ РЕШИЛИ РАБОТАТЬ СРАЗУ С ДВУМЯ ЗОНАМИ", 50, gap=18)
          .body("Сделали:", 32, wght=500, gap=10)
-         .plate("абдоминопластику с ушиванием диастаза", 32, gap=8)
-         .body("и", 32, gap=8)
+         .plate("абдоминопластику с ушиванием диастаза", 32, gap=12)
          .plate("увеличение груди анатомическими имплантами 375 мл", 32, gap=22)
          .body("На животе убрали избыток кожи, поработали со старой рубцовой тканью, сформировали новый пупок "
                "и более выраженную талию.", 31, gap=0))
@@ -227,55 +272,77 @@ def s4():
 
 
 def s5():
-    """first day: the surgeon's voice; text on her dark scrubs between the masked face and the patient"""
+    """first day: the surgeon's voice; text on her dark scrubs; the clinic stickers follow the nipples"""
     words = json.load(open(os.path.join(DRIVE, "day1.mp4.subs.json")))[0]["w"]
     dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
                                 os.path.join(DRIVE, "day1.mp4")], capture_output=True, text=True).stdout)
+    # hand-placed nipples (near, far) at the start of each shot, then optical flow
+    pos = track("day1.mp4", dur, [[(757, 1452), (730, 1290)], [(752, 1402), (733, 1276)]])
+    st = [sticker_rgba(118), sticker_rgba(96)]
+
+    def stick(fr, i):
+        f = fr.astype(np.float32) / 255
+        for k, (x, y) in enumerate(pos[min(i, len(pos) - 1)]):
+            a = st[k]; h, w = a.shape[:2]; x0, y0 = int(x - w / 2), int(y - h / 2)
+            if x0 < 0 or y0 < 0 or x0 + w > W or y0 + h > H: continue
+            al = a[..., 3:4]; f[y0:y0 + h, x0:x0 + w] = f[y0:y0 + h, x0:x0 + w] * (1 - al) + a[..., :3] * al
+        return (f * 255).astype(np.uint8)
+
     b = (Block().head("ПЕРВЫЕ СУТКИ", 60, gap=14).body("Это ещё ранний результат.", 34, wght=600, gap=10)
          .body("Дальше ткани будут восстанавливаться, отёк уменьшаться, а форма постепенно меняться.", 32, gap=0))
     top = 690; ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top)
     band = np.zeros((H, 1, 1), np.float32); ys = np.arange(H)
     band[:, 0, 0] = 0.55 * np.clip(1 - np.abs(ys - (top + b.h / 2)) / (b.h / 2 + 140), 0, 1) ** 0.7    # soft dark band
-    render_video("05_pervye_sutki.mp4", "day1.mp4", 0.0, dur, ly, band, subs=PillSubs(words, y=top + b.h + 70, outline=True))   # white edge: navy pill on navy scrubs
+    render_video("05_pervye_sutki.mp4", "day1.mp4", 0.0, dur, ly, band, on_frame=stick,
+                 subs=PillSubs(words, y=top + b.h + 70, outline=True))   # white edge: navy pill on navy scrubs
+
+
+# the clinic's before/after collages (after on top, before below, on black): the collage is pushed to the left edge,
+# the text goes into the black column on the right and the band above — nothing is written on the bodies
+COLLAGES = {"IMG_8393.JPG": dict(left=100, right=875, split=880), "IMG_8395.JPG": dict(left=105, right=955, split=930),
+            "IMG_8396.JPG": dict(left=70, right=800, split=890)}
+
+
+def collage_story(name, out, head, column, head_size=40):
+    cv = Image.new("RGBA", (W, H), (0, 0, 0, 255)); c = COLLAGES[name]
+    t = Block().head(head, head_size, gap=0); top = 130; y0 = top + t.h + 34
+    s = (H - y0) / 1920; im = photo(name).resize((int(1080 * s), H - y0), Image.LANCZOS)
+    x = int(14 - c["left"] * s); cv.paste(im, (x, y0))
+    colx = int(x + c["right"] * s) + 36; colw = W - 40 - colx
+    labs = [("после", y0 + 26), ("до", int(y0 + c["split"] * s) + 26)]
+    for lab, y in labs:
+        p = pill(lab, 28); cv.alpha_composite(p, (colx, y))
+    blk = column(Block(width=colw))
+    ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); t.draw(ly, MARGIN, top)
+    by = labs[0][1] + 90; blk.draw(ly, colx, by)
+    if by + blk.h > labs[1][1] - 10: print("WARNING column runs past the «до» label", name, flush=True)
+    cv.alpha_composite(ly); save_jpg(cv, out)
 
 
 def s6():
-    """before | after side by side on black; the question above, the women's thoughts below"""
-    cv = Image.new("RGBA", (W, H), (0, 0, 0, 255))
-    t = Block().head("И ВОТ ЧТО ХОЧЕТСЯ СКАЗАТЬ ЖЕНЩИНАМ, КОТОРЫЕ СМОТРЯТ НА СЕБЯ ПОСЛЕ РОДОВ И ДУМАЮТ:", 40, gap=0)
-    bt = (Block().body("«Наверное, я просто недостаточно стараюсь»", 30, gap=2).body("«Надо ещё похудеть»", 30, gap=2)
-          .body("«Может, спорт всё-таки поможет»", 30, gap=18)
-          .body("Иногда дело уже не в усилиях.", 34, wght=600, gap=8)
-          .body("Просто есть изменения тканей, которые требуют совсем другого подхода.", 31, gap=0))
-    top = 140; y0 = top + t.h + 40; yb = H - 70 - bt.h; y1 = yb - 30
-    for k, (name, lab) in enumerate([("IMG_8392.JPG", "до"), ("IMG_8391.JPG", "после")]):
-        im = photo(name); im = im.crop((0, 0, im.width, int(im.height * 0.86)))            # shoulders .. under the briefs
-        place(cv, im, (k * W // 2, y0, (k + 1) * W // 2, y1)); cx = W // 4 + k * W // 2
-        p = pill(lab, 30); cv.alpha_composite(p, (cx - p.width // 2, y1 - p.height - 18))
-    d = ImageDraw.Draw(cv); d.line((W // 2, y0, W // 2, y1), fill=(0, 0, 0), width=6)
-    ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); t.draw(ly, MARGIN, top); bt.draw(ly, MARGIN, yb); cv.alpha_composite(ly)
-    save_jpg(cv, "06_ne_v_usiliyah.jpg")
+    collage_story("IMG_8393.JPG", "06_ne_v_usiliyah.jpg",
+                  "И ВОТ ЧТО ХОЧЕТСЯ СКАЗАТЬ ЖЕНЩИНАМ, КОТОРЫЕ СМОТРЯТ НА СЕБЯ ПОСЛЕ РОДОВ И ДУМАЮТ:",
+                  lambda b: b.body("«Наверное, я просто недостаточно стараюсь»", 28, gap=14).body("«Надо ещё похудеть»", 28, gap=14)
+                  .body("«Может, спорт всё-таки поможет»", 28, gap=26).body("Иногда дело уже не в усилиях.", 30, wght=600, gap=12)
+                  .body("Просто есть изменения тканей, которые требуют совсем другого подхода.", 28, gap=0))
 
 
 def s7():
-    """the result (after, 3/4) on black between the thoughts and the invitation"""
-    cv = Image.new("RGBA", (W, H), (0, 0, 0, 255))
-    t = (Block().head("ЕСЛИ ВЫ СМОТРИТЕ НА НАШЕ ДО И ДУМАЕТЕ:", 44, gap=14)
-         .body("«У меня очень похоже»", 30, gap=0).body("«Живот так и не восстановился после родов»", 30, gap=0)
-         .body("«Грудь стала другой»", 30, gap=0).body("«Хочу снова чувствовать себя собой»", 30, gap=0))
-    bt = (Block().head("ПРИХОДИТЕ НА КОНСУЛЬТАЦИЮ", 44, gap=12)
-          .body("Посмотрим ваше ДО, состояние тканей и обсудим, какой объём коррекции имеет смысл именно в вашем случае.", 29, gap=16)
-          .body("Для записи напишите в Direct «КОНСУЛЬТАЦИЯ» или свяжитесь с нами по телефону", 29, gap=6)
-          .plate("+7 926 636 30 00", 34, wght=600, gap=6)
-          .body("в WhatsApp, Telegram или MAX.", 29, gap=0))
-    top = 130; y0 = top + t.h + 20; yb = H - 60 - bt.h; y1 = yb - 20
-    im = photo("IMG_8394.JPG"); a = np.asarray(im).max(2) > 25                          # the photo sits on black: crop to it
-    ys, xs = np.nonzero(a); im = im.crop((xs.min(), ys.min(), xs.max(), int(ys.min() + (ys.max() - ys.min()) * 0.97)))
-    place(cv, im, (0, y0, W, y1))
-    ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); t.draw(ly, MARGIN, top); bt.draw(ly, MARGIN, yb); cv.alpha_composite(ly)
-    save_jpg(cv, "07_konsultaciya.jpg")
+    collage_story("IMG_8395.JPG", "07_vy_dumaete.jpg", "ЕСЛИ ВЫ СМОТРИТЕ НА НАШЕ ДО И ДУМАЕТЕ:",
+                  lambda b: b.body("«У меня очень похоже»", 28, gap=14).body("«Живот так и не восстановился после родов»", 28, gap=14)
+                  .body("«Грудь стала другой»", 28, gap=14).body("«Хочу снова чувствовать себя собой»", 28, gap=26)
+                  .body("приходите на консультацию", 30, wght=600, gap=0), head_size=46)
 
 
-STORIES = {1: s1, 2: s2, 3: s3, 4: s4, 5: s5, 6: s6, 7: s7}
+def s8():
+    collage_story("IMG_8396.JPG", "08_konsultaciya.jpg", "ПРИХОДИТЕ НА КОНСУЛЬТАЦИЮ",
+                  lambda b: b.body("Посмотрим ваше ДО, состояние тканей и обсудим, какой объём коррекции имеет смысл именно "
+                                   "в вашем случае.", 28, gap=22)
+                  .body("Для записи напишите в Direct «КОНСУЛЬТАЦИЯ» или свяжитесь с нами по телефону", 28, gap=10)
+                  .plate("+7 926 636 30 00", 30, wght=600, gap=10)
+                  .body("в WhatsApp, Telegram или MAX.", 28, gap=0), head_size=50)
+
+
+STORIES = {1: s1, 2: s2, 3: s3, 4: s4, 5: s5, 6: s6, 7: s7, 8: s8}
 for k, fn in STORIES.items():
     if not ONLY or k in ONLY: fn()
