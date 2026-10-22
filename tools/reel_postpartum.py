@@ -23,8 +23,8 @@ SRC = os.environ.get("REEL_SRC", os.path.join(ROOT, "dl_postpartum"))
 WORK = os.path.join(SRC, "_work")
 NAME = "Reels_postpartum_breast_belly"
 W, H, FPS, SR = 1080, 1920, 30, 48000
-NAVY = np.float32([0, 29, 85]) / 255; PINK = np.float32([233, 197, 193]) / 255; WHITE = np.float32([1, 1, 1])
-DEEP = np.float32([0, 16, 52]) / 255
+NAVY = np.float32([0, 18, 58]) / 255; PINK = np.float32([233, 197, 193]) / 255; WHITE = np.float32([1, 1, 1])
+DEEP = np.float32([0, 8, 30]) / 255
 
 # ---------------- easing ----------------
 def cl(x): return min(1.0, max(0.0, x))
@@ -185,7 +185,7 @@ def cover(img, w, h, fx=0.5, fy=0.5, z=1.0):
 
 # ---------------- static layers ----------------
 yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
-BG = NAVY * (1 + 0.55 * np.exp(-(((xx - 540) / 900) ** 2 + ((yy - 520) / 900) ** 2)))[..., None] * 1.0
+BG = NAVY * (1 + 0.35 * np.exp(-(((xx - 540) / 900) ** 2 + ((yy - 520) / 900) ** 2)))[..., None] * 1.0
 BG = np.clip(BG, 0, 1).astype(np.float32)
 def ramp(y0, y1): return np.clip((yy[:, :1] - y0) / (y1 - y0), 0, 1)[..., None]
 GBOT = (ramp(950, 1650) ** 1.3 * 0.92).astype(np.float32)
