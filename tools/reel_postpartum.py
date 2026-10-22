@@ -49,7 +49,7 @@ for _k, (_b, _s, _a, _o) in enumerate(VO):
 VO_END = _t
 def bstart(b): return next(s[4] for s in SEG if s[0] == b)
 T_A = 3.95; T_B = bstart("B") - 0.15; T_C = bstart("C") - 0.15; T_D = bstart("D") - 0.15; T_E = bstart("E") - 0.15
-T_E3 = bstart("E3") - 0.12; T_F = bstart("F") - 0.15; T_G = bstart("G") - 0.15; T_OUT = VO_END + 0.2; DUR = T_OUT + 2.4
+T_E3 = bstart("E3") - 0.12; T_F = bstart("F") - 0.15; T_G = bstart("G") - 0.15; T_OUT = T_G + 4.9; DUR = T_OUT + 3.6
 WAVE = 0.55
 def src_of(t, name):
     """source time for synced footage; in the gaps the picture keeps running (no freeze)"""
@@ -352,38 +352,33 @@ def s_f(t):
     HF.draw(fr, t, T_F + 0.35); TF.draw(fr, t, T_F + 1.1)
     return fr
 
-HG = Head(["ГРУДЬ + ЖИВОТ", "*ЗА ОДИН ЭТАП*"], 150, 70, 1180)
-TG = Type(["дальше будем показывать", "восстановление и результат"], 36, 72, 1180 + HG.h + 70)
-GL, GR = (60, 230, 530, 1100), (550, 230, 1020, 1100)
-_GB = {}
+COLL = [8393, 8395, 8396]                                             # surgeon's own collages (front, 3/4, side): ПОСЛЕ on top, ДО below
+COLL_IMG = [photo(n).astype(np.float32) / 255 for n in COLL]
+T_COLL = [T_G, T_G + 1.7, T_G + 3.3]; PUSH = 0.4
 def s_g(t):
-    lt = t - T_G; fr = BG.copy()
-    for k, (box, img, lab, nt) in enumerate([(GL, BEF, "ДО", 0), (GR, AFT, "ПОСЛЕ", 1)]):
-        p = eo((lt - 0.25 - 0.15 * k) / 0.6); dx = (1 - p) * (-140 if k == 0 else 140)
-        x0, y0, x1, y1 = box; w, h = x1 - x0, y1 - y0
-        if k not in _GB: _GB[k] = cover(img, w, h, 0.5, 0.42, 1.0)[0]
-        z = 1 + 0.02 * lt; im = cv2.resize(_GB[k], None, fx=z, fy=z)[:h, :w]
-        pts = notch_poly(x0 + dx, y0, x1 + dx, y1, 120 * nt, 150 * nt)
-        m = poly_mask(pts)[..., None] * p; sub = np.zeros_like(fr); xi = int(x0 + dx)
-        xa, xb = max(0, xi), min(W, xi + w); sub[y0:y1, xa:xb] = im[:, xa - xi:xb - xi]
-        fr = fr * (1 - m) + sub * m
-        path_draw(fr, notch_poly(x0, y0, x1, y1, 120 * nt, 150 * nt, 12), eio((lt - 0.6 - 0.15 * k) / 0.8), WHITE, 2)
-        chip(fr, lab, x0 + 18, y1 - 78, eo((lt - 0.9 - 0.15 * k) / 0.3))
-    mk = cv2.resize(LOGO_MARK, (96, int(LOGO_MARK.shape[0] * 96 / LOGO_MARK.shape[1])), interpolation=cv2.INTER_AREA)
-    blend(fr, mk, GR[2] - 60 - mk.shape[1] / 2, GR[3] - 75 - mk.shape[0] / 2, PINK, eo((lt - 1.2) / 0.5))
-    HG.draw(fr, t, T_G + 0.5); TG.draw(fr, t, T_G + 1.3)
+    """the three collages full frame, uncropped; each next one pushes in from the right"""
+    k = max(i for i, tc in enumerate(T_COLL) if t >= tc)
+    if k > 0 and t < T_COLL[k] + PUSH:
+        p = eio((t - T_COLL[k]) / PUSH); x = int(W * (1 - p)); fr = np.empty_like(BG)
+        fr[:, :x] = COLL_IMG[k - 1][:, W - x:]; fr[:, x:] = COLL_IMG[k][:, :W - x]; fr[:, max(0, x - 2):x + 2] = PINK
+    else: fr = COLL_IMG[k].copy()
+    lt = t - T_G
+    chip(fr, "ПОСЛЕ", 30, 240, eo((lt - 0.35) / 0.3)); chip(fr, "ДО", 30, 1010, eo((lt - 0.5) / 0.3))
     return fr
 
+HG = Head(["ГРУДЬ + ЖИВОТ", "*ЗА ОДИН ЭТАП*"], 150, 70, 470)
+TG = Type(["дальше будем показывать", "восстановление и результат"], 36, 72, 470 + HG.h + 70)
 def s_out(t):
-    lt = t - T_OUT; fr = BG.copy(); w = 860
-    lg = logo_alpha(w); h = lg.shape[0]; x, y = 540 - w / 2, 860 - h / 2
+    lt = t - T_OUT; fr = BG.copy(); w = 760
+    HG.draw(fr, t, T_OUT + 0.3); TG.draw(fr, t, T_OUT + 1.0)
+    lg = logo_alpha(w); h = lg.shape[0]; x, y = 540 - w / 2, 1250 - h / 2
     sp = int(w * _split / _lg.shape[1]); mk = lg[:, :sp].copy(); wd = lg[:, sp:].copy()
     yy2, xx2 = np.mgrid[0:mk.shape[0], 0:mk.shape[1]]; ang = (np.arctan2(xx2 - mk.shape[1] / 2, -(yy2 - mk.shape[0] / 2)) % (2 * np.pi)) / (2 * np.pi)
-    mk *= np.clip((eio(lt / 0.9) - ang) * 20, 0, 1)
-    wd[:, int(wd.shape[1] * eio((lt - 0.45) / 0.8)):] = 0
+    mk *= np.clip((eio((lt - 1.0) / 0.9) - ang) * 20, 0, 1)
+    wd[:, int(wd.shape[1] * eio((lt - 1.45) / 0.8)):] = 0
     blend(fr, mk, x, y, PINK); blend(fr, wd, x + sp, y, PINK)
     ty = Type(["пластический хирург"], 40, 0, 0, 300, 30); ty.x = 540 - ty.lines[0][0].shape[1] / 2 + 4; ty.y = y + h + 70 + ty.top
-    ty.draw(fr, t, T_OUT + 1.0)
+    ty.draw(fr, t, T_OUT + 2.0)
     return fr
 
 SCENES = [(0, s_hook), (T_A, s_a), (T_B, s_b), (T_C, s_c), (T_D, s_d), (T_E, s_e), (T_F, s_f), (T_G, s_g), (T_OUT, s_out)]
@@ -501,9 +496,9 @@ def build_audio(path):
     for T in (T_A, T_C): put(WS, T - 0.05, 0.3); put(PP, T + 0.6, 0.25)         # frame morphs
     put(WS, T_E3 - 0.05, 0.3)
     for hd, t0 in [(HOOK, -0.3), (HA, T_A + 0.45), (HB, T_B + 0.3), (HC, T_C + 0.45), (HD, T_D + 0.3), (HE, T_E + 0.35),
-                   (HE3, T_E3 + 0.5), (HF, T_F + 0.35), (HG, T_G + 0.5)]:
+                   (HE3, T_E3 + 0.5), (HF, T_F + 0.35), (HG, T_OUT + 0.3)]:
         for k in range(len(hd.words)): put(pop(900 + 60 * (k % 3), 320), t0 + k * hd.gap + 0.08, 0.10)
-    for ty, t0 in [(TA, T_A + 1.1), (TB, T_B + 1.0), (TC, T_C + 1.2), (TE, T_E + 1.4), (TF, T_F + 1.1), (TG, T_G + 1.3)]:
+    for ty, t0 in [(TA, T_A + 1.1), (TB, T_B + 1.0), (TC, T_C + 1.2), (TE, T_E + 1.4), (TF, T_F + 1.1), (TG, T_OUT + 1.0)]:
         for k in range(ty.n):
             if k % 2 == 0: put(tick(), t0 + k / ty.cps, 0.06)
     for t0 in (T_B + 1.7, T_B + 2.4): put(pop(1500, 700), t0, 0.22)
@@ -512,7 +507,8 @@ def build_audio(path):
     put(whoosh(0.35, 1500, 9000), T_E + 1.05, 0.3)                              # strike-through
     for k in range(14): put(tick(), T_E3 + 0.9 + 0.9 * (k / 14) ** 0.5, 0.18)
     put(CH, T_E3 + 1.8, 0.14)
-    put(RS, T_OUT - 1.15, 0.12); put(CH, T_OUT + 0.25, 0.2); put(chime(1975.5), T_OUT + 0.55, 0.1)
+    put(RS, T_OUT - 1.15, 0.12); put(CH, T_OUT + 1.05, 0.2); put(chime(1975.5), T_OUT + 1.5, 0.1)
+    for tc in T_COLL[1:]: put(WS, tc - 0.1, 0.25)                                 # collage push
     sfx[:n] *= 1 - 0.8 * np.clip(d, 0, 1)                                     # effects step back under the voice
     mix = vo[:, None] + mus + sfx[:n, None] * np.float64([[0.92, 1.0]])
     mix /= max(1, np.abs(mix).max() / 0.95)
