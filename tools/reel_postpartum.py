@@ -467,6 +467,17 @@ def music(n):
     mix = pad / np.abs(pad).max() * 0.55 * pump + sub * 0.22 * pump + arp / max(1e-6, np.abs(arp).max()) * 0.16 + kick * 0.42 + hat * 0.12
     return mix / np.abs(mix).max()
 
+MUSIC = os.path.join(SRC, "music.wav")                               # ffmpeg -i track.mp4 -vn -ac 2 -ar 48000 music.wav
+M0, M_DROP = 10.50, 14.45                                              # the track's drop lands on the first frame morph (T_A)
+G_VO, G_GAP = 0.022, 0.075                                             # music RMS under the voice / between phrases (~-33 / -22 dBFS): voice sits ~13 dB above
+def track(n):
+    w = wave.open(MUSIC); x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64).reshape(-1, w.getnchannels()) / 32768
+    if x.shape[1] == 1: x = np.repeat(x, 2, 1)
+    x = x / np.sqrt(np.mean(x[int(M_DROP * SR):].mean(1) ** 2))         # loud part -> RMS 1
+    x[:int(M_DROP * SR)] *= 4.5                                         # lift the soft intro under the hook
+    seg = x[int(M0 * SR):int(M0 * SR) + n]
+    return np.pad(seg, ((0, n - len(seg)), (0, 0)))
+
 def build_audio(path):
     n = int(DUR * SR); vo = np.zeros(n); act = np.zeros(n); srcs = {}
     for b, s, si, so, t0 in SEG:
@@ -475,17 +486,18 @@ def build_audio(path):
             srcs[s] = hp(x, 90)
         seg = srcs[s][int(si * SR):int(so * SR)].copy(); f = int(0.012 * SR); seg[:f] *= np.linspace(0, 1, f); seg[-f:] *= np.linspace(1, 0, f)
         seg /= np.sqrt(np.mean(seg[np.abs(seg) > 0.01] ** 2)) + 1e-6; i = int(t0 * SR); vo[i:i + len(seg)] += seg[:n - i]
-        act[max(0, i - int(0.08 * SR)):i + len(seg) + int(0.1 * SR)] = 1
+        act[max(0, i - int(0.25 * SR)):i + len(seg) + int(0.1 * SR)] = 1          # music dips before the first word
     vo = np.tanh(vo * 0.16 * 1.6) / 1.6                                  # gentle level + soft limiting
     d = np.convolve(act, np.ones(int(0.25 * SR)) / int(0.25 * SR), "same")
     tt = np.arange(n) / SR; fade = np.clip((DUR - tt) / 1.6, 0, 1) ** 1.5 * np.minimum(1, tt / 0.15)
-    mus = music(n) * (0.26 - 0.19 * d) * fade
+    if os.path.exists(MUSIC): mus = track(n) * ((G_GAP - (G_GAP - G_VO) * np.clip(d, 0, 1)) * fade)[:, None]
+    else: mus = (music(n) * (0.26 - 0.19 * d) * fade)[:, None] * np.float64([[1.0, 0.92]])   # fallback: synth bed
     sfx = np.zeros(n + 2 * SR)
     def put(x, t, g):
         i = int(max(0, t) * SR); seg = sfx[i:i + len(x)]; seg += x[:len(seg)] * g
     WH = whoosh(); WS = whoosh(0.4, 700, 8000); BM = boom(); PP = pop(); CH = chime(); RS = riser(); SC = scribble()
     put(BM, 0.0, 0.5); put(CH, 0.05, 0.12)
-    for T in sorted(WAVED): put(WH, T - 0.15, 0.32); put(boom(0.5), T + WAVE * 0.55, 0.22)
+    for T in sorted(WAVED): put(WH, T - 0.12, 0.32); put(boom(0.5), T - 0.04, 0.2)   # thump in the gap, not on the first word
     for T in (T_A, T_C): put(WS, T - 0.05, 0.3); put(PP, T + 0.6, 0.25)         # frame morphs
     put(WS, T_E3 - 0.05, 0.3)
     for hd, t0 in [(HOOK, -0.3), (HA, T_A + 0.45), (HB, T_B + 0.3), (HC, T_C + 0.45), (HD, T_D + 0.3), (HE, T_E + 0.35),
@@ -493,16 +505,16 @@ def build_audio(path):
         for k in range(len(hd.words)): put(pop(900 + 60 * (k % 3), 320), t0 + k * hd.gap + 0.08, 0.10)
     for ty, t0 in [(TA, T_A + 1.1), (TB, T_B + 1.0), (TC, T_C + 1.2), (TE, T_E + 1.4), (TF, T_F + 1.1), (TG, T_G + 1.3)]:
         for k in range(ty.n):
-            if k % 2 == 0: put(tick(), t0 + k / ty.cps, 0.10)
+            if k % 2 == 0: put(tick(), t0 + k / ty.cps, 0.06)
     for t0 in (T_B + 1.7, T_B + 2.4): put(pop(1500, 700), t0, 0.22)
     put(SC, T_C + 1.25, 0.18)                                                    # lacing
-    put(WS, T_WIPE - 0.05, 0.28); put(pop(), bstart("D") + 1.1, 0.2); put(pop(), bstart("D") + (61.97 - 59.68) + 0.98, 0.2)
+    put(WS, T_WIPE - 0.05, 0.28)   # list items appear silently: they land on the voice
     put(whoosh(0.35, 1500, 9000), T_E + 1.05, 0.3)                              # strike-through
     for k in range(14): put(tick(), T_E3 + 0.9 + 0.9 * (k / 14) ** 0.5, 0.18)
     put(CH, T_E3 + 1.8, 0.14)
     put(RS, T_OUT - 1.15, 0.12); put(CH, T_OUT + 0.25, 0.2); put(chime(1975.5), T_OUT + 0.55, 0.1)
-    sfx[:n] *= 1 - 0.55 * np.clip(d, 0, 1)                                     # effects step back under the voice
-    mix = vo[:, None] + mus[:, None] * np.float64([[1.0, 0.92]]) + sfx[:n, None] * np.float64([[0.92, 1.0]])
+    sfx[:n] *= 1 - 0.8 * np.clip(d, 0, 1)                                     # effects step back under the voice
+    mix = vo[:, None] + mus + sfx[:n, None] * np.float64([[0.92, 1.0]])
     mix /= max(1, np.abs(mix).max() / 0.95)
     with wave.open(path, "wb") as w:
         w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR); w.writeframes((mix * 32767).astype(np.int16).tobytes())
