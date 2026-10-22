@@ -265,22 +265,12 @@ def s1():
     render_video("01_posle_rodov.mp4", "IMG_0336.MOV", 0.0, 8.1, ly, fade(top + 40, 300, 0.85))
 
 
-def s2a():
-    """side before photo (IMG_8389) full screen; the first half of the belly text straight on it, low"""
-    cv = photo("IMG_8389.JPG").resize((W, H), Image.LANCZOS).convert("RGBA")
+def s2():
+    """before (belly) video full frame; the belly text straight on it, low (no black), the belly open"""
     b = (Block().body("У нашей пациентки после родов и кормления ослабла передняя брюшная стенка, был выраженный диастаз, "
                       "растяжки и старый рубец после полостной операции.", 36, gap=0))
-    ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, H - 90 - b.h); cv.alpha_composite(ly)
-    save_jpg(cv, "02_stenka_zhivota.jpg")
-
-
-def s2():
-    """before (belly) video full frame; the text straight on it low on the thighs (no black), the belly open"""
-    b = (Block().body("И вот здесь очень важно понять:", 33, wght=500, gap=8)
-         .head("ЭТО УЖЕ НЕ ИСТОРИЯ ПРО «ЕЩЁ НЕМНОГО ПОХУДЕТЬ»", 50, gap=14)
-         .body("Некоторые изменения спортом просто не убрать.", 36, wght=600, gap=0))
-    top = H - 60 - b.h; ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top)
-    render_video("03_diastaz.mp4", "IMG_0337.MOV", 0.0, 9.9, ly, NOSHADE)        # body full screen, no black under the text
+    top = H - 90 - b.h; ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top)
+    render_video("02_diastaz.mp4", "IMG_0337.MOV", 0.0, 9.9, ly, NOSHADE)
 
 
 def arrow(d, p0, p1, width=3, head=13):
@@ -336,7 +326,7 @@ def s3():
     lab = pill("наше до", 28); ly.alpha_composite(lab, (MARGIN - 10, y0 + 24))
     finding(ly, "опущение груди", m(540, 820), "DL")                    # lower pole of the near breast (sticker 616, 700)
     finding(ly, "асимметрия", m(940, 610), "UL")                        # the far breast sits lower
-    cv.alpha_composite(ly); save_jpg(cv, "04_grud.jpg")
+    cv.alpha_composite(ly); save_jpg(cv, "03_grud.jpg")
 
 
 def s4():
@@ -351,7 +341,7 @@ def s4():
     top = 1790 - b.h
     cv = Image.fromarray((np.asarray(cv, np.float32) * (1 - fade(top + 60, 420, 0.85))).astype(np.uint8)).convert("RGBA")
     ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top); cv.alpha_composite(ly)
-    save_jpg(cv, "05_dve_zony.jpg")
+    save_jpg(cv, "04_dve_zony.jpg")
 
 
 def s5():
@@ -374,14 +364,14 @@ def s5():
     b = (Block().head("[[ПЕРВЫЕ СУТКИ]]", 62, gap=14).body("Это ещё [[ранний результат.]]", 34, wght=600, gap=10)
          .body("Дальше ткани будут восстанавливаться, [[отёк уменьшаться,]] а форма постепенно меняться.", 32, gap=0))
     top = 690; ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top)
-    render_video("06_pervye_sutki.mp4", "day1.mp4", 0.0, dur, ly, NOSHADE, on_frame=stick,
+    render_video("05_pervye_sutki.mp4", "day1.mp4", 0.0, dur, ly, NOSHADE, on_frame=stick,
                  subs=PillSubs(words, y=top + b.h + 70, outline=True))   # white edge: navy pill on navy scrubs
 
 
 # the clinic's before/after collages: as they are, no text, no arrows
-def s6(): save_jpg(photo("IMG_8393.JPG").resize((W, H), Image.LANCZOS), "07_kollazh_pryamo.jpg")
-def s7(): save_jpg(photo("IMG_8395.JPG").resize((W, H), Image.LANCZOS), "08_kollazh_3-4.jpg")
-def s8(): save_jpg(photo("IMG_8396.JPG").resize((W, H), Image.LANCZOS), "09_kollazh_sboku.jpg")
+def s6(): save_jpg(photo("IMG_8393.JPG").resize((W, H), Image.LANCZOS), "06_kollazh_pryamo.jpg")
+def s7(): save_jpg(photo("IMG_8395.JPG").resize((W, H), Image.LANCZOS), "07_kollazh_3-4.jpg")
+def s8(): save_jpg(photo("IMG_8396.JPG").resize((W, H), Image.LANCZOS), "08_kollazh_sboku.jpg")
 
 
 def s9():
@@ -391,7 +381,7 @@ def s9():
          .body("«Может, спорт всё-таки поможет»", 32, gap=22).body("Иногда дело уже не в усилиях.", 35, wght=600, gap=8)
          .body("Просто есть изменения тканей, которые требуют совсем другого подхода.", 32, gap=0))
     top = H - 80 - b.h; ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top)
-    render_video("10_ne_v_usiliyah.mp4", "C0585.MP4", 0.0, 8.1, ly, fade(top + 40, 420, 0.85), mute=True)
+    render_video("09_ne_v_usiliyah.mp4", "C0585.MP4", 0.0, 8.1, ly, fade(top + 40, 420, 0.85), mute=True)
 
 
 def s10():
@@ -405,9 +395,9 @@ def s10():
     top = H - 70 - b.h
     cv = Image.fromarray((np.asarray(cv, np.float32) * (1 - fade(top + 60, 420, 0.88))).astype(np.uint8)).convert("RGBA")
     ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top); cv.alpha_composite(ly)
-    save_jpg(cv, "11_konsultaciya.jpg")
+    save_jpg(cv, "10_konsultaciya.jpg")
 
 
-STORIES = {1: s1, 2: s2a, 3: s2, 4: s3, 5: s4, 6: s5, 7: s6, 8: s7, 9: s8, 10: s9, 11: s10}
+STORIES = {1: s1, 2: s2, 3: s3, 4: s4, 5: s5, 6: s6, 7: s7, 8: s8, 9: s9, 10: s10}
 for k, fn in STORIES.items():
     if not ONLY or k in ONLY: fn()
