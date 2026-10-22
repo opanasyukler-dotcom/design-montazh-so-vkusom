@@ -689,10 +689,15 @@ def story(num, slug, clip, col, sub_y, ct=0.0, more=(), animate=False, fade=True
 # ---------------- stories ----------------
 def s1():
     col = Column(0, align="left")
-    col.head("ПОЧЕМУ БЕЗ ПОДТЯЖКИ?", 0, size=64, gap=14)
-    col.body("история пациентки", 0, size=36, wght=400, gap=0)
+    for i, ln in enumerate(["Перед операцией", "ещё раз всё с вами", "проговариваем"]):
+        col.body(ln, 0, size=36, wght=400, gap=0 if i < 2 else 26)
+    col.body("Для пациентки важно:", 0, size=36, wght=500, gap=4)
+    col.head("ОТСУТСТВИЕ ВИДИМЫХ РУБЦОВ,", 0, size=48, gap=4)
+    col.body("поэтому без подтяжки, а также она против имплантов", 0, size=36, wght=400, gap=26)
+    col.body("Поэтому выбор пал", 0, size=42, wght=600, gap=0)
+    col.body("на липофилинг", 0, size=42, wght=600, gap=0)
     col.to_bottom(1720)
-    story(1, "pochemu_bez_podtyazhki", "d1.mp4", col, sub_y=1240)
+    story(1, "pochemu_bez_podtyazhki", "d1.mp4", col, sub_y=col.top - 60)
 
 
 def s2():
