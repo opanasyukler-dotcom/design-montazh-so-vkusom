@@ -266,14 +266,14 @@ def s1():
 
 
 def s2():
-    """before (belly) video full frame; the text low on the thighs under a black fade, the belly open"""
+    """before (belly) video full frame; the text straight on it low on the thighs (no black), the belly open"""
     b = (Block().body("У нашей пациентки после родов и кормления ослабла передняя брюшная стенка, был выраженный диастаз, "
                       "растяжки и старый рубец после полостной операции.", 31, gap=14)
          .body("И вот здесь очень важно понять:", 31, wght=500, gap=6)
          .head("ЭТО УЖЕ НЕ ИСТОРИЯ ПРО «ЕЩЁ НЕМНОГО ПОХУДЕТЬ»", 44, gap=12)
          .body("Некоторые изменения спортом просто не убрать.", 33, wght=600, gap=0))
     top = H - 60 - b.h; ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top)
-    render_video("02_diastaz.mp4", "IMG_0337.MOV", 0.0, 9.9, ly, fade(top + 40, 300, 0.85))
+    render_video("02_diastaz.mp4", "IMG_0337.MOV", 0.0, 9.9, ly, NOSHADE)        # body full screen, no black under the text
 
 
 def arrow(d, p0, p1, width=3, head=13):
@@ -351,7 +351,7 @@ def s5():
                                 os.path.join(DRIVE, "day1.mp4")], capture_output=True, text=True).stdout)
     # hand-placed nipples (near, far) at the start of each shot, then optical flow
     pos = track("day1.mp4", dur, [[(757, 1452), (730, 1290)], [(752, 1402), (733, 1276)]])
-    st = [sticker_rgba(118), sticker_rgba(96)]
+    st = [sticker_rgba(88), sticker_rgba(72)]
 
     def stick(fr, i):
         f = fr.astype(np.float32) / 255
@@ -385,16 +385,13 @@ def s9():
 
 
 def s10():
-    """the invitation on its own slide: photo of the surgeon at work (DSC00932), text low under the usual black fade"""
+    """only the consultation: photo of the surgeon at work (DSC00932), text low under the usual black fade"""
     cv = photo("DSC00932.JPG").resize((W, H), Image.LANCZOS)
-    b = (Block().head("ЕСЛИ ВЫ СМОТРИТЕ НА НАШЕ ДО И ДУМАЕТЕ:", 44, gap=14)
-         .body("«У меня очень похоже»", 31, gap=0).body("«Живот так и не восстановился после родов»", 31, gap=0)
-         .body("«Грудь стала другой»", 31, gap=0).body("«Хочу снова чувствовать себя собой»", 31, gap=18)
-         .head("ПРИХОДИТЕ НА КОНСУЛЬТАЦИЮ", 44, gap=10)
-         .body("Посмотрим ваше ДО, состояние тканей и обсудим, какой объём коррекции имеет смысл именно в вашем случае.", 29, gap=14)
-         .body("Для записи напишите в Direct «КОНСУЛЬТАЦИЯ» или свяжитесь с нами по телефону", 29, gap=8)
-         .plate("+7 926 636 30 00", 32, wght=600, gap=8)
-         .body("в WhatsApp, Telegram или MAX.", 29, gap=0))
+    b = (Block().head("ПРИХОДИТЕ НА КОНСУЛЬТАЦИЮ", 54, gap=16)
+         .body("Посмотрим ваше ДО, состояние тканей и обсудим, какой объём коррекции имеет смысл именно в вашем случае.", 33, gap=18)
+         .body("Для записи напишите в Direct «КОНСУЛЬТАЦИЯ» или свяжитесь с нами по телефону", 33, gap=10)
+         .plate("+7 926 636 30 00", 36, wght=600, gap=10)
+         .body("в WhatsApp, Telegram или MAX.", 33, gap=0))
     top = H - 70 - b.h
     cv = Image.fromarray((np.asarray(cv, np.float32) * (1 - fade(top + 60, 420, 0.88))).astype(np.uint8)).convert("RGBA")
     ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top); cv.alpha_composite(ly)
