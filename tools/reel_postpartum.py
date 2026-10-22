@@ -247,9 +247,10 @@ def full(content, fx=0.5, fy=0.5, z=1.0):
     img, M = cover(content, W, H, fx, fy, z); return img, M
 
 # ---------------- scenes ----------------
+def h_src(t): return 0.2 + t * 0.9                                     # skip the first frames: the sticker slips off there
 HOOK = Head(["ПОСЛЕ РОДОВ ТЕЛО", "УЖЕ НЕ ВОЗВРАЩАЕТСЯ", "*НАЗАД*"], 150, 70, 1170)
 def s_hook(t):
-    fr, _ = full(V["0336"].at(t * 0.9), 0.5, 0.42, 1.04 + 0.02 * t); shade(fr, VIG); shade(fr, GBOT)
+    fr, _ = full(V["0336"].at(h_src(t)), 0.5, 0.42, 1.04 + 0.02 * t); shade(fr, VIG); shade(fr, GBOT)
     lg = logo_alpha(400); blend(fr, lg, 540 - 200, 215, PINK, eo((t + 0.1) / 0.5))
     HOOK.draw(fr, t, -0.3)
     blend(fr, np.ones((4, int(260 * eo((t - 0.9) / 0.6)) + 1), np.float32), 72, HOOK.y + HOOK.h + 60, PINK)
@@ -259,11 +260,11 @@ HA = Head(["ПАЦИЕНТКА РОЖАЛА", "И *КОРМИЛА*"], 112, 70, 1
 TA = Type(["после родов ослабла передняя брюшная стенка,", "а грудь немного опустилась"], 36, 72, 1300 + HA.h + 70)
 def s_a(t):
     lt = t - T_A
-    if lt < 0.65: c = V["0336"].at(t * 0.9)
+    if lt < 0.65: c = V["0336"].at(h_src(t))
     else: c = V["2994"].at(src_of(t, "2994"))
     fr = card_frame(c, t, lt / 0.6, T_A + 0.3, 0.5, 0.45 if lt < 0.65 else 0.36, 1.0 + 0.012 * lt)
     if 0.5 < lt < 0.8:                                                   # soft dissolve from ДО-video into the consultation
-        k = (lt - 0.5) / 0.3; f2 = card_frame(V["0336"].at(t * 0.9), t, 1, T_A + 0.3, 0.5, 0.45); fr = f2 * (1 - k) + fr * k
+        k = (lt - 0.5) / 0.3; f2 = card_frame(V["0336"].at(h_src(t)), t, 1, T_A + 0.3, 0.5, 0.45); fr = f2 * (1 - k) + fr * k
     HA.draw(fr, t, T_A + 0.45); TA.draw(fr, t, T_A + 1.1); notch_num(fr, "01", t, T_A + 0.7)
     return fr
 
