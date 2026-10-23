@@ -38,7 +38,7 @@ VO = [("H", 1.05, 4.95),                                               # мож�
       ("N", 41.15, 44.62), ("N", 44.95, 46.45),                        # у нас нет разрезов, только небольшие маленькие проколы. абсолютно натуральная грудь
       ("S", 46.45, 49.45),                                             # на ощупь никогда никто не поймёт, что эта грудь увеличена
       ("R", 51.74, 55.05)]                                             # эту процедуру при желании можно повторить
-HOLD = {"S": 1.0, "R": 1.1}                                        # the case slides stay on screen a bit longer
+HOLD = {"S": 2.6, "R": 4.2}                                        # each case slide stays ~4 s on screen
 SEG = []; _t = 0.25
 for _k, (_b, _a, _o) in enumerate(VO):
     if _k: _t += 0.18 if _b == VO[_k - 1][0] else HOLD.get(_b, 0.4)          # breathing room between lines
@@ -320,7 +320,7 @@ def badge(fr, x, y, sym, t, t0):
     m = np.zeros((H, W), np.uint8); cv2.circle(m, (int(x), int(y)), int(28 * s), 255, -1, cv2.LINE_AA); blend(fr, m.astype(np.float32) / 255, 0, 0, PINK)
     bar = np.ones((max(1, int(6 * s)), max(1, int(26 * s))), np.float32); blend(fr, bar, x - bar.shape[1] / 2, y - bar.shape[0] / 2, NAVY)
     if sym == "+": blend(fr, bar.T.copy(), x - bar.shape[0] / 2, y - bar.shape[1] / 2, NAVY)
-def pip(fr, t, t0, cx=190, cy=1500, r=130):
+def pip(fr, t, t0, cx=250, cy=1650, r=200):
     """the surgeon keeps talking in a round window"""
     p = eback((t - t0) / 0.45)
     if p <= 0: return
@@ -380,8 +380,8 @@ def s_schema(t):
         px, py = bp(250, 300); badge(fr, px, py, "+", t, T_T + 1.2)
     return fr
 HT = Drop(["ДВА ЭФФЕКТА *СРАЗУ*"], 120, 70, 250)
-TT1 = Track(["− меньше объёма в донорских зонах"], 34, 360, 1440, 400)
-TT2 = Track(["+ больше наполненности груди"], 34, 360, 1500, 500, PINK)
+TT1 = Track(["− меньше объёма в донорских зонах"], 36, 70, 1345, 400)
+TT2 = Track(["+ больше наполненности груди"], 36, 70, 1397, 500, PINK)
 
 # warning: surgeon, zoom-out; 10 droplets, part of them falls away; «30–50 %»
 HW = Drop(["ВАЖНО:", "*ЧАСТЬ ЖИРА МОЖЕТ УЙТИ*"], 112, 70, 1150)
@@ -426,12 +426,12 @@ def incision(fr, t, t0, x0=90, y=1000):
     b = alpha_img("только проколы", mont(32, 500)); blend(fr, b, 615, y + 26, PINK, eo((t - T_PUNCT - 0.4) / 0.3))
 def s_noinc(t):
     if t >= T_SL1: return SLIDE_FR[0].copy()
-    fr = BG.copy(); HN.draw(fr, t, T_N + 0.3); incision(fr, t, T_N + 1.0); pip(fr, t, T_N + 0.2, 540, 1400, 170)
+    fr = BG.copy(); HN.draw(fr, t, T_N + 0.3); incision(fr, t, T_N + 1.0); pip(fr, t, T_N + 0.2, 540, 1430, 250)
     return fr
 
 # soft & natural: text card + ripple (surgeon in the circle), then slide 2 full screen
 HS = Drop(["МЯГКИЙ И ЕСТЕСТВЕННЫЙ", "*РЕЗУЛЬТАТ*"], 116, 70, 300)
-T_SL2 = T_S + 1.7
+T_SL2 = vend("S") + 0.1                                               # slide 2 after the «на ощупь» line
 def ripple(fr, t, t0, cx=540, cy=900):
     if t < t0: return
     for k in range(3):
@@ -442,7 +442,7 @@ def ripple(fr, t, t0, cx=540, cy=900):
     a = alpha_img("на ощупь", mont(32, 500)); blend(fr, a, cx - a.shape[1] / 2, cy + 110, WHITE, eo((t - t0) / 0.3))
 def s_soft(t):
     if t >= T_SL2: return SLIDE_FR[1].copy()
-    fr = BG.copy(); HS.draw(fr, t, T_S + 0.2); ripple(fr, t, T_S + 0.5); pip(fr, t, T_S + 0.1, 540, 1400, 170)
+    fr = BG.copy(); HS.draw(fr, t, T_S + 0.2); ripple(fr, t, T_S + 0.5); pip(fr, t, T_S + 0.1, 540, 1430, 250)
     return fr
 
 # repeat: surgeon full frame, repeat arrows
