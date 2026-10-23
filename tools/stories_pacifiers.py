@@ -3,7 +3,7 @@
            headline (main) + first paragraph (second)
   story 2: the rest of the text on the same page, the question in bold, room at the bottom for a native question sticker
 Fonts (stories_kit): main = Inter Bold, second = thin Montserrat, detail = Montserrat Italic.
-  python3 -I stories_pacifiers.py main.jpg side.jpg out_dir
+  python3 -I stories_pacifiers.py main.jpg side.jpg stroller.jpg baby.jpg out_dir
 """
 import os, sys
 from PIL import Image, ImageDraw, ImageFilter
@@ -59,29 +59,48 @@ def story1(main, side, out):
           "second", 36, y + 22, 50, 880, col=(255, 255, 255))
     img.save(out, quality=95, subsampling=0)
 
-def story2(main, out):
-    img = Image.new("RGB", (W, H), PAPER); d = ImageDraw.Draw(img)
-    # small round thumb of the cover photo as a visual link to story 1
-    circle(img, main, W // 2, 380, 170, (180, 700, 1380, 1900))
-    X = 110; y = 560
-    paras = [
-        ("second", "Раньше я всегда покупала латексные, но они ужасно быстро изнашиваются, и приходится постоянно менять."),
-        ("second", "Поэтому решила найти силиконовые такой же круглой формы."),
-        ("main", "И вы не представляете, какой это оказался квест!"),
-        ("second", "Почему-то найти красивую пустышку с круглой силиконовой соской практически невозможно."),
-        ("detail", "В итоге нашла подходящую только у Paomma."),
-    ]
-    sizes = {"main": 44, "second": 36, "detail": 36}; leads = {"main": 56, "second": 50, "detail": 50}
-    for role, t in paras:
-        y = block(d, t, role, sizes[role], y, leads[role], 860, GREY if role == "detail" else INK, X) + 28
-    d.line((X, y + 6, X + 90, y + 6), fill=LILAC, width=3); y += 56
-    y = block(d, "Если знаете ещё бренды с красивыми силиконовыми пустышками именно круглой формы, поделитесь!",
-              "main", 40, y, 54, 860, INK, X) + 18
-    block(d, "Потому что я уже весь интернет перерыла.", "detail", 34, y, 48, 860, GREY, X)
-    img.save(out, quality=95, subsampling=0)
+def fill(ph):
+    s = max(W / ph.width, H / ph.height); p = ph.resize((round(ph.width * s), round(ph.height * s)), Image.LANCZOS)
+    x, y = (p.width - W) // 2, (p.height - H) // 2
+    return p.crop((x, y, x + W, y + H))
+
+def shadow_text(img, items, y, x=None, maxw=880):
+    """white lines with a soft dark glyph shadow; items = [(role, size, lead, text, gap_after)]"""
+    lay = Image.new("RGBA", img.size, (0, 0, 0, 0)); sh = Image.new("L", img.size, 0)
+    d, ds = ImageDraw.Draw(lay), ImageDraw.Draw(sh)
+    for role, size, lead, t, gap in items:
+        f = font(role, size)
+        for l in wrap(t, f, maxw):
+            d.text((W / 2, y), l, font=f, fill=(255, 255, 255, 255), anchor="mm")
+            ds.text((W / 2, y + 3), l, font=f, fill=170, anchor="mm"); y += lead
+        y += gap
+    img.paste(Image.new("RGB", img.size, (30, 22, 20)), (0, 0), sh.filter(ImageFilter.GaussianBlur(9)))
+    img.paste(lay, (0, 0), lay)
     return y
 
+def story2(stroller, out):
+    """blurred stroller photo, the search story over it"""
+    import numpy as np
+    img = fill(stroller).filter(ImageFilter.GaussianBlur(26))
+    a = np.asarray(img, np.float32) * 0.78; img = Image.fromarray(a.clip(0, 255).astype(np.uint8))   # a bit darker for white type
+    items = [("second", 38, 52, "Раньше я всегда покупала латексные, но они ужасно быстро изнашиваются, и приходится постоянно менять.", 34),
+             ("second", 38, 52, "Поэтому решила найти силиконовые такой же круглой формы.", 34),
+             ("main", 50, 64, "И вы не представляете, какой это оказался квест!", 34),
+             ("second", 38, 52, "Почему-то найти красивую пустышку с круглой силиконовой соской практически невозможно.", 34),
+             ("detail", 38, 52, "В итоге нашла подходящую только у Paomma.", 0)]
+    shadow_text(img, items, 560)
+    img.save(out, quality=95, subsampling=0)
+
+def story3(baby, out):
+    """baby photo full screen, the question on the white sheet above her head, dark type"""
+    img = fill(baby); d = ImageDraw.Draw(img)
+    y = block(d, "Если знаете ещё бренды с красивыми силиконовыми пустышками именно круглой формы, поделитесь!",
+              "main", 40, 270, 54, 880)
+    block(d, "Потому что я уже весь интернет перерыла.", "detail", 34, y + 14, 46, 900, INK)
+    img.save(out, quality=95, subsampling=0)
+
 if __name__ == "__main__":
-    main, side = Image.open(sys.argv[1]).convert("RGB"), Image.open(sys.argv[2]).convert("RGB"); od = sys.argv[3]
+    main, side, stroller, baby = (Image.open(p).convert("RGB") for p in sys.argv[1:5]); od = sys.argv[5]
     story1(main, side, os.path.join(od, "pustyshki_1.jpg"))
-    print("text ends at y", story2(main, os.path.join(od, "pustyshki_2.jpg")))
+    story2(stroller, os.path.join(od, "pustyshki_2.jpg"))
+    story3(baby, os.path.join(od, "pustyshki_3.jpg"))
