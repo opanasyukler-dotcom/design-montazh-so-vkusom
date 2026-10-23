@@ -45,14 +45,18 @@ def block(d, text, role, size, y, lead, maxw=880, col=INK, x=None):
     return y
 
 def story1(main, side, out):
-    img = Image.new("RGB", (W, H), PAPER)
-    cw, ch = 720, 960; x0, y0 = (W - cw) // 2, 250
-    rounded_card(img, main, (x0, y0, x0 + cw, y0 + ch), 36)
-    circle(img, side, x0 + cw - 20, y0 + 70, 300, (156, 640, 1356, 1340))             # nipples through the clear case, top corner
+    """cover: the main photo full screen, the second photo in a big circle, text over a soft bottom shade"""
+    import numpy as np
+    sc = H / main.height; p = main.resize((round(main.width * sc), H), Image.LANCZOS)
+    x = (p.width - W) // 2; img = p.crop((x, 0, x + W, H))
+    a = np.asarray(img, np.float32); y = np.linspace(0, 1, H, dtype=np.float32)[:, None, None]
+    a *= 1 - np.clip((y - 0.58) / 0.42, 0, 1) ** 1.3 * 0.72                        # bottom shade so white text reads
+    img = Image.fromarray(a.clip(0, 255).astype(np.uint8))
+    circle(img, side, 270, 330, 420, (430, 640, 1230, 1440))                        # square crop → no distortion
     d = ImageDraw.Draw(img)
-    y = block(d, "А ещё обновили пустышки.", "main", 50, y0 + ch + 120, 62)
-    y = block(d, "Мы пользуемся Paomma и BIBS, потому что другую форму соски человек категорически отказывается воспринимать.",
-              "second", 36, y + 24, 50, 860)
+    y = block(d, "А ещё обновили пустышки.", "main", 52, 1450, 64, col=(255, 255, 255))
+    block(d, "Мы пользуемся Paomma и BIBS, потому что другую форму соски человек категорически отказывается воспринимать.",
+          "second", 36, y + 22, 50, 880, col=(255, 255, 255))
     img.save(out, quality=95, subsampling=0)
 
 def story2(main, out):
