@@ -380,7 +380,6 @@ def s_s(t):
     fr = full(s_frame(t), 0.5, 0.4, z); shade(fr, VIG); shade(fr, GBOT)
     if T_FRZ <= t < T_FRZ + FRZ:
         fl = 1 - eo((t - T_FRZ) / 0.3); fr = fr * (1 - fl) + fl
-        path_draw(fr, [(540 + 300 * np.cos(a), 640 + 300 * np.sin(a)) for a in np.linspace(-np.pi / 2, 1.5 * np.pi, 80)], eio((t - T_FRZ - 0.1) / 0.5), PINK, 4)
         a = alpha_img("НЕБОЛЬШАЯ ДЕТАЛЬ", bebas(70)); blend(fr, a, 540 - a.shape[1] / 2, 960, PINK, eo((t - T_FRZ - 0.35) / 0.3))
     if t < T_FRZ: HS.draw(fr, t, T_S + 0.3, T_FRZ - 0.25)
     else: RS.draw(fr, t, T_FRZ + FRZ, T_SELF - 0.5)                    # the line comes back after the freeze, then rolls over
@@ -413,7 +412,9 @@ def s_f(t):
     lt = t - T_F; fr = BG.copy()
     for k, (img, lab) in enumerate([(PB["f"], "ДО"), (PA["f"], "ПОСЛЕ")]):
         p = eio((lt - 0.05 - 0.1 * k) / 0.55); dy = (1 - p) * (-H if k == 0 else H)
-        im = full(img, 0.5, 0.42, 1.2 + 0.03 * lt)[:, 270:810]; y0 = int(dy)
+        sc = 0.64 + 0.008 * lt                                          # whole body fits the half (photo body: x 150-930, y 300-1440)
+        M = np.float32([[sc, 0, 270 - 540 * sc], [0, sc, 330 - 300 * sc]])
+        im = cv2.warpAffine(img, M, (540, H), flags=cv2.INTER_LINEAR, borderValue=(0, 0, 0)).astype(np.float32) / 255; y0 = int(dy)
         ya, yb = max(0, y0), min(H, y0 + H)
         if yb > ya: fr[ya:yb, k * 540:(k + 1) * 540] = im[ya - y0:yb - y0]
         chip(fr, lab, k * 540 + 24, 240, eo((lt - 0.6 - 0.1 * k) / 0.3))
