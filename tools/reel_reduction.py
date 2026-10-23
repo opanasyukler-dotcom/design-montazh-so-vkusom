@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reels «Я шла к этой операции 25 лет» — редукционная маммопластика, Анна Тваури.
+"""Reels «Уменьшение груди на 7 размеров» — редукционная маммопластика, Анна Тваури.
 
 Same brand system as tools/reel_postpartum.py (navy #00123A, powder pink, Bebas Neue + Montserrat, notched frame,
 logo outro), but a different edit: zoom-out reveals, flash freeze-frames, an iris reveal into ПОСЛЕ, a diagonal
@@ -262,32 +262,33 @@ def card(fr, img, box, nw, nh, p_in, t_line_p, dx=0, dy=0, fx=0.5, fy=0.45, z=1.
     path_draw(fr, notch_poly(x0, y0, x1, y1, nw, nh, 12), t_line_p, WHITE, 2, True)
 
 # ---------------- scenes ----------------
-# P1 — mirror, ДО. zoom-out reveal from the reflection; letters drop; 25 counts up over a 25-tick ruler
-H1 = Drop(["Я ШЛА К ЭТОЙ ОПЕРАЦИИ"], 104, 70, 1060)
+# P1 — mirror, ДО. zoom-out reveal from the reflection; letters drop; «7» counts up over a 7-step ruler
+H1 = Drop(["УМЕНЬШЕНИЕ ГРУДИ"], 132, 70, 1040)
 T1 = Track(["редукционная маммопластика"], 36, 72, 0)
-NY = 1205                                                              # cap line of the big «25»
-def ruler(fr, t, t0, x0=70, y0=1520, w=900):
-    n = 25; p = (t - t0) / 1.6
+NY = 1215                                                              # cap line of the big «7»
+def ruler(fr, t, t0, x0=70, y0=1520, w=900, n=7):
+    p = (t - t0) / 1.2
     for i in range(n):
-        pi = eo((p * n - i) / 2)
+        pi = eo((p * n - i) / 1.5)
         if pi <= 0: break
-        x = x0 + w * i / (n - 1); hh = (34 if i % 5 == 4 or i == 0 else 18) * pi
-        bar = np.ones((max(1, int(hh)), 3), np.float32); blend(fr, bar, x - 1, y0 - hh, PINK if i == n - 1 else WHITE, 0.9)
-    path_draw(fr, [(x0, y0 + 4), (x0 + w, y0 + 4)], eo((t - t0) / 1.6), WHITE, 2, op=0.5)
+        x = x0 + w * i / (n - 1); hh = 34 * pi
+        bar = np.ones((max(1, int(hh)), 4), np.float32); blend(fr, bar, x - 2, y0 - hh, PINK if i == n - 1 else WHITE, 0.9)
+    path_draw(fr, [(x0, y0 + 4), (x0 + w, y0 + 4)], eo((t - t0) / 1.2), WHITE, 2, op=0.5)
 def s_p1(t):
     z = lerp(1.55, 1.04, eio(t / 3.2)); fr = full(V["3406"].at(0.6 + t * 0.85), 0.7, 0.32, z); shade(fr, VIG); shade(fr, GBOT)
     H1.draw(fr, t, 0.0)
-    n = int(round(lerp(1, 25, eio((t - 0.45) / 1.6))))
     if t > 0.45:
-        a = alpha_img(str(n), bebas(330)); blend(fr, a, 66, NY - cap_top(bebas(330)), PINK, eo((t - 0.45) / 0.3))
-        b = alpha_img("ЛЕТ", bebas(150)); blend(fr, b, 66 + alpha_img("25", bebas(330)).shape[1] + 10, NY + 330 * 0.72 - 150 * 0.72 - cap_top(bebas(150)), WHITE, eo((t - 1.6) / 0.4))
-    ruler(fr, t, 0.5, y0=NY + 330 * 0.72 + 45)
+        na = alpha_img("НА", bebas(150)); y_small = NY + 330 * 0.72 - 150 * 0.72 - cap_top(bebas(150))
+        blend(fr, na, 66, y_small, WHITE, eo((t - 0.45) / 0.3)); x7 = 66 + na.shape[1] + 6
+        n = int(round(lerp(1, 7, eio((t - 0.55) / 1.2))))
+        a = alpha_img(str(n), bebas(330)); blend(fr, a, x7, NY - cap_top(bebas(330)), PINK, eo((t - 0.55) / 0.3))
+        b = alpha_img("РАЗМЕРОВ", bebas(150)); blend(fr, b, x7 + alpha_img("7", bebas(330)).shape[1] + 14, y_small, WHITE, eo((t - 1.5) / 0.4))
+    ruler(fr, t, 0.55, y0=NY + 330 * 0.72 + 45)
     T1.y = NY + 330 * 0.72 + 125; T1.draw(fr, t, 1.3)
     return fr
 
-# P2 — two ДО cards (profile + front) slide in; heartbeat line turns into a check mark on «решилась»
+# P2 — full-screen ДО/ПОСЛЕ slider (front photos); heartbeat line turns into a check mark on «решилась»
 H2 = Drop(["25 ЛЕТ ХОТЕЛА", "*И ВСЁ РАВНО БОЯЛАСЬ*"], 112, 70, 1270)
-CL, CR = (60, 250, 530, 1150), (550, 250, 1020, 1150)
 T_DECIDE = vstart("P2") + (17.46 - 15.58)                              # «…решилась»
 def ecg(fr, t, t0, y=1600):
     xs = np.linspace(70, 1010, 120); base = []
@@ -303,12 +304,17 @@ def ecg(fr, t, t0, y=1600):
         c = (540, y); pc = eio((t - T_DECIDE) / 0.35)
         path_draw(fr, [(c[0] + 48 * np.cos(a), c[1] + 48 * np.sin(a)) for a in np.linspace(-np.pi / 2, 1.5 * np.pi, 50)], pc, PINK, 4)
         path_draw(fr, [(c[0] - 22, c[1] + 2), (c[0] - 6, c[1] + 18), (c[0] + 24, c[1] - 16)], eo((t - T_DECIDE - 0.25) / 0.3), PINK, 6)
+def slider_x(lt): return W * (1 - 0.5 * eio((lt - 0.35) / 0.8) - 0.5 * eio((lt - 1.9) / 0.8))   # ДО -> half/half -> ПОСЛЕ
 def s_p2(t):
-    lt = t - T_P2; fr = BG.copy()
-    for k, (box, img, nt, fy) in enumerate([(CL, PB["s"], 1, 0.4), (CR, PB["f"], 0, 0.4)]):
-        p = eo((lt - 0.1 - 0.12 * k) / 0.5); dy = (1 - p) * (-180 if k == 0 else 180)
-        card(fr, img, box, 110 * nt, 140 * nt, p, eio((lt - 0.4 - 0.12 * k) / 0.8), 0, dy, 0.5, fy, 1.05 + 0.03 * lt)
-        chip(fr, "ДО", box[0] + 18, box[3] - 78, eo((lt - 0.7 - 0.12 * k) / 0.3))
+    lt = t - T_P2; z = 1.0 + 0.03 * eio(lt / 3.2)
+    b = full(PB["f"], 0.5, 0.38, z); a = full(PA["f"], 0.5, 0.38, z); xd = int(slider_x(lt))
+    fr = b.copy(); fr[:, xd:] = a[:, xd:]; shade(fr, GBOT)
+    if 0 < xd < W:
+        fr[:, max(0, xd - 2):xd + 2] = PINK
+        m = np.zeros((H, W), np.uint8); cv2.circle(m, (xd, 760), 32, 255, -1, cv2.LINE_AA); blend(fr, m.astype(np.float32) / 255, 0, 0, PINK)
+        ar = alpha_img("‹ ›", mont(36, 600)); blend(fr, ar, xd - ar.shape[1] / 2, 760 - ar.shape[0] / 2 - 2, NAVY)
+    chip(fr, "ДО", 40, 250, eo((lt - 0.15) / 0.3) * cl((xd - 160) / 120))
+    chip(fr, "ПОСЛЕ", 875, 250, cl((W - 200 - xd) / 120))
     H2.draw(fr, t, T_P2 + 0.35); ecg(fr, t, T_P2 + 0.8)
     return fr
 
@@ -512,9 +518,10 @@ def build_audio(path):
     def put(x, t, g): i = int(max(0, t) * SR); seg = sfx[i:i + len(x)]; seg += x[:len(seg)] * g
     WH = whoosh(); WS = whoosh(0.4, 700, 8000)
     put(boom(), 0.0, 0.45)                                               # opening hit
-    for k in range(24): put(tick(), 0.45 + 1.6 * eio(k / 24), 0.12)      # the counter
+    for k in range(6): put(tick(), 0.55 + 1.2 * eio((k + 1) / 7), 0.16)  # the counter
     put(chime(), 2.1, 0.1)
-    put(flash_hit(), T_P2 - 0.02, 0.4); put(WS, T_P2 + 0.05, 0.22)
+    put(flash_hit(), T_P2 - 0.02, 0.4)
+    for ts in (0.35, 1.9): put(WS, T_P2 + ts, 0.24)                          # slider moves
     put(heartbeat(), T_P2 + 1.0, 0.5); put(heartbeat(), T_P2 + 1.85, 0.4); put(pop(1300, 600), T_DECIDE + 0.25, 0.25)
     put(riser(), T_R - 1.1, 0.12); put(WH, T_R - 0.1, 0.32); put(boom(0.6), T_R - 0.03, 0.22)
     for i in range(5): put(pop(900 + 150 * i, 400), T_OK - 0.05 + i * 0.12, 0.12)
@@ -543,8 +550,8 @@ def make_cover(path):
     fr[160:160 + h2, 538:542] = PINK
     m = np.clip((yy[:, :1] - (160 + h2 - 300)) / 300, 0, 1)[..., None]; fr = fr * (1 - m) + BG * m; shade(fr, GBOT)
     chip(fr, "ДО", 40, 200); chip(fr, "ПОСЛЕ", 580, 200)
-    hd = Drop(["Я ШЛА К ЭТОЙ", "ОПЕРАЦИИ *25 ЛЕТ*"], 170, 60, 1250, maxw=960); hd.draw(fr, 99, 0)
-    ty = Track(["полтора месяца после уменьшения груди"], 40, 64, 0, 400); ty.y = 1250 + hd.h + 80 + ty.top; ty.draw(fr, 99, 0)
+    hd = Drop(["УМЕНЬШЕНИЕ ГРУДИ", "НА *7 РАЗМЕРОВ*"], 170, 60, 1250, maxw=960); hd.draw(fr, 99, 0)
+    ty = Track(["полтора месяца после операции"], 40, 64, 0, 400); ty.y = 1250 + hd.h + 80 + ty.top; ty.draw(fr, 99, 0)
     lg = logo_alpha(380); blend(fr, lg, 540 - 190, 60, PINK)
     cv2.imwrite(path, cv2.cvtColor((np.clip(fr, 0, 1) * 255).astype(np.uint8), cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])
 
