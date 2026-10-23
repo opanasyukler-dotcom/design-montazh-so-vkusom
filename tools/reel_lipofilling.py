@@ -32,15 +32,16 @@ def lerp(a, b, p): return a + (b - a) * p
 
 # ---------------- voice edit: (block, src_in, src_out) — everything is the surgeon, IMG_3858 ----------------
 VO = [("H", 1.05, 4.95),                                               # можно ли увеличить грудь без имплантов? да, конечно, можно
-      ("M", 5.14, 6.68), ("M", 7.02, 9.80), ("M", 12.78, 14.55),       # это методика липофилинга… забираем собственную жировую ткань… пересаживаем в область груди
-      ("T", 18.92, 20.95), ("T", 21.50, 23.20),                        # улучшаем контуры тела… увеличиваем грудь
-      ("W", 28.22, 30.95), ("W", 31.75, 33.80),                        # часть жира, к сожалению, может рассосаться… от 30 до 50 процентов
-      ("N", 41.15, 44.45), ("N", 44.95, 46.45),                        # у нас нет разрезов, только небольшие маленькие проколы. абсолютно натуральная грудь
+      ("M", 5.14, 6.68), ("M", 6.96, 9.88), ("M", 12.78, 14.64),       # это методика липофилинга… забираем собственную жировую ткань… пересаживаем в область груди
+      ("T", 18.92, 20.95), ("T", 21.50, 23.40),                        # улучшаем контуры тела… увеличиваем грудь
+      ("W", 28.22, 31.08), ("W", 31.75, 33.80),                        # часть жира, к сожалению, может рассосаться… от 30 до 50 процентов
+      ("N", 41.15, 44.62), ("N", 44.95, 46.45),                        # у нас нет разрезов, только небольшие маленькие проколы. абсолютно натуральная грудь
       ("S", 46.45, 49.45),                                             # на ощупь никогда никто не поймёт, что эта грудь увеличена
-      ("R", 51.80, 54.75)]                                             # эту процедуру при желании можно повторить
+      ("R", 51.74, 55.05)]                                             # эту процедуру при желании можно повторить
+HOLD = {"S": 1.0, "R": 1.1}                                        # the case slides stay on screen a bit longer
 SEG = []; _t = 0.25
 for _k, (_b, _a, _o) in enumerate(VO):
-    if _k: _t += 0.08 if _b == VO[_k - 1][0] else 0.25
+    if _k: _t += 0.18 if _b == VO[_k - 1][0] else HOLD.get(_b, 0.4)          # breathing room between lines
     SEG.append((_b, "3858", _a, _o, _t)); _t += _o - _a
 def vstart(b, i=0): return [s[4] for s in SEG if s[0] == b][i]
 def vend(b): return max(s[4] + s[3] - s[2] for s in SEG if s[0] == b)
@@ -404,57 +405,49 @@ def s_warn(t):
     drops_row(fr, t, T_W + 0.6)
     return fr
 
-# no incisions: case card with ДО -> ПОСЛЕ slider; incision crossed out, punctures pop
-HN = Drop(["БЕЗ ИМПЛАНТОВ", "*БЕЗ БОЛЬШИХ РАЗРЕЗОВ*"], 112, 70, 1060)
-NB = (60, 250, 1020, 960)
-def incision(fr, t, t0, x0=90, y=1530):
-    path_draw(fr, [(x0, y), (x0 + 330, y - 8)], eio((t - t0) / 0.5), WHITE, 4)
-    a = alpha_img("разрез", mont(28, 400)); blend(fr, a, x0, y + 22, WHITE, eo((t - t0 - 0.2) / 0.3))
-    path_draw(fr, [(x0 - 10, y - 40), (x0 + 340, y + 34)], eio((t - t0 - 0.6) / 0.3), PINK, 7)
+# no incisions: text card + incision crossed out / punctures (surgeon in the circle), then slide 1 full screen
+HN = Drop(["БЕЗ ИМПЛАНТОВ", "*БЕЗ БОЛЬШИХ РАЗРЕЗОВ*"], 116, 70, 300)
+SLIDES = [np.asarray(Image.open(os.path.join(SRC, f"IMG_{n}.PNG")).convert("RGB")) for n in ("8523", "8524")]
+def slide_frame(i):
+    """the whole presentation slide, scaled down to the frame width — never enlarged"""
+    im = SLIDES[i]; s = W / im.shape[1]; im = cv2.resize(im, (W, int(im.shape[0] * s)), interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+    fr = np.zeros((H, W, 3), np.float32) + im[2:6].mean((0, 1)); y = (H - im.shape[0]) // 2; fr[y:y + im.shape[0]] = im; return fr
+SLIDE_FR = [slide_frame(0), slide_frame(1)]
+T_SL1 = T_NAT - 0.2
+def incision(fr, t, t0, x0=90, y=1000):
+    path_draw(fr, [(x0, y), (x0 + 380, y - 10)], eio((t - t0) / 0.5), WHITE, 5)
+    a = alpha_img("разрез", mont(32, 400)); blend(fr, a, x0, y + 26, WHITE, eo((t - t0 - 0.2) / 0.3))
+    path_draw(fr, [(x0 - 10, y - 46), (x0 + 390, y + 38)], eio((t - t0 - 0.6) / 0.3), PINK, 8)
     for k in range(3):
         lt = t - T_PUNCT - k * 0.15
         if lt > 0:
-            r = 9 * eback(lt / 0.3); m = np.zeros((H, W), np.uint8); cv2.circle(m, (560 + k * 70, y), max(1, int(r)), 255, -1, cv2.LINE_AA)
+            r = 11 * eback(lt / 0.3); m = np.zeros((H, W), np.uint8); cv2.circle(m, (640 + k * 90, y), max(1, int(r)), 255, -1, cv2.LINE_AA)
             blend(fr, m.astype(np.float32) / 255, 0, 0, PINK)
-    b = alpha_img("только проколы", mont(28, 500)); blend(fr, b, 545, y + 22, PINK, eo((t - T_PUNCT - 0.4) / 0.3))
+    b = alpha_img("только проколы", mont(32, 500)); blend(fr, b, 615, y + 26, PINK, eo((t - T_PUNCT - 0.4) / 0.3))
 def s_noinc(t):
-    lt = t - T_N; fr = BG.copy(); bef, aft = CASES[1]
-    x0, y0, x1, y1 = NB; w, h = x1 - x0, y1 - y0; z = 1.02 + 0.03 * lt
-    b, _ = cover(bef, w, h, 0.5, 0.5, z); a, _ = cover(aft, w, h, 0.5, 0.5, z)
-    xd = int(w * (1 - eio((t - T_NAT + 0.3) / 0.9))); im = b.copy(); im[:, xd:] = a[:, xd:]
-    pin = eo((lt - 0.05) / 0.5); m = poly_mask(notch_poly(x0, y0 + (1 - pin) * 120, x1, y1 + (1 - pin) * 120, 130, 120))[..., None] * pin
-    sub = np.zeros_like(fr); sub[y0:y1, x0:x1] = im; fr[:] = fr * (1 - m) + sub * m
-    if 0 < xd < w: fr[y0:y1, x0 + xd - 2:x0 + xd + 2] = PINK
-    path_draw(fr, notch_poly(x0, y0, x1, y1, 130, 120, 12), eio((lt - 0.3) / 0.8), WHITE, 2, True)
-    chip(fr, "ДО", x0 + 18, y1 - 78, eo((lt - 0.6) / 0.3) * cl((xd - 150) / 100)); chip(fr, "ПОСЛЕ", x1 - 175, y1 - 78, cl((w - 230 - xd) / 100))
-    HN.draw(fr, t, T_N + 0.3); incision(fr, t, T_N + 1.0)
+    if t >= T_SL1: return SLIDE_FR[0].copy()
+    fr = BG.copy(); HN.draw(fr, t, T_N + 0.3); incision(fr, t, T_N + 1.0); pip(fr, t, T_N + 0.2, 540, 1400, 170)
     return fr
 
-# soft & natural: 2 cases x ДО/ПОСЛЕ grid, soft ripple
-HS = Drop(["МЯГКИЙ И ЕСТЕСТВЕННЫЙ", "*РЕЗУЛЬТАТ*"], 116, 70, 1110)
-def ripple(fr, t, t0, cx=880, cy=1560):
+# soft & natural: text card + ripple (surgeon in the circle), then slide 2 full screen
+HS = Drop(["МЯГКИЙ И ЕСТЕСТВЕННЫЙ", "*РЕЗУЛЬТАТ*"], 116, 70, 300)
+T_SL2 = T_S + 1.7
+def ripple(fr, t, t0, cx=540, cy=900):
     if t < t0: return
     for k in range(3):
         u = ((t - t0) * 0.8 - k / 3) % 1
         if (t - t0) * 0.8 - k / 3 < 0: continue
-        path_draw(fr, [(cx + (20 + 110 * u) * np.cos(a), cy + (20 + 110 * u) * 0.62 * np.sin(a)) for a in np.linspace(0, 2 * np.pi, 60)], 1, PINK, 3, op=(1 - u) ** 1.5)
-    m = np.zeros((H, W), np.uint8); cv2.circle(m, (cx, cy), 12, 255, -1, cv2.LINE_AA); blend(fr, m.astype(np.float32) / 255, 0, 0, PINK)
-    a = alpha_img("на ощупь", mont(28, 500)); blend(fr, a, cx - a.shape[1] / 2, cy + 70, WHITE, eo((t - t0) / 0.3))
+        path_draw(fr, [(cx + (20 + 150 * u) * np.cos(a), cy + (20 + 150 * u) * 0.6 * np.sin(a)) for a in np.linspace(0, 2 * np.pi, 60)], 1, PINK, 3, op=(1 - u) ** 1.5)
+    m = np.zeros((H, W), np.uint8); cv2.circle(m, (cx, cy), 14, 255, -1, cv2.LINE_AA); blend(fr, m.astype(np.float32) / 255, 0, 0, PINK)
+    a = alpha_img("на ощупь", mont(32, 500)); blend(fr, a, cx - a.shape[1] / 2, cy + 110, WHITE, eo((t - t0) / 0.3))
 def s_soft(t):
-    lt = t - T_S; fr = BG.copy()
-    for r, ci in enumerate([2, 4]):
-        for k, (img, lab) in enumerate(zip(CASES[ci], ("ДО", "ПОСЛЕ"))):
-            x0 = 60 + k * 490; y0 = 250 + r * 400; box = (x0, y0, x0 + 470, y0 + 360)
-            j = r * 2 + k; p = eo((lt - 0.1 - 0.12 * j) / 0.5)
-            card(fr, img, box, 0, 0, p, eio((lt - 0.4 - 0.12 * j) / 0.6), (1 - p) * (-160 if k == 0 else 160), 0, 0.5, 0.5, 1.02 + 0.02 * lt)
-            chip(fr, lab, x0 + 14, y0 + 360 - 72, eo((lt - 0.7 - 0.12 * j) / 0.3))
-    HS.draw(fr, t, T_S + 0.35); ripple(fr, t, T_S + 1.0)
+    if t >= T_SL2: return SLIDE_FR[1].copy()
+    fr = BG.copy(); HS.draw(fr, t, T_S + 0.2); ripple(fr, t, T_S + 0.5); pip(fr, t, T_S + 0.1, 540, 1400, 170)
     return fr
 
-# repeat: surgeon in the brand card, repeat arrows
-HR = Drop(["ПРИ ЖЕЛАНИИ", "*МОЖНО ПОВТОРИТЬ*"], 120, 70, 1300)
-RB = (60, 230, 1020, 1240)
-def repeat_icon(fr, t, t0, cx=880, cy=1380, r=70):
+# repeat: surgeon full frame, repeat arrows
+HR = Drop(["ПРИ ЖЕЛАНИИ", "*МОЖНО ПОВТОРИТЬ*"], 124, 70, 1300)
+def repeat_icon(fr, t, t0, cx=880, cy=1390, r=70):
     p = eio((t - t0) / 0.8); rot = (t - t0) * 1.6
     for h0 in (0, np.pi):
         arc = [(cx + r * np.cos(a), cy + r * np.sin(a)) for a in np.linspace(h0 + rot, h0 + rot + 2.4, 30)]
@@ -463,40 +456,41 @@ def repeat_icon(fr, t, t0, cx=880, cy=1380, r=70):
             e = h0 + rot + 2.4; tip = (cx + r * np.cos(e), cy + r * np.sin(e)); d = np.array([-np.sin(e), np.cos(e)])
             n = np.array([np.cos(e), np.sin(e)]); fill_poly(fr, [tip + d * 20, tip + n * 16 - d * 6, tip - n * 16 - d * 6], PINK)
 def s_rep(t):
-    lt = t - T_R; fr = BG.copy(); x0, y0, x1, y1 = RB
-    im, _ = cover(talk(t), x1 - x0, y1 - y0, 0.5, 0.33, 1.0 + 0.02 * lt)
-    pin = eo((lt - 0.05) / 0.5); m = poly_mask(notch_poly(x0, y0, x1, y1, 200 * pin, 200 * pin))[..., None]
-    sub = np.zeros_like(fr); sub[y0:y1, x0:x1] = im; fr[:] = fr * (1 - m) + sub * m
-    path_draw(fr, notch_poly(x0, y0, x1, y1, 200, 200, 14), eio((lt - 0.2) / 0.9), WHITE, 2, True)
+    lt = t - T_R; fr = full(talk(t), 0.5, 0.3, lerp(1.0, 1.08, eio(lt / 3.5))); shade(fr, VIG); shade(fr, GBOT)
     HR.draw(fr, t, T_R + 0.3); repeat_icon(fr, t, T_R + 0.8)
     return fr
 
-# end card: question + «stories highlight» bubble + logo
+# end card: question + the real «Липофилинг» highlight cover + logo
 HE = Drop(["ХОТИТЕ ПОНЯТЬ,", "ПОДОЙДЁТ ЛИ ВАМ", "*ЛИПОФИЛИНГ?*"], 128, 70, 330)
+_hl = np.asarray(Image.open(os.path.join(SRC, "highlight.jpg")).convert("RGB")).astype(np.float32) / 255
+HL = cv2.resize(_hl[12:212, 24:224], (300, 300), interpolation=cv2.INTER_CUBIC)                   # circle of the highlight cover
 def s_end(t):
     lt = t - T_END; fr = BG.copy(); HE.draw(fr, t, T_END + 0.2)
-    cx, cy, r = 540, 1110, 105; p = eback((lt - 1.0) / 0.5)
+    cx, cy = 540, 1130; p = eback((lt - 0.9) / 0.5)
     if p > 0:
-        m = np.zeros((H, W), np.uint8); cv2.circle(m, (cx, cy), int(r * p), 255, -1, cv2.LINE_AA); blend(fr, m.astype(np.float32) / 255, 0, 0, NAVY * 0.6 + PINK * 0.15)
-        mk = cv2.resize(_lg[:, :_split], (int(110 * p) + 1, int(110 * p * _lg.shape[0] / _split) + 1), interpolation=cv2.INTER_AREA)
-        blend(fr, mk, cx - mk.shape[1] / 2, cy - mk.shape[0] / 2, PINK)
-        rot = (lt - 1.0) * 1.2
-        path_draw(fr, [(cx + (r + 14) * p * np.cos(a), cy + (r + 14) * p * np.sin(a)) for a in np.linspace(-np.pi / 2 + rot, 1.5 * np.pi + rot, 90)], eio((lt - 1.1) / 0.8), PINK, 5)
-        tap = (lt - 2.0) % 1.2
-        if lt > 2.0: path_draw(fr, [(cx + 60 + (10 + 40 * tap) * np.cos(a), cy + 60 + (10 + 40 * tap) * np.sin(a)) for a in np.linspace(0, 2 * np.pi, 40)], 1, WHITE, 2, op=1 - tap / 1.2)
-        lab = alpha_img("Липофилинг", mont(32, 500)); blend(fr, lab, cx - lab.shape[1] / 2, cy + r + 40, WHITE, eo((lt - 1.3) / 0.3))
-    ty = Track(["смотрите актуальное «Липофилинг»"], 38, 540, 0, 300, WHITE, True); ty.y = 1400 + ty.top; ty.draw(fr, t, T_END + 1.6)
-    lg = logo_alpha(420); blend(fr, lg, 540 - 210, 1560, PINK, eo((lt - 2.0) / 0.5))
+        d = max(4, int(300 * p)); im = cv2.resize(HL, (d, d)); yy2, xx2 = np.mgrid[0:d, 0:d]
+        m = np.clip(d / 2 - np.sqrt((xx2 - d / 2 + 0.5) ** 2 + (yy2 - d / 2 + 0.5) ** 2), 0, 1)[..., None].astype(np.float32)
+        reg = fr[cy - d // 2:cy - d // 2 + d, cx - d // 2:cx - d // 2 + d]; reg[:] = reg * (1 - m) + im * m
+        rot = (lt - 0.9) * 1.2
+        path_draw(fr, [(cx + (160 * p) * np.cos(a), cy + (160 * p) * np.sin(a)) for a in np.linspace(-np.pi / 2 + rot, 1.5 * np.pi + rot, 90)], eio((lt - 1.0) / 0.8), PINK, 5)
+        tap = (lt - 1.9) % 1.2
+        if lt > 1.9: path_draw(fr, [(cx + 80 + (10 + 45 * tap) * np.cos(a), cy + 80 + (10 + 45 * tap) * np.sin(a)) for a in np.linspace(0, 2 * np.pi, 40)], 1, WHITE, 2, op=1 - tap / 1.2)
+        lab = alpha_img("Липофилинг", mont(40, 500)); blend(fr, lab, cx - lab.shape[1] / 2, cy + 185, WHITE, eo((lt - 1.2) / 0.3))
+    ty = Track(["смотрите актуальное «Липофилинг»"], 38, 540, 0, 300, WHITE, True); ty.y = 1440 + ty.top; ty.draw(fr, t, T_END + 1.5)
+    lg = logo_alpha(420); blend(fr, lg, 540 - 210, 1580, PINK, eo((lt - 2.0) / 0.5))
     return fr
 
 SCENES = [(0, s_hook), (T_M, s_broll), (T_X, s_schema), (T_W, s_warn), (T_N, s_noinc), (T_S, s_soft), (T_R, s_rep), (T_END, s_end)]
 TRANS = {T_M: ("zoom", 0.5), T_X: ("iris", 0.6), T_W: ("diag", 0.55), T_N: ("flash", 0.3), T_S: ("push", 0.5), T_R: ("zoom", 0.5), T_END: ("iris", 0.6)}
+INNER = {T_SL1: 0.45, T_SL2: 0.45}                                     # slides push in inside their scenes
 def push(old, new, p):
     e = eio(p); x = int(W * e); fr = np.empty_like(old); fr[:, :W - x] = old[:, x:]; fr[:, W - x:] = new[:, :x]
     if 0 < x < W: fr[:, max(0, W - x - 2):W - x + 2] = PINK
     return fr
 def render(t):
     k = max(i for i, (s0, _) in enumerate(SCENES) if t >= s0); s0, fn = SCENES[k]
+    for ti, d in INNER.items():
+        if s0 < ti <= t < ti + d: return push(fn(ti - 0.01), fn(t), (t - ti) / d)
     kind, d = TRANS.get(s0, ("none", 0))
     if kind != "none" and t < s0 + d:
         p = (t - s0) / d
@@ -543,10 +537,27 @@ def riser(dur=1.2):
     n = int(dur * SR); t = np.arange(n) / SR; x = hp(rng.standard_normal(n), 1500) * (t / dur) ** 2
     return x / np.abs(x).max() + 0.3 * np.sin(2 * np.pi * np.cumsum(300 + 900 * (t / dur) ** 2) / SR) * (t / dur) ** 2
 
-def blip(f=900): n = int(0.07 * SR); t = np.arange(n) / SR; return np.sin(2 * np.pi * f * t * (1 + 0.6 * t / 0.07)) * env(n, 0.002, 0.02)
-def drip(): n = int(0.18 * SR); t = np.arange(n) / SR; return np.sin(2 * np.pi * np.cumsum(1400 * np.exp(-t / 0.03) + 500) / SR) * env(n, 0.001, 0.05)
-def scratch(dur=0.45): n = int(dur * SR); x = hp(rng.standard_normal(n), 2500); t = np.arange(n) / SR; return x * np.sin(np.pi * t / dur) * 0.5
-
+# this reel's own sound palette: wood, water, paper, felt, glass
+def marimba(f=587.3, dur=0.5):
+    n = int(dur * SR); t = np.arange(n) / SR
+    return (np.sin(2 * np.pi * f * t) + 0.35 * np.sin(2 * np.pi * f * 3.93 * t) * np.exp(-t / 0.03)) * env(n, 0.001, 0.16)
+def water(f0=500, f1=1700):
+    n = int(0.12 * SR); t = np.arange(n) / SR; ph = 2 * np.pi * np.cumsum(f0 + (f1 - f0) * (1 - np.exp(-t / 0.015))) / SR
+    return np.sin(ph) * env(n, 0.001, 0.035)
+def paper(dur=0.28, fc=3500):
+    n = int(dur * SR); t = np.arange(n) / SR; x = rng.standard_normal(n)
+    x = lp(hp(x, fc * 0.5), fc * 2.2) * (np.sin(np.pi * np.clip(t / dur, 0, 1)) ** 0.7) * (1 + 0.5 * np.sin(2 * np.pi * 37 * t))
+    return x / (np.abs(x).max() + 1e-9)
+def felt(f=95, dur=0.3):
+    n = int(dur * SR); t = np.arange(n) / SR
+    return np.sin(2 * np.pi * f * t) * env(n, 0.002, 0.07) + 0.5 * lp(rng.standard_normal(n), 600) * env(n, 0.001, 0.018)
+def glass(f=1760, dur=1.4):
+    n = int(dur * SR); t = np.arange(n) / SR
+    return sum(a * np.sin(2 * np.pi * f * r * t) * np.exp(-t / d) for r, a, d in [(1, 1, 0.6), (2.76, 0.45, 0.3), (5.4, 0.2, 0.15)]) * env(n, 0.002, 9) / 1.6
+def swell(dur=1.0):
+    n = int(dur * SR); t = np.arange(n) / SR; x = lp(rng.standard_normal(n), 1800) * (t / dur) ** 2.2
+    return x / (np.abs(x).max() + 1e-9)
+PENTA = [587.3, 659.3, 740.0, 880.0, 987.8, 1174.7]                    # D major pentatonic, matches the music
 MUSIC = os.path.join(SRC, "music.wav")
 M_DROP = 14.45; M0 = M_DROP - T_X                                      # the track's drop lands on the body schematic
 G_VO, G_GAP = 0.022, 0.075
@@ -559,39 +570,48 @@ def track(n):
 def build_audio(path):
     n = int(DUR * SR); vo = np.zeros(n); act = np.zeros(n)
     w = wave.open(os.path.join(WORK, "IMG_3858.wav")); src = hp(np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64) / 32768, 90)
-    for b, s, si, so, t0 in SEG:
-        seg = src[int(si * SR):int(so * SR)].copy(); f = int(0.012 * SR); seg[:f] *= np.linspace(0, 1, f); seg[-f:] *= np.linspace(1, 0, f)
-        fr_rms = np.sqrt(np.mean(seg[:len(seg) // 960 * 960].reshape(-1, 960) ** 2, 1))
-        seg /= np.sqrt(np.mean(np.sort(fr_rms)[-max(1, len(fr_rms) * 2 // 5):] ** 2)) + 1e-6
-        i = int(t0 * SR); vo[i:i + len(seg)] += seg[:n - i]; act[max(0, i - int(0.25 * SR)):i + len(seg) + int(0.1 * SR)] = 1
-    vo = np.tanh(vo * 0.16 * 1.6) / 1.6
+    ir_t = np.arange(int(0.45 * SR)) / SR; IR = rng.standard_normal(len(ir_t)) * np.exp(-ir_t / 0.11); IR = lp(IR, 3500); IR /= np.sqrt(np.sum(IR ** 2))
+    room = src[int(0.15 * SR):int(0.95 * SR)].copy()                   # the room before she speaks
+    for b, s_, si, so, t0 in SEG:
+        seg = src[int(si * SR):int(so * SR)].copy()
+        fi, fo = int(0.03 * SR), int(0.11 * SR)
+        seg[:fi] *= np.sin(np.linspace(0, np.pi / 2, fi)) ** 2; seg[-fo:] *= np.cos(np.linspace(0, np.pi / 2, fo)) ** 2     # soft edges
+        fr_rms = np.sqrt(np.mean(seg[:len(seg) // 960 * 960].reshape(-1, 960) ** 2, 1)); g = 1 / (np.sqrt(np.mean(np.sort(fr_rms)[-max(1, len(fr_rms) * 2 // 5):] ** 2)) + 1e-6)
+        tail = np.convolve(seg[-int(0.25 * SR):], IR)[int(0.25 * SR):] * 0.22                  # short room tail: the last word decays instead of stopping
+        seg = np.concatenate([seg, tail]) * g
+        i = int(t0 * SR); vo[i:i + len(seg)] += seg[:n - i]; act[max(0, i - int(0.25 * SR)):i + int((so - si) * SR) + int(0.1 * SR)] = 1
+    rt = np.resize(room, n) * (1 / (np.sqrt(np.mean(room ** 2)) + 1e-9)) * 0.004                     # constant quiet room tone under everything
+    vo = np.tanh((vo + rt) * 0.16 * 1.6) / 1.6
     d = np.convolve(act, np.ones(int(0.25 * SR)) / int(0.25 * SR), "same")
     tt = np.arange(n) / SR; fade = np.clip((DUR - tt) / 1.8, 0, 1) ** 1.5 * np.minimum(1, tt / 0.15)
     mus = track(n) * ((G_GAP - (G_GAP - G_VO) * np.clip(d, 0, 1)) * fade)[:, None]
     sfx = np.zeros(n + 2 * SR)
     def put(x, t, g): i = int(max(0, t) * SR); seg = sfx[i:i + len(x)]; seg += x[:len(seg)] * g
-    WH = whoosh(); WS = whoosh(0.4, 700, 8000)
-    put(boom(), 0.0, 0.4); put(boom(0.6), T_YES, 0.45); put(whoosh(0.25, 2000, 9000), T_YES - 0.05, 0.25)
-    for T, kind in [(T_M, 0), (T_X, 1), (T_W, 0), (T_N, 2), (T_S, 0), (T_R, 0), (T_END, 1)]:
-        if kind == 2: put(whoosh(0.25, 2000, 12000), T - 0.02, 0.3); put(boom(0.5), T, 0.2)
-        else: put(WH, T - 0.12, 0.3)
-        if kind == 1: put(riser(), T - 1.1, 0.1); put(boom(0.6), T + 0.05, 0.2)
+    put(felt(70, 0.5), 0.0, 0.5); put(glass(1174.7), 0.05, 0.1)
+    put(felt(80, 0.4), T_YES, 0.6); put(paper(0.18, 4000), T_YES - 0.04, 0.3); put(glass(1760), T_YES + 0.05, 0.12)   # «ДА» stamp
+    for T in (T_M, T_W, T_R): put(paper(0.32), T - 0.2, 0.35); put(felt(110, 0.25), T - 0.08, 0.25)   # before the first word, not on it
+    put(swell(1.1), T_X - 1.0, 0.12); put(paper(0.4, 2500), T_X - 0.05, 0.3); put(marimba(PENTA[0]), T_X + 0.3, 0.2)
+    put(glass(2349.3, 0.6), T_N, 0.18); put(felt(), T_N + 0.02, 0.3)                    # flash
+    for T in (T_SL1, T_SL2): put(paper(0.3, 3000), T - 0.05, 0.3)                      # slides push in
+    put(paper(0.3), T_S - 0.08, 0.3); put(swell(1.0), T_END - 1.0, 0.1); put(paper(0.4, 2500), T_END - 0.05, 0.3)
+    for k, hd_t in enumerate([T_X + 0.2, T_T + 0.15, T_W + 0.25, T_N + 0.3, T_S + 0.2, T_R + 0.3, T_END + 0.2]):
+        put(marimba(PENTA[(k * 2) % 6], 0.4), hd_t + 0.05, 0.12)                       # each headline lands on a note
     k = 0; t = T_X + 0.9
-    while t < T_T + 2.4:                                               # droplets arriving
-        put(blip(800 + 90 * (k % 5)), t, 0.09); t += 0.21; k += 1
-    put(scratch(0.3), T_X + 2.3, 0.2); put(pop(1500, 700), T_X + 2.5, 0.2)                  # implant crossed out
-    put(pop(700, 300), T_T + 0.6, 0.22); put(pop(1300, 600), T_T + 1.2, 0.22)                # − / +
-    for i in range(10): put(pop(900 + 40 * i, 500), T_W + 0.6 + i * 0.05, 0.06)
-    for i in range(3): put(drip(), T_PCT + 0.3 + i * 0.1, 0.25)
-    put(scratch(), T_N + 1.0, 0.18); put(whoosh(0.3, 1500, 7000), T_N + 1.6, 0.18)
-    for i in range(3): put(pop(1600, 900), T_PUNCT + i * 0.15, 0.2)
-    put(WS, T_NAT - 0.35, 0.22)
-    for i in range(4): put(whoosh(0.35, 300, 2500), T_S + 1.0 + i * 1.25, 0.08)
-    put(whoosh(0.6, 400, 4000), T_R + 0.8, 0.2)
-    put(chime(), T_END + 1.0, 0.18); put(chime(1975.5), T_END + 1.5, 0.1); put(pop(), T_END + 2.0, 0.15)
+    while t < T_T + 2.4:                                               # droplets landing in the breast
+        put(water(450 + 60 * (k % 6), 1500 + 90 * (k % 4)), t, 0.12); t += 0.25; k += 1
+    put(paper(0.22, 5000), T_X + 2.3, 0.22); put(felt(150, 0.2), T_X + 2.5, 0.2)       # implant crossed out
+    put(marimba(PENTA[1] / 2, 0.5), T_T + 0.6, 0.25); put(marimba(PENTA[4], 0.5), T_T + 1.2, 0.25)   # − low / + high
+    for i in range(10): put(water(700 + 40 * i, 1300 + 40 * i), T_W + 0.6 + i * 0.05, 0.05)
+    for i in range(3): put(water(1600, 400), T_PCT + 0.3 + i * 0.1, 0.25)               # droplets fall away (falling pitch)
+    put(paper(0.5, 6000), T_N + 1.0, 0.2); put(paper(0.15, 5000), T_N + 1.6, 0.25)     # incision drawn / crossed
+    for i in range(3): put(marimba(PENTA[3 + i] * 2, 0.15), T_PUNCT + i * 0.15, 0.12)  # punctures
+    put(swell(0.8), T_S + 0.3, 0.07)
+    put(paper(0.6, 2000), T_R + 0.8, 0.18)
+    put(glass(1174.7), T_END + 0.95, 0.2); put(glass(1760), T_END + 1.25, 0.12)
+    for i, f in enumerate([PENTA[0], PENTA[2], PENTA[3], PENTA[5]]): put(marimba(f, 0.6), T_END + 1.9 + i * 0.12, 0.12)
     sfx[:n] *= 1 - 0.8 * np.clip(d, 0, 1)
     mix = vo[:, None] + mus + sfx[:n, None] * np.float64([[0.92, 1.0]])
-    mix *= 10 ** (1.5 / 20); mix /= max(1, np.abs(mix).max() / 0.95)
+    mix *= 10 ** (1.0 / 20); mix /= max(1, np.abs(mix).max() / 0.95)
     with wave.open(path, "wb") as w:
         w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR); w.writeframes((mix * 32767).astype(np.int16).tobytes())
 
