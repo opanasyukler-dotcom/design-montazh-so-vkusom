@@ -258,9 +258,9 @@ NOSHADE = np.zeros((H, 1, 1), np.float32)
 def s1():
     """before video (3/4) full frame; the text low on the legs under a black fade (torso open);
     the poll sticker goes on the wall at the top right"""
-    b = (Block().head("«ПОСЛЕ РОДОВ Я ВРОДЕ ВЕРНУЛАСЬ В СВОЙ ВЕС… НО ТЕЛО УЖЕ СТАЛО ДРУГИМ»", 48, gap=16)
-         .body("Живот не собирается так, как раньше.", 33, gap=0).body("Грудь потеряла форму.", 33, gap=0)
-         .body("Появилось ощущение, что ты стараешься, а тело всё равно не возвращается назад.", 33, gap=0))
+    b = (Block().head("ДОРОГИЕ МАМЫ,", 52, gap=6)
+         .body("кто столкнулся с такими проблемами после беременности?", 36, wght=500, gap=18)
+         .body("Диастаз, растянутые ткани, выпирающий животик, потеря объёма груди", 33, gap=0))
     top = H - 70 - b.h; ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top)
     render_video("01_posle_rodov.mp4", "IMG_0336.MOV", 0.0, 8.1, ly, fade(top + 40, 300, 0.85))
 
