@@ -546,7 +546,7 @@ def water(f0=500, f1=1700):
     return np.sin(ph) * env(n, 0.001, 0.035)
 def paper(dur=0.28, fc=3500):
     n = int(dur * SR); t = np.arange(n) / SR; x = rng.standard_normal(n)
-    x = lp(hp(x, fc * 0.5), fc * 2.2) * (np.sin(np.pi * np.clip(t / dur, 0, 1)) ** 0.7) * (1 + 0.5 * np.sin(2 * np.pi * 37 * t))
+    x = lp(hp(x, fc * 0.5), fc * 2.2) * (np.sin(np.pi * np.clip(t / dur, 0, 1)) ** 0.7)          # smooth, no flutter
     return x / (np.abs(x).max() + 1e-9)
 def felt(f=95, dur=0.3):
     n = int(dur * SR); t = np.arange(n) / SR
@@ -589,11 +589,7 @@ def build_audio(path):
     def put(x, t, g): i = int(max(0, t) * SR); seg = sfx[i:i + len(x)]; seg += x[:len(seg)] * g
     put(felt(70, 0.5), 0.0, 0.5); put(glass(1174.7), 0.05, 0.1)
     put(felt(80, 0.4), T_YES, 0.6); put(paper(0.18, 4000), T_YES - 0.04, 0.3); put(glass(1760), T_YES + 0.05, 0.12)   # «ДА» stamp
-    for T in (T_M, T_W, T_R): put(paper(0.32), T - 0.2, 0.35); put(felt(110, 0.25), T - 0.08, 0.25)   # before the first word, not on it
-    put(swell(1.1), T_X - 1.0, 0.12); put(paper(0.4, 2500), T_X - 0.05, 0.3); put(marimba(PENTA[0]), T_X + 0.3, 0.2)
-    put(glass(2349.3, 0.6), T_N, 0.18); put(felt(), T_N + 0.02, 0.3)                    # flash
-    for T in (T_SL1, T_SL2): put(paper(0.3, 3000), T - 0.05, 0.3)                      # slides push in
-    put(paper(0.3), T_S - 0.08, 0.3); put(swell(1.0), T_END - 1.0, 0.1); put(paper(0.4, 2500), T_END - 0.05, 0.3)
+    put(marimba(PENTA[0]), T_X + 0.3, 0.2)                                         # transitions themselves stay silent
     for k, hd_t in enumerate([T_X + 0.2, T_T + 0.15, T_W + 0.25, T_N + 0.3, T_S + 0.2, T_R + 0.3, T_END + 0.2]):
         put(marimba(PENTA[(k * 2) % 6], 0.4), hd_t + 0.05, 0.12)                       # each headline lands on a note
     k = 0; t = T_X + 0.9
