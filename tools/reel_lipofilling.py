@@ -564,6 +564,14 @@ def track(n):
     w = wave.open(MUSIC); x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64).reshape(-1, w.getnchannels()) / 32768
     if x.shape[1] == 1: x = np.repeat(x, 2, 1)
     x = x / np.sqrt(np.mean(x[int(M_DROP * SR):].mean(1) ** 2)); x[:int(M_DROP * SR)] *= 4.5
+    # the reel is longer than the track: loop bars 4..20 after the drop (137 bpm), seam matched by waveform, 0.3 s crossfade
+    bar = 4 * 60 / 137.0; b = int((M_DROP + 20 * bar) * SR); a0 = int((M_DROP + 4 * bar) * SR); w = SR; cf = int(0.3 * SR)
+    ref = x[b:b + w].mean(1); a = max(range(a0 - int(0.08 * SR), a0 + int(0.08 * SR), 12), key=lambda k: float(np.dot(ref, x[k:k + w].mean(1))))
+    fade = np.sin(np.linspace(0, np.pi / 2, cf))[:, None] ** 2; seam = x[b:b + cf] * (1 - fade) + x[a:a + cf] * fade
+    parts = [x[:b]]; total = b
+    while total < int(M0 * SR) + n:
+        parts += [seam, x[a + cf:b]]; total += b - a
+    x = np.concatenate(parts)
     seg = x[int(M0 * SR):int(M0 * SR) + n]; return np.pad(seg, ((0, n - len(seg)), (0, 0)))
 
 def build_audio(path):
