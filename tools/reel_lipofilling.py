@@ -31,17 +31,17 @@ def eback(x): x = cl(x); c = 1.7; return 1 + (c + 1) * (x - 1) ** 3 + c * (x - 1
 def lerp(a, b, p): return a + (b - a) * p
 
 # ---------------- voice edit: (block, src_in, src_out) — everything is the surgeon, IMG_3858 ----------------
-VO = [("H", 1.05, 4.95),                                               # можно ли увеличить грудь без имплантов? да, конечно, можно
-      ("M", 5.14, 6.68), ("M", 6.96, 9.88), ("M", 12.78, 14.64),       # это методика липофилинга… забираем собственную жировую ткань… пересаживаем в область груди
-      ("T", 18.92, 20.95), ("T", 21.50, 23.40),                        # улучшаем контуры тела… увеличиваем грудь
-      ("W", 28.22, 31.08), ("W", 31.75, 33.80),                        # часть жира, к сожалению, может рассосаться… от 30 до 50 процентов
-      ("N", 41.15, 44.62), ("N", 44.95, 46.45),                        # у нас нет разрезов, только небольшие маленькие проколы. абсолютно натуральная грудь
-      ("S", 46.45, 49.45),                                             # на ощупь никогда никто не поймёт, что эта грудь увеличена
-      ("R", 51.74, 55.05)]                                             # эту процедуру при желании можно повторить
-HOLD = {"S": 2.6, "R": 4.2}                                        # each case slide stays ~4 s on screen
+VO = [("H", 1.05, 4.95),                                               # можно ли увеличить грудь без имплантов? да, конечно, можно.
+      ("M", 5.04, 14.58),                                              # это методика липофилинга… и пересаживаем в область груди.
+      ("T", 14.62, 23.40),                                             # тем самым мы добиваемся сразу двух результатов… увеличиваем грудь.
+      ("W", 26.86, 35.70),                                             # минусы состоят в том, что часть жира… от 30 до 50 процентов жира, который может уходить.
+      ("N", 41.15, 50.42),                                             # у нас нет разрезов… на ощупь никто не поймёт, что эта грудь увеличена чем-либо.
+      ("R", 50.44, 55.05)]                                             # и плюс, конечно же, эту процедуру при желании можно повторить.
+# whole sentences only: every cut sits in a real pause, so no line is chopped mid-thought
+HOLD = {"R": 4.35}                                                     # the second case slide stays ~4 s before the last line
 SEG = []; _t = 0.25
 for _k, (_b, _a, _o) in enumerate(VO):
-    if _k: _t += 0.18 if _b == VO[_k - 1][0] else HOLD.get(_b, 0.4)          # breathing room between lines
+    if _k: _t += HOLD.get(_b, 0.45)
     SEG.append((_b, "3858", _a, _o, _t)); _t += _o - _a
 def vstart(b, i=0): return [s[4] for s in SEG if s[0] == b][i]
 def vend(b): return max(s[4] + s[3] - s[2] for s in SEG if s[0] == b)
@@ -50,9 +50,10 @@ def at_src(src_t):                                                     # reel ti
         if si <= src_t <= so: return t0 + src_t - si
     raise ValueError(src_t)
 T_M = vstart("M") - 0.15; T_X = T_M + 1.8                              # OR b-roll, then the body schematic
-T_T = vstart("T") - 0.15; T_W = vstart("W") - 0.15; T_N = vstart("N") - 0.15; T_S = vstart("S") - 0.12
+T_T = vstart("T") - 0.15; T_W = vstart("W") - 0.15; T_N = vstart("N") - 0.15
+T_S = at_src(44.62) - 0.1; T_SL1 = at_src(47.30); T_SL2 = vend("N") + 0.4    # «натуральная грудь» card, then the two case slides
 T_R = vstart("R") - 0.15; T_END = vend("R") + 0.25; DUR = T_END + 3.0
-T_YES = at_src(3.76); T_PCT = at_src(31.96); T_PUNCT = at_src(43.20); T_NAT = at_src(45.00)
+T_YES = at_src(3.76); T_PCT = at_src(31.96); T_PUNCT = at_src(43.20)
 def src_of(t, name="3858"):
     best = None
     for _, s, si, so, t0 in SEG:
@@ -283,7 +284,7 @@ def spline(pts, n=12):
         for u in np.linspace(0, 1, n, endpoint=False):
             out.append(0.5 * ((2 * p1) + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u ** 2 + (-p0 + 3 * p1 - 3 * p2 + p3) * u ** 3))
     out.append(np.float32(pts[-1])); return out
-BX, BY, BS = 600, 520, 0.95                                            # schematic placement
+BX, BY, BS = 540, 560, 0.70                                            # schematic placement (leaves room for the circle)
 def bp(x, y): return (BX + x * BS, BY + y * BS)
 def body(fr, t, t0, grow=0.0, slim=0.0, op=1.0):
     """front torso: outline draws itself; grow = breast fullness 0..1, slim = waist 0..1"""
@@ -320,11 +321,11 @@ def badge(fr, x, y, sym, t, t0):
     m = np.zeros((H, W), np.uint8); cv2.circle(m, (int(x), int(y)), int(28 * s), 255, -1, cv2.LINE_AA); blend(fr, m.astype(np.float32) / 255, 0, 0, PINK)
     bar = np.ones((max(1, int(6 * s)), max(1, int(26 * s))), np.float32); blend(fr, bar, x - bar.shape[1] / 2, y - bar.shape[0] / 2, NAVY)
     if sym == "+": blend(fr, bar.T.copy(), x - bar.shape[0] / 2, y - bar.shape[1] / 2, NAVY)
-def pip(fr, t, t0, cx=250, cy=1650, r=200):
+def pip(fr, t, t0, cx=540, cy=1430, r=255):
     """the surgeon keeps talking in a round window"""
     p = eback((t - t0) / 0.45)
     if p <= 0: return
-    rr = max(4, int(r * p)); im, _ = cover(talk(t), 2 * rr, 2 * rr, 0.5, 0.3, 1.0)
+    rr = max(4, int(r * p)); im, _ = cover(talk(t), 2 * rr, 2 * rr, 0.5, 0.42, 1.0)     # face and shoulders centred
     yy2, xx2 = np.mgrid[0:2 * rr, 0:2 * rr]; m = np.clip(rr - np.sqrt((xx2 - rr + 0.5) ** 2 + (yy2 - rr + 0.5) ** 2), 0, 1)[..., None].astype(np.float32)
     reg = fr[cy - rr:cy + rr, cx - rr:cx + rr]; reg[:] = reg * (1 - m) + im * m
     path_draw(fr, [(cx + (rr + 8) * np.cos(a), cy + (rr + 8) * np.sin(a)) for a in np.linspace(-np.pi / 2, 1.5 * np.pi, 80)], 1, PINK, 3)
@@ -349,7 +350,7 @@ def s_hook(t):
 # method: OR b-roll -> body schematic, droplets flow, implant crossed out; surgeon in a round window
 HM = Drop(["СВОЯ ЖИРОВАЯ ТКАНЬ", "*ВМЕСТО ИМПЛАНТОВ*"], 112, 70, 250)
 TM = Track(["увеличение груди собственным жиром"], 38, 72, 0, 500, PINK)
-def implant_x(fr, t, t0, cx=880, cy=1520):
+def implant_x(fr, t, t0, cx=880, cy=830):
     p = eio((t - t0) / 0.6)
     pts = [(cx + 62 * np.cos(a), cy + 46 * np.sin(a) + 12 * np.sin(a) ** 2 * (np.sin(a) > 0)) for a in np.linspace(0, 2 * np.pi, 50)]
     path_draw(fr, pts, p, WHITE, 3, True)
@@ -379,9 +380,9 @@ def s_schema(t):
         px, py = bp(250, 470); badge(fr, px, py, "−", t, T_T + 0.6)
         px, py = bp(250, 300); badge(fr, px, py, "+", t, T_T + 1.2)
     return fr
-HT = Drop(["ДВА ЭФФЕКТА *СРАЗУ*"], 120, 70, 250)
-TT1 = Track(["− меньше объёма в донорских зонах"], 36, 70, 1345, 400)
-TT2 = Track(["+ больше наполненности груди"], 36, 70, 1397, 500, PINK)
+HT = Drop(["ДВА ЭФФЕКТА *СРАЗУ*"], 112, 70, 250)
+TT1 = Track(["− меньше объёма в донорских зонах"], 36, 72, 420, 400)
+TT2 = Track(["+ больше наполненности груди"], 36, 72, 472, 500, PINK)
 
 # warning: surgeon, zoom-out; 10 droplets, part of them falls away; «30–50 %»
 HW = Drop(["ВАЖНО:", "*ЧАСТЬ ЖИРА МОЖЕТ УЙТИ*"], 112, 70, 1150)
@@ -413,7 +414,6 @@ def slide_frame(i):
     im = SLIDES[i]; s = W / im.shape[1]; im = cv2.resize(im, (W, int(im.shape[0] * s)), interpolation=cv2.INTER_AREA).astype(np.float32) / 255
     fr = np.zeros((H, W, 3), np.float32) + im[2:6].mean((0, 1)); y = (H - im.shape[0]) // 2; fr[y:y + im.shape[0]] = im; return fr
 SLIDE_FR = [slide_frame(0), slide_frame(1)]
-T_SL1 = T_NAT - 0.2
 def incision(fr, t, t0, x0=90, y=1000):
     path_draw(fr, [(x0, y), (x0 + 380, y - 10)], eio((t - t0) / 0.5), WHITE, 5)
     a = alpha_img("разрез", mont(32, 400)); blend(fr, a, x0, y + 26, WHITE, eo((t - t0 - 0.2) / 0.3))
@@ -425,13 +425,11 @@ def incision(fr, t, t0, x0=90, y=1000):
             blend(fr, m.astype(np.float32) / 255, 0, 0, PINK)
     b = alpha_img("только проколы", mont(32, 500)); blend(fr, b, 615, y + 26, PINK, eo((t - T_PUNCT - 0.4) / 0.3))
 def s_noinc(t):
-    if t >= T_SL1: return SLIDE_FR[0].copy()
-    fr = BG.copy(); HN.draw(fr, t, T_N + 0.3); incision(fr, t, T_N + 1.0); pip(fr, t, T_N + 0.2, 540, 1430, 250)
+    fr = BG.copy(); HN.draw(fr, t, T_N + 0.3); incision(fr, t, T_N + 1.0); pip(fr, t, T_N + 0.2, 540, 1420, 275)
     return fr
 
 # soft & natural: text card + ripple (surgeon in the circle), then slide 2 full screen
 HS = Drop(["МЯГКИЙ И ЕСТЕСТВЕННЫЙ", "*РЕЗУЛЬТАТ*"], 116, 70, 300)
-T_SL2 = vend("S") + 0.1                                               # slide 2 after the «на ощупь» line
 def ripple(fr, t, t0, cx=540, cy=900):
     if t < t0: return
     for k in range(3):
@@ -442,7 +440,8 @@ def ripple(fr, t, t0, cx=540, cy=900):
     a = alpha_img("на ощупь", mont(32, 500)); blend(fr, a, cx - a.shape[1] / 2, cy + 110, WHITE, eo((t - t0) / 0.3))
 def s_soft(t):
     if t >= T_SL2: return SLIDE_FR[1].copy()
-    fr = BG.copy(); HS.draw(fr, t, T_S + 0.2); ripple(fr, t, T_S + 0.5); pip(fr, t, T_S + 0.1, 540, 1430, 250)
+    if t >= T_SL1: return SLIDE_FR[0].copy()
+    fr = BG.copy(); HS.draw(fr, t, T_S + 0.2); ripple(fr, t, T_S + 0.5); pip(fr, t, T_S + 0.1, 540, 1420, 275)
     return fr
 
 # repeat: surgeon full frame, repeat arrows
