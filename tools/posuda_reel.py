@@ -142,7 +142,6 @@ def main(src, photos, work, frames_only=False):
             run(["ffmpeg", "-v", "error", "-y", "-ss", str(a), "-i", f"{src}/{c}.MP4", "-frames:v", str(n), "-vf", f"fps={FPS},setsar=1"] + enc + [out])
     with open(f"{work}/list.txt", "w") as f:
         for p in parts: f.write(f"file '{os.path.abspath(p)}'\n")
-    run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", f"{work}/list.txt", "-c", "copy", f"{work}/video.mp4"])
     # 2. narration: the six files with short pauses, a tiny fade at each edge
     durs = [float(subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f"{src}/a{k}.mp3"])) for k in range(1, 7)]
     offs = offsets(durs)
@@ -161,7 +160,7 @@ def main(src, photos, work, frames_only=False):
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(img)
     d.text((240, 330), t1, font=font("main", 120), fill=INK + (255,), anchor="lm")             # the wall left of the flowers
     d.text((244, 480), t2, font=font("detail", 92), fill=INK + (255,), anchor="lm"); img.save(p); ov.append((a, b, p))
-    ins = ["-i", f"{work}/video.mp4", "-i", f"{work}/voice.wav", "-loop", "1", "-i", f"{work}/spray.png"]
+    ins = ["-f", "concat", "-safe", "0", "-i", f"{work}/list.txt", "-i", f"{work}/voice.wav", "-loop", "1", "-i", f"{work}/spray.png"]
     for _, _, p in ov: ins += ["-loop", "1", "-i", p]
     fl = f"[0:v][2:v]overlay=0:0:shortest=1[x0]"
     for k, (a, b, _) in enumerate(ov):
