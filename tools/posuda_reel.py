@@ -160,15 +160,22 @@ def main(src, photos, work, frames_only=False):
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(img)
     d.text((240, 330), t1, font=font("main", 120), fill=INK + (255,), anchor="lm")             # the wall left of the flowers
     d.text((244, 480), t2, font=font("detail", 92), fill=INK + (255,), anchor="lm"); img.save(p); ov.append((a, b, p))
-    ins = ["-f", "concat", "-safe", "0", "-i", f"{work}/list.txt", "-i", f"{work}/voice.wav", "-loop", "1", "-i", f"{work}/spray.png"]
-    for _, _, p in ov: ins += ["-loop", "1", "-i", p]
-    fl = f"[0:v][2:v]overlay=0:0:shortest=1[x0]"
-    for k, (a, b, _) in enumerate(ov):
-        fade = f"[{k+3}:v]format=rgba,fade=t=in:st={a:.2f}:d=0.25:alpha=1,fade=t=out:st={b-0.25:.2f}:d=0.25:alpha=1[o{k}]"
-        fl += f";{fade};[x{k}][o{k}]overlay=0:0:enable='between(t,{a:.2f},{b:.2f})':shortest=1[x{k+1}]"
-    fl += f";[x{len(ov)}]fade=t=in:d=0.5,fade=t=out:st={END-1.0}:d=1.0,format=yuv420p[v]"
-    with open(f"{work}/fc.txt", "w") as f: f.write(fl)
-    run(["ffmpeg", "-v", "error", "-y"] + ins + ["-filter_complex_script", f"{work}/fc.txt", "-map", "[v]", "-map", "1:a",
+    # one RGBA overlay track: a composed PNG per interval where the set of active layers is constant (low memory)
+    spray = Image.open(f"{work}/spray.png"); cuts = sorted({0.0, END} | {round(x, 2) for a, b, _ in ov for x in (a, b) if x < END})
+    lst = []
+    for k, (t0, t1) in enumerate(zip(cuts, cuts[1:])):
+        fr = spray.copy()
+        for a, b, p in ov:
+            if a <= t0 < b: fr = Image.alpha_composite(fr, Image.open(p))
+        q = f"{work}/ov{k:03d}.png"; fr.save(q); lst.append((q, t1 - t0))
+    with open(f"{work}/ov.txt", "w") as f:
+        for q, d in lst: f.write(f"file '{os.path.abspath(q)}'\nduration {d:.3f}\n")
+        f.write(f"file '{os.path.abspath(lst[-1][0])}'\n")
+    ins = ["-f", "concat", "-safe", "0", "-i", f"{work}/list.txt", "-i", f"{work}/voice.wav",
+           "-f", "concat", "-safe", "0", "-i", f"{work}/ov.txt"]
+    fl = (f"[2:v]fps={FPS},format=rgba[o];[0:v][o]overlay=0:0:eof_action=repeat,"
+          f"fade=t=in:d=0.5,fade=t=out:st={END-1.0}:d=1.0,format=yuv420p[v]")
+    run(["ffmpeg", "-v", "error", "-y"] + ins + ["-filter_complex", fl, "-map", "[v]", "-map", "1:a",
          "-t", str(END), "-c:v", "libx264", "-preset", "medium", "-crf", "17", "-profile:v", "high", "-r", str(FPS),
          "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", f"{work}/posuda_4k.mp4"])
 
