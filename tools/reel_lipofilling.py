@@ -576,7 +576,7 @@ def swell(dur=1.0):
 def click():
     n = int(0.09 * SR); t = np.arange(n) / SR; x = hp(rng.standard_normal(n), 2500)
     e = np.exp(-t / 0.004) + 0.7 * np.exp(-np.clip(t - 0.045, 0, None) / 0.005) * (t > 0.045)
-    return x * e / 2 + felt(160, 0.08)[:n] * 0.4
+    x = x * e / 2; k = felt(160, 0.08); x[:len(k)] += k * 0.4; return x
 PENTA = [587.3, 659.3, 740.0, 880.0, 987.8, 1174.7]                    # D major pentatonic, matches the music
 MUSIC = os.path.join(SRC, "music.wav")
 M_DROP = 14.45; M0 = M_DROP - T_X                                      # the track's drop lands on the body schematic
