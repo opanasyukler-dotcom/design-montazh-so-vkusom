@@ -2,7 +2,7 @@
 Voice-over = the six narration mp3s in script order; shots cut to the words (faster-whisper timings in words.json).
 Subtitles: thin Montserrat (wght 300), white with a soft glyph shadow over a long black spray at the very bottom.
 Pieces the narration does not name get small pills (Montserrat Italic, INK on white).
-Dynamic cut: long shots are split into ~1.4 s jump cuts with an alternating punch-in, hand footage runs up to 1.35x.
+Dynamic cut: long shots are split into ~1.4 s jump cuts, hand footage runs up to 1.35x; steady pieces get slow eased\npush-ins / pull-outs, in-points avoid the moments the camera is being re-aimed (motion.json, phase correlation).
 The relatives' gifts: the video freezes, the still blurs, and the gift photos snap in one by one (flash + shutter)
 with a heading and a label under each card.
   python3 posuda_reel.py SRC_DIR PHOTO_DIR WORK_DIR [--frames]
@@ -24,18 +24,18 @@ SCRIPT = [
     "Оставалось выяснить лишь одно: оценит ли всё это сама хозяйка? Впрочем, маму этот вопрос пока волновал меньше всего. Ведь она уже была в полном восторге от покупок.",
 ]
 # (start on the timeline, clip or photo layout, in-point)
-SHOTS = [
+SHOTS = [                                   # (start, clip, in-point[, speed]) — in-points sit in steady stretches
     (0.0, "C0934", 0.3), (4.6, "C0936", 0.0), (7.6, "C0922", 0.0),
-    (10.3, "C0914", 3.0), (12.7, "C0914", 15.5), (15.1, "C0914", 36.0),
-    (17.25, "C0932", 0.0), (20.2, "C0926", 0.0), (22.9, "C0928", 8.0), (24.75, "C0919", 4.6),
-    (26.5, "C0941", 0.5), (27.6, "C0917", 11.2), (29.1, "C0919", 17.0), (32.1, "C0928", 13.3),
+    (10.3, "C0914", 2.4, 1.0), (12.7, "C0914", 19.6, 1.3), (15.1, "C0914", 41.2, 0.85),
+    (17.25, "C0932", 0.0), (20.2, "C0926", 0.0), (22.9, "C0928", 5.0, 1.3), (24.75, "C0919", 3.4, 1.3),
+    (26.5, "C0941", 0.5), (27.6, "C0917", 11.2), (29.1, "C0919", 10.2, 1.0), (31.3, "C0919", 13.6, 1.0), (33.5, "C0928", 19.4, 1.3),
     (35.05, "C0929", 1.0), (39.25, "C0930", 0.3), (41.75, "C0931", 0.0),
-    (43.8, "C0928", 1.5), (46.3, "C0928", 23.0), (48.8, "C0919", 0.5), (51.1, "C0919", 11.0),
-    (53.4, "C0939", 1.0), (55.0, "C0940", 37.5), (56.6, "C0915", 1.0), (59.4, "C0917", 3.5),
-    (62.3, "C0933", 0.0), (65.2, "C0937", 0.0), (68.0, "C0938", 0.0), (70.8, "C0927", 7.0),
+    (43.8, "C0928", 1.5), (46.3, "C0928", 23.0), (48.8, "C0919", 0.5), (51.1, "C0919", 24.0, 1.1),
+    (53.4, "C0939", 7.2, 1.0), (55.0, "C0940", 37.5), (56.6, "C0915", 24.0, 1.0), (59.4, "C0917", 3.6, 0.9),
+    (62.3, "C0929", 16.0, 1.0), (65.2, "C0937", 0.0), (68.0, "C0938", 0.0), (70.8, "C0927", 9.0, 1.0), (73.2, "C0937", 0.6, 1.0),
     (74.4, "C0921", 16.0), (76.7, "C0934", 2.0), (79.0, "F:C0934", 4.3),
     (90.0, "C0934", 5.2), (94.0, "C0923", 0.0),
-    (99.0, "C0940", 27.0), (102.2, "C0941", 2.5), (105.2, "C0924", 0.0), (107.5, "C0925", 0.0),
+    (99.0, "C0940", 21.0, 0.9), (102.2, "C0941", 2.5), (105.2, "C0921", 6.0, 1.0), (107.5, "C0925", 0.0),
     (110.3, "C0935", 0.0),
 ]
 END = 115.1
@@ -133,16 +133,28 @@ def clip_len(src, c):
         _len[c] = float(subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f"{src}/{c}.MP4"]))
     return _len[c]
 
+def steady(src, c, a, dur):
+    """mean camera shift (px per 0.2 s at 192 px wide) over a source window, from motion.json if present"""
+    p = os.path.join(src, "..", "motion.json")
+    if not os.path.exists(p): return 99
+    m = np.array(json.load(open(p))[c]); seg = m[int(a * 5):max(int(a * 5) + 1, int((a + dur) * 5)), 0]
+    return float(seg.mean()) if len(seg) else 99
+
 def pieces(src):
-    """SHOTS → (start, dur, clip, in, speed, zoom): ~1.4 s jump cuts, alternating 1.0 / 1.12 punch-in, up to 1.35x"""
-    starts = [s[0] for s in SHOTS] + [END]; out = []
-    for i, (t, c, a) in enumerate(SHOTS):
-        d = starts[i + 1] - t
+    """SHOTS → (start, dur, clip, in, speed, zoom). Long shots become ~1.4 s jump cuts, hand footage runs up to 1.35x.
+    zoom: steady pieces take turns with a slow eased push-in / pull-out ("in" / "out"), the rest alternate 1.0 / 1.1"""
+    starts = [s[0] for s in SHOTS] + [END]; out = []; cyc = 0
+    for i, sh in enumerate(SHOTS):
+        t, c, a = sh[:3]; d = starts[i + 1] - t
         if c.startswith("F:"): out.append((t, d, c, a, 1.0, 1.0)); continue
-        sp = float(np.clip((clip_len(src, c) - a - 0.12) / d, 1.0, 1.35))
+        sp = sh[3] if len(sh) > 3 else float(np.clip((clip_len(src, c) - a - 0.12) / d, 0.8, 1.35))   # short clips slow down a touch rather than run out
         k = max(1, round(d / 1.4)) if d > 2.2 else 1
         for j in range(k):
-            tj = t + d * j / k; out.append((tj, d / k, c, a + (tj - t) * sp, sp, 1.0 if j % 2 == 0 else 1.12))
+            tj = t + d * j / k; aj = a + (tj - t) * sp
+            if steady(src, c, aj, d / k * sp) < 1.2:
+                z = ("in", 1.0, "out", 1.0)[cyc % 4]; cyc += 1
+            else: z = 1.0 if j % 2 == 0 else 1.1
+            out.append((tj, d / k, c, aj, sp, z))
     return out
 
 def polaroid(ph, size, tilt):
@@ -229,7 +241,12 @@ def main(src, photos, work, frames_only=False):
         if c.startswith("F:"):
             freeze(src, ph, c[2:], a, t, t + d, out)
         else:
-            vf = f"setpts=PTS/{sp:.4f},fps={FPS}" + (f",crop=iw/{z}:ih/{z},scale={W}:{H}:flags=lanczos" if z != 1.0 else "") + ",setsar=1"
+            vf = f"setpts=PTS/{sp:.4f},fps={FPS}"
+            if isinstance(z, str):                                    # slow eased push-in / pull-out
+                e = f"(0.5-0.5*cos(PI*min(t/{d:.3f},1)))"; zz = f"(1+0.13*{e})" if z == "in" else f"(1.13-0.13*{e})"
+                vf += f",scale=w='trunc({W}*{zz}/2)*2':h='trunc({H}*{zz}/2)*2':eval=frame:flags=bicubic,crop={W}:{H}"
+            elif z != 1.0: vf += f",crop=iw/{z}:ih/{z},scale={W}:{H}:flags=lanczos"
+            vf += ",setsar=1"
             run(["ffmpeg", "-v", "error", "-y", "-ss", f"{a:.3f}", "-i", f"{src}/{c}.MP4", "-frames:v", str(n), "-vf", vf] + enc + [out])
     with open(f"{work}/list.txt", "w") as f:
         for p in parts: f.write(f"file '{os.path.abspath(p)}'\n")
