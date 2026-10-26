@@ -8,7 +8,7 @@ a body schematic where fat droplets travel from the donor zones into the breast,
 repeat arrows, a «stories highlight» bubble for «Смотрите актуальное».
 
 usage:
-  REEL_SRC=<folder with IMG_3858.MP4, C0818.MP4, C_SYRINGES.MP4, IMG_8523/8524.PNG, logo.png, music.wav> python3 tools/reel_lipofilling.py [--preview t1,t2 | --cover | --audio-only]
+  REEL_SRC=<folder with IMG_3858.MP4, C0818.MP4, C_SYRINGES.MP4 (=C0590), C_HOLD.mp4 (IMG_9879 14-19 s), IMG_8694-8696.JPG, IMG_8523/8524.PNG, logo.png, music.wav> python3 tools/reel_lipofilling.py [--preview t1,t2 | --cover | --audio-only]
 Sources are first normalised into $REEL_SRC/_work (1080x1920, 30 fps; voice 48 kHz mono wav):
   ffmpeg -i IMG_3858.MP4 -vf "scale=1080:1920:flags=lanczos,fps=30,format=yuv420p" -an -c:v libx264 -crf 14 _work/IMG_3858.mp4   (same for C0818)
   ffmpeg -i IMG_3858.MP4 -vn -ac 1 -ar 48000 _work/IMG_3858.wav
@@ -210,7 +210,7 @@ class Src:
             s.i += 1; s.f = f
         return cv2.cvtColor(s.f, cv2.COLOR_BGR2RGB)
     def at(s, t): return s.get(round(t * FPS))
-V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ["IMG_3858", "C0818", "C_SYRINGES"]}
+V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ["IMG_3858", "C0818", "C_SYRINGES", "C_HOLD"]}
 def talk(t): return V["IMG_3858"].at(src_of(t))
 def case_crops():
     """six ДО/ПОСЛЕ pairs cut out of the two presentation slides"""
@@ -343,12 +343,14 @@ def stamp(fr, t, t0, cx=830, cy=1010):
     a = alpha_img("ДА", bebas(int(130 * s))); M = cv2.getRotationMatrix2D((a.shape[1] / 2, a.shape[0] / 2), 8, 1.0)
     a = cv2.warpAffine(a, M, (a.shape[1], a.shape[0])); blend(fr, a, cx - a.shape[1] / 2, cy - a.shape[0] / 2 - 8, NAVY, op)
 def s_intro(t):
-    fr = full(V["C_SYRINGES"].at(1.0 + t), 0.5, 0.45, lerp(1.0, 1.08, eio(t / INTRO))); shade(fr, VIG); shade(fr, GBOT)
+    """the surgeon holding a fat syringe (no own sound) covers the talking head under the question"""
+    fr = full(V["C_HOLD"].at(0.6 + t), 0.5, 0.4, lerp(1.04, 1.12, eio(t / INTRO))); shade(fr, VIG); shade(fr, GBOT)
     lg = logo_alpha(360); blend(fr, lg, 540 - 180, 210, PINK, eo((t + 0.1) / 0.5) * 0.9)
     HH.draw(fr, t, -0.25)                                              # the question sits on the syringes
     return fr
 def s_hook(t):
-    lt = t - INTRO; fr = full(talk(t), 0.5, 0.3, lerp(1.0, 1.1, eio(lt / 2.0))); shade(fr, VIG)
+    """«да, конечно, можно» — over the syringes close-up"""
+    lt = t - INTRO; fr = full(V["C_SYRINGES"].at(1.0 + lt), 0.5, 0.45, lerp(1.0, 1.08, eio(lt / 1.8))); shade(fr, VIG)
     stamp(fr, t, T_YES)
     return fr
 
@@ -367,7 +369,12 @@ def s_broll(t):
     a = alpha_img("ЛИПОФИЛИНГ", bebas(170)); blend(fr, a, 66, 1400 - cap_top(bebas(170)), WHITE, eo((lt - 0.2) / 0.4))
     TM.y = 1400 + 125 + TM.top; TM.draw(fr, t, T_M + 0.5)
     return fr
+def s_collage(t):
+    k = min(2, int((t - T_C0) / C_DT)); lt = t - T_C0 - k * C_DT; fr = COLLS[k].copy()
+    chip(fr, "ПОСЛЕ", 30, 240); chip(fr, "ДО", 30, 990)
+    f = 1 - eo(lt / 0.18); return fr * (1 - f) + f                     # camera-flash on every click
 def s_schema(t):
+    if t >= T_C0: return s_collage(t)
     fr = BG.copy(); grow = eio((t - T_X - 1.0) / (T_T - T_X)) * 0.6 + 0.4 * eio((t - T_T - 0.3) / 1.6)
     slim = eio((t - T_T - 0.3) / 1.6)
     body(fr, t, T_X + 0.1, grow, slim)
@@ -386,6 +393,11 @@ def s_schema(t):
         px, py = bp(250, 300); badge(fr, px, py, "+", t, T_T + 1.2)
     return fr
 HT = Drop(["ДВА ЭФФЕКТА *СРАЗУ*"], 112, 70, 250)
+def _coll(n):
+    im = Image.open(os.path.join(SRC, f"IMG_{n}.JPG")).convert("RGB").resize((W, H), Image.LANCZOS)
+    return np.asarray(im, np.float32) / 255
+COLLS = [_coll(n) for n in (8694, 8696, 8695)]                         # patient result: front, 3/4, side — ПОСЛЕ on top, ДО below
+T_C0 = T_T + 3.2; C_DT = (T_W - T_C0) / 3                              # «щёлк-щёлк-щёлк» until the next block
 TT1 = Track(["− меньше объёма в донорских зонах"], 36, 72, 420, 400)
 TT2 = Track(["+ больше наполненности груди"], 36, 72, 472, 500, PINK)
 
@@ -561,6 +573,10 @@ def glass(f=1760, dur=1.4):
 def swell(dur=1.0):
     n = int(dur * SR); t = np.arange(n) / SR; x = lp(rng.standard_normal(n), 1800) * (t / dur) ** 2.2
     return x / (np.abs(x).max() + 1e-9)
+def click():
+    n = int(0.09 * SR); t = np.arange(n) / SR; x = hp(rng.standard_normal(n), 2500)
+    e = np.exp(-t / 0.004) + 0.7 * np.exp(-np.clip(t - 0.045, 0, None) / 0.005) * (t > 0.045)
+    return x * e / 2 + felt(160, 0.08)[:n] * 0.4
 PENTA = [587.3, 659.3, 740.0, 880.0, 987.8, 1174.7]                    # D major pentatonic, matches the music
 MUSIC = os.path.join(SRC, "music.wav")
 M_DROP = 14.45; M0 = M_DROP - T_X                                      # the track's drop lands on the body schematic
@@ -608,6 +624,7 @@ def build_audio(path):
     while t < T_T + 2.4:                                               # droplets landing in the breast
         put(water(450 + 60 * (k % 6), 1500 + 90 * (k % 4)), t, 0.12); t += 0.25; k += 1
     put(paper(0.22, 5000), T_X + 2.3, 0.22); put(felt(150, 0.2), T_X + 2.5, 0.2)       # implant crossed out
+    for k in range(3): put(click(), T_C0 + k * C_DT - 0.01, 1.4)                  # «щёлк» on every collage
     put(marimba(PENTA[1] / 2, 0.5), T_T + 0.6, 0.25); put(marimba(PENTA[4], 0.5), T_T + 1.2, 0.25)   # − low / + high
     for i in range(10): put(water(700 + 40 * i, 1300 + 40 * i), T_W + 0.6 + i * 0.05, 0.05)
     for i in range(3): put(water(1600, 400), T_PCT + 0.3 + i * 0.1, 0.25)               # droplets fall away (falling pitch)
