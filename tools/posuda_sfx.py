@@ -1,6 +1,7 @@
 """Sound design for the posuda review (posuda_reel.py timeline).
   foley  — the camera's own sound of each shot (box, film, silicone, lids), cleaned, quiet, ducked under the voice
-  sfx    — soft synthesized accents: whooshes on section changes, a pop for every pill, bell sparkles on the «wow» lines
+  sfx    — soft synthesized accents: whooshes on section changes, a pop for every pill, a shutter for every gift photo,
+           bell sparkles on the «wow» lines
   python3 posuda_sfx.py SRC_DIR voice.wav master.mp4 out.mp4 [--mute-foley i,j]
 """
 import os, subprocess, sys
@@ -35,10 +36,10 @@ def limit(x, ceil_db, rel=0.08):
     x[:n] *= np.repeat(sm, b)[:, None]; return x
 
 def foley(src, mute):
-    out = np.zeros((N, 2), np.float32); starts = [s[0] for s in R.SHOTS] + [R.END]
-    for i, (t, c, a) in enumerate(R.SHOTS):
-        if c.startswith("P:") or i in mute: continue
-        d = starts[i + 1] - t; x = read(f"{src}/{c}.MP4", a, d + 0.05, "highpass=f=90,lowpass=f=14000,afftdn=nf=-42")   # no rumble, no hiss
+    out = np.zeros((N, 2), np.float32)
+    for i, (t, d, c, a, sp, _) in enumerate(R.pieces(src)):         # same jump cuts and speed as the picture
+        if c.startswith("F:") or i in mute: continue
+        x = read(f"{src}/{c}.MP4", a, d * sp + 0.05, f"highpass=f=90,lowpass=f=14000,afftdn=nf=-42,atempo={sp:.4f}")  # no rumble, no hiss
         rms = np.sqrt(np.mean(x ** 2)) + 1e-9
         x *= min(db(-30) / rms, db(6))                          # level every shot to ~-30 dBFS rms, max +6 dB
         n = min(len(x), N - int(t * SR)); x = x[:n] * env(n, int(0.04 * SR), int(0.06 * SR))[:, None]
@@ -73,6 +74,16 @@ def bells(notes, gain, step=0.07):
         out[-m:, 0] += y * (1 - p) * gain; out[-m:, 1] += y * p * gain
     return out
 
+def shutter(gain):
+    """camera «щелк»: a bright click + body thump, the mirror's second click 70 ms later"""
+    rng = np.random.default_rng(3); n = int(0.16 * SR); y = np.zeros(n, np.float32); t = np.arange(n) / SR
+    for t0, g in ((0.0, 1.0), (0.07, 0.6)):
+        i = int(t0 * SR); m = int(0.012 * SR); nz = np.diff(rng.standard_normal(m + 1)).astype(np.float32)
+        y[i:i + m] += nz * np.exp(-np.arange(m) / (0.0025 * SR)) * g * 0.5
+        tt = t[i:] - t0; y[i:] += np.sin(2 * np.pi * 140 * tt) * np.exp(-tt * 60) * g * 0.6
+    y *= gain / np.abs(y).max()
+    return np.stack([y, y], 1)
+
 def place(bus, x, t):
     i = int(t * SR); n = min(len(x), N - i); bus[i:i + n] += x[:n]
 
@@ -89,11 +100,12 @@ def main(src, voice_wav, master, out, mute=()):
     sfx = np.zeros((N, 2), np.float32)
     place(sfx, noise_sweep(0.9, 400, 5000, db(-20)), 0.0)                        # intro air
     place(sfx, bells([1318.5, 1568, 1975.5, 2637], db(-24)), 0.35)              # title sparkle
-    for t in (17.25 - 0.45, 35.05 - 0.45, 53.4 - 0.45, 74.4 - 0.45, 99.0 - 0.45):  # section changes
+    for t in (17.25 - 0.45, 35.05 - 0.45, 53.4 - 0.45, R.FREEZE[0] - 0.5, R.FREEZE[1] - 0.45, 99.0 - 0.45):  # section changes
         place(sfx, noise_sweep(0.9, 300, 3500, db(-22)), t)
     for a, b, _ in R.PILLS: place(sfx, pop(db(-17)), a + 0.02)                   # pill pops
     place(sfx, bells([1568, 1975.5, 2349, 3136], db(-23)), 66.5)                # «радовал цвет»
-    place(sfx, bells([1318.5, 1661, 1975.5, 2637], db(-23)), 83.5)              # «в виде сердечка»
+    for t in R.SNAPS: place(sfx, shutter(db(-12)), t - 0.01)                      # щелк, щелк, щелк
+    place(sfx, pop(db(-19)), R.GIFTS[0][3])                                      # the «подстилка» label
     place(sfx, bells([1046.5, 1318.5, 1568, 2093, 2637], db(-21), 0.09), 112.2) # «в полном восторге»
     mix = v + fol + sfx
     fade = np.ones(N, np.float32); fade[-SR:] = np.linspace(1, 0, SR); mix *= fade[:, None]

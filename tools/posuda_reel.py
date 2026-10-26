@@ -2,6 +2,9 @@
 Voice-over = the six narration mp3s in script order; shots cut to the words (faster-whisper timings in words.json).
 Subtitles: thin Montserrat (wght 300), white with a soft glyph shadow over a long black spray at the very bottom.
 Pieces the narration does not name get small pills (Montserrat Italic, INK on white).
+Dynamic cut: long shots are split into ~1.4 s jump cuts with an alternating punch-in, hand footage runs up to 1.35x.
+The relatives' gifts: the video freezes, the still blurs, and the gift photos snap in one by one (flash + shutter)
+with a heading and a label under each card.
   python3 posuda_reel.py SRC_DIR PHOTO_DIR WORK_DIR [--frames]
 """
 import json, os, subprocess, sys
@@ -30,7 +33,7 @@ SHOTS = [
     (43.8, "C0928", 1.5), (46.3, "C0928", 23.0), (48.8, "C0919", 0.5), (51.1, "C0919", 11.0),
     (53.4, "C0939", 1.0), (55.0, "C0940", 37.5), (56.6, "C0915", 1.0), (59.4, "C0917", 3.5),
     (62.3, "C0933", 0.0), (65.2, "C0937", 0.0), (68.0, "C0938", 0.0), (70.8, "C0927", 7.0),
-    (74.4, "P:set", 0), (81.9, "P:plate|cupside", 0), (84.9, "P:cuptop|spoon", 0), (87.4, "P:mat", 0),
+    (74.4, "C0921", 16.0), (76.7, "C0934", 2.0), (79.0, "F:C0934", 4.3),
     (90.0, "C0934", 5.2), (94.0, "C0923", 0.0),
     (99.0, "C0940", 27.0), (102.2, "C0941", 2.5), (105.2, "C0924", 0.0), (107.5, "C0925", 0.0),
     (110.3, "C0935", 0.0),
@@ -44,8 +47,15 @@ PILLS = [                                   # things the voice does not say
     (53.6, 56.5, "ниблер edda"),
     (59.6, 62.2, "поильник с трубочкой и грузиком"),
     (71.0, 74.3, "+ прорезыватель-звёздочка"),
-    (76.0, 89.8, "подарок от близких"),
+] 
+FREEZE = (79.0, 90.0)
+GIFTS = [                                   # (snap time, photo, label, label time, card size, centre, tilt)
+    (81.05, "set", "подстилка", 87.6, (1100, 825), (3000, 1000), 5),
+    (82.41, "plate", "тарелочка-сердечко", 82.41, (720, 960), (680, 1000), -6),
+    (84.95, "cupside", "кружечка", 84.95, (720, 960), (1370, 960), 4),
+    (86.29, "spoon", "ложечка", 86.29, (720, 960), (2060, 1030), -3),
 ]
+SNAPS = [g[0] for g in GIFTS]
 TITLE = (0.3, 4.4, "первая посуда", "для прикорма")
 
 def offsets(durs):
@@ -117,11 +127,93 @@ def photo_frame(name, ph):
 
 def run(cmd): subprocess.run(cmd, check=True)
 
+_len = {}
+def clip_len(src, c):
+    if c not in _len:
+        _len[c] = float(subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f"{src}/{c}.MP4"]))
+    return _len[c]
+
+def pieces(src):
+    """SHOTS → (start, dur, clip, in, speed, zoom): ~1.4 s jump cuts, alternating 1.0 / 1.12 punch-in, up to 1.35x"""
+    starts = [s[0] for s in SHOTS] + [END]; out = []
+    for i, (t, c, a) in enumerate(SHOTS):
+        d = starts[i + 1] - t
+        if c.startswith("F:"): out.append((t, d, c, a, 1.0, 1.0)); continue
+        sp = float(np.clip((clip_len(src, c) - a - 0.12) / d, 1.0, 1.35))
+        k = max(1, round(d / 1.4)) if d > 2.2 else 1
+        for j in range(k):
+            tj = t + d * j / k; out.append((tj, d / k, c, a + (tj - t) * sp, sp, 1.0 if j % 2 == 0 else 1.12))
+    return out
+
+def polaroid(ph, size, tilt):
+    """photo card with a white border, rotated; returns (card RGBA, shadow L)"""
+    w, h = size; b = 30; im = Image.new("RGBA", (w + 2 * b, h + 2 * b), (255, 255, 255, 255))
+    im.paste(cover(ph, w, h), (b, b)); m = Image.new("L", im.size, 0)
+    ImageDraw.Draw(m).rounded_rectangle((0, 0, im.width - 1, im.height - 1), 18, fill=255); im.putalpha(m)
+    im = im.rotate(tilt, Image.BICUBIC, expand=True)
+    sh = im.getchannel("A").point(lambda v: int(v * 0.45)).filter(ImageFilter.GaussianBlur(34))
+    return im, sh
+
+def fade(img, a):
+    if a >= 1: return img
+    img = img.copy(); img.putalpha(img.getchannel("A").point(lambda v: int(v * max(a, 0)))); return img
+
+def freeze(src, ph, clip, at, t0, t1, out):
+    """still of the last frame, blur ramps in, gift cards snap in one by one with a flash, heading + labels"""
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(at), "-i", f"{src}/{clip}.MP4", "-frames:v", "1",
+                          "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, check=True).stdout
+    still = Image.frombytes("RGB", (W, H), raw)
+    blurs = [still] + [Image.fromarray((np.asarray(still.filter(ImageFilter.GaussianBlur(4 * k)), np.float32) * (1 - 0.018 * k))
+                       .astype(np.uint8)) for k in range(1, 11)]
+    cards = [(g, *polaroid(ph[g[1]], g[4], g[6])) for g in GIFTS]
+    text_png(f"{out}.head.png", ["подарок от близких"], 116, "main", 250)
+    head = Image.open(f"{out}.head.png")
+    labels = []
+    for g, im, _ in cards:
+        q = f"{out}.lab{len(labels)}.png"; lab = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        f = font("detail", 70); cx, cy = g[5]; y = cy + im.height // 2 + 20
+        sh = Image.new("L", (W, H), 0); ImageDraw.Draw(sh).text((cx, y + 4), g[2], font=f, fill=200, anchor="mm")
+        s2 = Image.new("RGBA", (W, H), (20, 14, 12, 0)); s2.putalpha(sh.filter(ImageFilter.GaussianBlur(12)))
+        lab = Image.alpha_composite(lab, s2); ImageDraw.Draw(lab).text((cx, y), g[2], font=f, fill=(255, 255, 255, 255), anchor="mm")
+        labels.append(lab)
+    n = round(t1 * FPS) - round(t0 * FPS)
+    enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS),
+                            "-i", "-", "-c:v", "libx264", "-preset", "medium", "-crf", "16", "-pix_fmt", "yuv420p", out], stdin=subprocess.PIPE)
+    ease = lambda x: 1 - (1 - min(max(x, 0), 1)) ** 3
+    for k in range(n):
+        t = t0 + k / FPS; lt = t - t0
+        fr = blurs[min(10, int(lt / 0.5 * 10))].convert("RGBA")
+        if lt > 0.2: fr = Image.alpha_composite(fr, fade(head, (lt - 0.2) / 0.4))
+        flash = 0.0
+        for (g, im, sh), lab in zip(cards, labels):
+            dt = t - g[0]
+            if dt < 0: continue
+            z = 1.22 - 0.22 * ease(dt / 0.16); a = min(1, dt / 0.05)
+            ci, cs = im, sh
+            if z != 1.0:
+                ci = im.resize((round(im.width * z), round(im.height * z)), Image.BILINEAR)
+                cs = sh.resize(ci.size, Image.BILINEAR)
+            ci = fade(ci, a)
+            cx, cy = g[5]; x, y = cx - ci.width // 2, cy - ci.height // 2
+            fr.paste((40, 25, 25, 255), (x + 10, y + 26), cs)
+            fr.alpha_composite(ci, (max(x, 0), max(y, 0)), (max(-x, 0), max(-y, 0)))
+            flash = max(flash, 0.45 * max(0, 1 - dt / 0.12))
+            lt2 = t - g[3]
+            if lt2 >= 0: fr = Image.alpha_composite(fr, fade(lab, lt2 / 0.3))
+        fr = fr.convert("RGB")
+        if flash > 0: fr = Image.blend(fr, Image.new("RGB", (W, H), (255, 255, 255)), flash)
+        enc.stdin.write(fr.tobytes())
+    enc.stdin.close(); enc.wait()
+
 def main(src, photos, work, frames_only=False):
     os.makedirs(work, exist_ok=True)
     ph = {k: Image.open(os.path.join(photos, f"{i}.png")).convert("RGB")
           for i, k in enumerate(["spoon", "plate", "sweater", "jacket", "set", "cupside", "cuptop"], 1)}
     starts = [s[0] for s in SHOTS] + [END]
+    if frames_only == "freeze":
+        (t, c, a), = [x for x in SHOTS if x[1].startswith("F:")]
+        t0, t1 = FREEZE
+        freeze(src, ph, c[2:], a, t0, t1, f"{work}/freeze_test.mp4"); return
     if frames_only:
         for i, (t, c, a) in enumerate(SHOTS):
             mid = (starts[i + 1] - t) / 2
@@ -130,16 +222,15 @@ def main(src, photos, work, frames_only=False):
         return
     # 1. shots → 4K intermediates (frame-exact durations)
     parts = []
-    for i, (t, c, a) in enumerate(SHOTS):
-        n = round(starts[i + 1] * FPS) - round(t * FPS); out = f"{work}/s{i:02d}.mp4"; parts.append(out)
+    for i, (t, d, c, a, sp, z) in enumerate(pieces(src)):
+        n = round((t + d) * FPS) - round(t * FPS); out = f"{work}/s{i:03d}.mp4"; parts.append(out)
         if os.path.exists(out): continue
-        enc = ["-c:v", "libx264", "-preset", "medium", "-crf", "14", "-pix_fmt", "yuv420p", "-r", str(FPS), "-an"]
-        if c.startswith("P:"):
-            p = f"{work}/p{i:02d}.png"; photo_frame(c[2:], ph).save(p)
-            vf = f"scale=8*{W}:-1,zoompan=z='1+0.05*on/{n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={n}:s={W}x{H}:fps={FPS}"
-            run(["ffmpeg", "-v", "error", "-y", "-loop", "1", "-i", p, "-vf", vf, "-frames:v", str(n)] + enc + [out])
+        enc = ["-c:v", "libx264", "-preset", "medium", "-crf", "16", "-pix_fmt", "yuv420p", "-r", str(FPS), "-an"]
+        if c.startswith("F:"):
+            freeze(src, ph, c[2:], a, t, t + d, out)
         else:
-            run(["ffmpeg", "-v", "error", "-y", "-ss", str(a), "-i", f"{src}/{c}.MP4", "-frames:v", str(n), "-vf", f"fps={FPS},setsar=1"] + enc + [out])
+            vf = f"setpts=PTS/{sp:.4f},fps={FPS}" + (f",crop=iw/{z}:ih/{z},scale={W}:{H}:flags=lanczos" if z != 1.0 else "") + ",setsar=1"
+            run(["ffmpeg", "-v", "error", "-y", "-ss", f"{a:.3f}", "-i", f"{src}/{c}.MP4", "-frames:v", str(n), "-vf", vf] + enc + [out])
     with open(f"{work}/list.txt", "w") as f:
         for p in parts: f.write(f"file '{os.path.abspath(p)}'\n")
     # 2. narration: the six files with short pauses, a tiny fade at each edge
@@ -180,4 +271,4 @@ def main(src, photos, work, frames_only=False):
          "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", f"{work}/posuda_4k.mp4"])
 
 if __name__ == "__main__":
-    main(*sys.argv[1:4], frames_only="--frames" in sys.argv)
+    main(*sys.argv[1:4], frames_only="freeze" if "--freeze-test" in sys.argv else "--frames" in sys.argv)
