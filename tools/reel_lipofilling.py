@@ -39,8 +39,7 @@ VO = [("H", 1.05, 4.95),                                               # мож�
       ("R", 50.44, 55.05)]                                             # и плюс, конечно же, эту процедуру при желании можно повторить.
 # whole sentences only: every cut sits in a real pause, so no line is chopped mid-thought
 HOLD = {"R": 4.35}                                                     # the second case slide stays ~4 s before the last line
-INTRO = 3.0                                                            # opening: fat syringes, no own sound
-SEG = []; _t = INTRO + 0.25
+SEG = []; _t = 0.25
 for _k, (_b, _a, _o) in enumerate(VO):
     if _k: _t += HOLD.get(_b, 0.45)
     SEG.append((_b, "3858", _a, _o, _t)); _t += _o - _a
@@ -54,6 +53,7 @@ T_M = vstart("M") - 0.15; T_X = T_M + 1.8                              # OR b-ro
 T_T = vstart("T") - 0.15; T_W = vstart("W") - 0.15; T_N = vstart("N") - 0.15
 T_S = at_src(44.62) - 0.1; T_SL1 = at_src(47.30); T_SL2 = vend("N") + 0.4    # «натуральная грудь» card, then the two case slides
 T_R = vstart("R") - 0.15; T_END = vend("R") + 0.25; DUR = T_END + 3.0
+INTRO = at_src(3.72) - 0.08                                            # fat syringes under the question, surgeon on «да»
 T_YES = at_src(3.76); T_PCT = at_src(31.96); T_PUNCT = at_src(43.20)
 def src_of(t, name="3858"):
     best = None
@@ -343,11 +343,13 @@ def stamp(fr, t, t0, cx=830, cy=1010):
     a = alpha_img("ДА", bebas(int(130 * s))); M = cv2.getRotationMatrix2D((a.shape[1] / 2, a.shape[0] / 2), 8, 1.0)
     a = cv2.warpAffine(a, M, (a.shape[1], a.shape[0])); blend(fr, a, cx - a.shape[1] / 2, cy - a.shape[0] / 2 - 8, NAVY, op)
 def s_intro(t):
-    return full(V["C_SYRINGES"].at(1.0 + t), 0.5, 0.45, lerp(1.0, 1.08, eio(t / INTRO)))
+    fr = full(V["C_SYRINGES"].at(1.0 + t), 0.5, 0.45, lerp(1.0, 1.08, eio(t / INTRO))); shade(fr, VIG); shade(fr, GBOT)
+    lg = logo_alpha(360); blend(fr, lg, 540 - 180, 210, PINK, eo((t + 0.1) / 0.5) * 0.9)
+    HH.draw(fr, t, -0.25)                                              # the question sits on the syringes
+    return fr
 def s_hook(t):
-    lt = t - INTRO; fr = full(talk(t), 0.5, 0.3, lerp(1.0, 1.14, eio(lt / 4.2))); shade(fr, VIG); shade(fr, GBOT)
-    lg = logo_alpha(360); blend(fr, lg, 540 - 180, 210, PINK, eo((lt + 0.1) / 0.5) * 0.9)
-    HH.draw(fr, t, INTRO - 0.1); stamp(fr, t, T_YES)
+    lt = t - INTRO; fr = full(talk(t), 0.5, 0.3, lerp(1.0, 1.1, eio(lt / 2.0))); shade(fr, VIG)
+    stamp(fr, t, T_YES)
     return fr
 
 # method: OR b-roll -> body schematic, droplets flow, implant crossed out; surgeon in a round window
@@ -597,7 +599,7 @@ def build_audio(path):
     mus = track(n) * ((G_GAP - (G_GAP - G_VO) * np.clip(d, 0, 1)) * fade)[:, None]
     sfx = np.zeros(n + 2 * SR)
     def put(x, t, g): i = int(max(0, t) * SR); seg = sfx[i:i + len(x)]; seg += x[:len(seg)] * g
-    put(felt(70, 0.5), INTRO, 0.5); put(glass(1174.7), INTRO + 0.05, 0.1)
+    put(felt(70, 0.5), 0.0, 0.5); put(glass(1174.7), 0.05, 0.1)
     put(felt(80, 0.4), T_YES, 0.6); put(paper(0.18, 4000), T_YES - 0.04, 0.3); put(glass(1760), T_YES + 0.05, 0.12)   # «ДА» stamp
     put(marimba(PENTA[0]), T_X + 0.3, 0.2)                                         # transitions themselves stay silent
     for k, hd_t in enumerate([T_X + 0.2, T_T + 0.15, T_W + 0.25, T_N + 0.3, T_S + 0.2, T_R + 0.3, T_END + 0.2]):
