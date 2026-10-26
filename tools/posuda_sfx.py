@@ -104,7 +104,7 @@ def main(src, voice_wav, master, out, mute=()):
         place(sfx, noise_sweep(0.9, 300, 3500, db(-22)), t)
     for a, b, _ in R.PILLS: place(sfx, pop(db(-17)), a + 0.02)                   # pill pops
     place(sfx, bells([1568, 1975.5, 2349, 3136], db(-23)), 66.5)                # «радовал цвет»
-    for t in R.SNAPS: place(sfx, shutter(db(-12)), t - 0.01)                      # щелк, щелк, щелк
+    for t in R.SNAPS: place(sfx, shutter(db(-6)), t - 0.01)                      # щелк, щелк, щелк
     place(sfx, pop(db(-19)), R.GIFTS[0][3])                                      # the «подстилка» label
     place(sfx, bells([1046.5, 1318.5, 1568, 2093, 2637], db(-21), 0.09), 112.2) # «в полном восторге»
     mix = v + fol + sfx
