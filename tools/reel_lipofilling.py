@@ -8,7 +8,7 @@ a body schematic where fat droplets travel from the donor zones into the breast,
 repeat arrows, a «stories highlight» bubble for «Смотрите актуальное».
 
 usage:
-  REEL_SRC=<folder with IMG_3858.MP4, C0818.MP4, IMG_8523/8524.PNG, logo.png, music.wav> python3 tools/reel_lipofilling.py [--preview t1,t2 | --cover | --audio-only]
+  REEL_SRC=<folder with IMG_3858.MP4, C0818.MP4, C_SYRINGES.MP4, IMG_8523/8524.PNG, logo.png, music.wav> python3 tools/reel_lipofilling.py [--preview t1,t2 | --cover | --audio-only]
 Sources are first normalised into $REEL_SRC/_work (1080x1920, 30 fps; voice 48 kHz mono wav):
   ffmpeg -i IMG_3858.MP4 -vf "scale=1080:1920:flags=lanczos,fps=30,format=yuv420p" -an -c:v libx264 -crf 14 _work/IMG_3858.mp4   (same for C0818)
   ffmpeg -i IMG_3858.MP4 -vn -ac 1 -ar 48000 _work/IMG_3858.wav
@@ -39,7 +39,8 @@ VO = [("H", 1.05, 4.95),                                               # мож�
       ("R", 50.44, 55.05)]                                             # и плюс, конечно же, эту процедуру при желании можно повторить.
 # whole sentences only: every cut sits in a real pause, so no line is chopped mid-thought
 HOLD = {"R": 4.35}                                                     # the second case slide stays ~4 s before the last line
-SEG = []; _t = 0.25
+INTRO = 3.0                                                            # opening: fat syringes, no own sound
+SEG = []; _t = INTRO + 0.25
 for _k, (_b, _a, _o) in enumerate(VO):
     if _k: _t += HOLD.get(_b, 0.45)
     SEG.append((_b, "3858", _a, _o, _t)); _t += _o - _a
@@ -209,7 +210,7 @@ class Src:
             s.i += 1; s.f = f
         return cv2.cvtColor(s.f, cv2.COLOR_BGR2RGB)
     def at(s, t): return s.get(round(t * FPS))
-V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ["IMG_3858", "C0818"]}
+V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ["IMG_3858", "C0818", "C_SYRINGES"]}
 def talk(t): return V["IMG_3858"].at(src_of(t))
 def case_crops():
     """six ДО/ПОСЛЕ pairs cut out of the two presentation slides"""
@@ -341,10 +342,12 @@ def stamp(fr, t, t0, cx=830, cy=1010):
     path_draw(fr, [(cx + 116 * s * np.cos(a), cy + 116 * s * np.sin(a)) for a in np.linspace(0, 2 * np.pi, 70)], 1, PINK, 4, op=op)
     a = alpha_img("ДА", bebas(int(130 * s))); M = cv2.getRotationMatrix2D((a.shape[1] / 2, a.shape[0] / 2), 8, 1.0)
     a = cv2.warpAffine(a, M, (a.shape[1], a.shape[0])); blend(fr, a, cx - a.shape[1] / 2, cy - a.shape[0] / 2 - 8, NAVY, op)
+def s_intro(t):
+    return full(V["C_SYRINGES"].at(1.0 + t), 0.5, 0.45, lerp(1.0, 1.08, eio(t / INTRO)))
 def s_hook(t):
-    fr = full(talk(t), 0.5, 0.3, lerp(1.0, 1.14, eio(t / 4.2))); shade(fr, VIG); shade(fr, GBOT)
-    lg = logo_alpha(360); blend(fr, lg, 540 - 180, 210, PINK, eo((t + 0.1) / 0.5) * 0.9)
-    HH.draw(fr, t, -0.25); stamp(fr, t, T_YES)
+    lt = t - INTRO; fr = full(talk(t), 0.5, 0.3, lerp(1.0, 1.14, eio(lt / 4.2))); shade(fr, VIG); shade(fr, GBOT)
+    lg = logo_alpha(360); blend(fr, lg, 540 - 180, 210, PINK, eo((lt + 0.1) / 0.5) * 0.9)
+    HH.draw(fr, t, INTRO - 0.1); stamp(fr, t, T_YES)
     return fr
 
 # method: OR b-roll -> body schematic, droplets flow, implant crossed out; surgeon in a round window
@@ -479,8 +482,8 @@ def s_end(t):
     lg = logo_alpha(420); blend(fr, lg, 540 - 210, 1580, PINK, eo((lt - 2.0) / 0.5))
     return fr
 
-SCENES = [(0, s_hook), (T_M, s_broll), (T_X, s_schema), (T_W, s_warn), (T_N, s_noinc), (T_S, s_soft), (T_R, s_rep), (T_END, s_end)]
-TRANS = {T_M: ("zoom", 0.5), T_X: ("iris", 0.6), T_W: ("diag", 0.55), T_N: ("flash", 0.3), T_S: ("push", 0.5), T_R: ("zoom", 0.5), T_END: ("iris", 0.6)}
+SCENES = [(0, s_intro), (INTRO, s_hook), (T_M, s_broll), (T_X, s_schema), (T_W, s_warn), (T_N, s_noinc), (T_S, s_soft), (T_R, s_rep), (T_END, s_end)]
+TRANS = {INTRO: ("zoom", 0.45), T_M: ("zoom", 0.5), T_X: ("iris", 0.6), T_W: ("diag", 0.55), T_N: ("flash", 0.3), T_S: ("push", 0.5), T_R: ("zoom", 0.5), T_END: ("iris", 0.6)}
 INNER = {T_SL1: 0.45, T_SL2: 0.45}                                     # slides push in inside their scenes
 def push(old, new, p):
     e = eio(p); x = int(W * e); fr = np.empty_like(old); fr[:, :W - x] = old[:, x:]; fr[:, W - x:] = new[:, :x]
@@ -594,7 +597,7 @@ def build_audio(path):
     mus = track(n) * ((G_GAP - (G_GAP - G_VO) * np.clip(d, 0, 1)) * fade)[:, None]
     sfx = np.zeros(n + 2 * SR)
     def put(x, t, g): i = int(max(0, t) * SR); seg = sfx[i:i + len(x)]; seg += x[:len(seg)] * g
-    put(felt(70, 0.5), 0.0, 0.5); put(glass(1174.7), 0.05, 0.1)
+    put(felt(70, 0.5), INTRO, 0.5); put(glass(1174.7), INTRO + 0.05, 0.1)
     put(felt(80, 0.4), T_YES, 0.6); put(paper(0.18, 4000), T_YES - 0.04, 0.3); put(glass(1760), T_YES + 0.05, 0.12)   # «ДА» stamp
     put(marimba(PENTA[0]), T_X + 0.3, 0.2)                                         # transitions themselves stay silent
     for k, hd_t in enumerate([T_X + 0.2, T_T + 0.15, T_W + 0.25, T_N + 0.3, T_S + 0.2, T_R + 0.3, T_END + 0.2]):
