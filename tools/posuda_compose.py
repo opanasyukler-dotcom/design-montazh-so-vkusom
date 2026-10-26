@@ -1,12 +1,13 @@
 """Frame-exact compositor for the posuda review (posuda_reel timeline), 3840x2160 @ 25 fps.
 Reads the joined shots as raw frames and draws, per frame:
+  • the warm-cream grade (luts/mcgva_warm_cream.cube) on the picture, before any type is drawn
   • whip transitions at section cuts (horizontal motion blur + soft flash)
   • «shrink» moments: the picture eases down into a rounded card over its own blurred copy, then back
   • a long black spray at the very bottom
   • subtitles one word at a time, lower case, thin Montserrat, a small pop; key words on a blush pill
   • the item pills (slide in from the left) and the opening title
 """
-import json, re, subprocess
+import json, os, re, subprocess
 import numpy as np
 import cv2
 from PIL import Image, ImageDraw, ImageFilter
@@ -21,6 +22,7 @@ KEY = ("прикорм", "заранее", "ребёнок", "красив", "п
        "ниблер", "поильник", "присоск", "кормлени", "угодно", "продукт", "каш", "пюре", "пить", "цвет", "прекрасн",
        "сердечк", "кружечк", "подстилк", "коллекци", "хозяйк", "восторг", "покупок")
 SUB_Y = H - 290
+GRADE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "luts", "mcgva_warm_cream.cube")   # make_warm_lut.py
 
 def ease(x): x = min(max(x, 0.0), 1.0); return x * x * (3 - 2 * x)
 
@@ -105,7 +107,8 @@ def whip(fr, k):
 def render(work, offs, out):
     cues, pills, title, (r0, spray) = build(work, offs)
     n = round(R.END * FPS)
-    rd = subprocess.Popen(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", f"{work}/list.txt", "-frames:v", str(n),
+    grade = ["-vf", f"lut3d=file={GRADE}:interp=tetrahedral"] if GRADE else []          # warm-cream grade on the picture only
+    rd = subprocess.Popen(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", f"{work}/list.txt", "-frames:v", str(n)] + grade + [
                            "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE, bufsize=W * H * 3 * 2)
     wr = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS),
                            "-i", "-", "-i", f"{work}/voice.wav", "-map", "0:v", "-map", "1:a", "-t", str(R.END),
