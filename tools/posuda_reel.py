@@ -27,18 +27,27 @@ SCRIPT = [
 SHOTS = [                                   # (start, clip, in-point[, speed]) — in-points sit in steady stretches
     (0.0, "C0934", 0.3), (4.6, "C0936", 0.0), (7.6, "C0922", 0.0),
     (10.3, "C0914", 2.4, 1.0), (12.7, "C0914", 19.6, 1.3), (15.1, "C0914", 41.2, 0.85),
-    (17.25, "C0932", 0.0), (20.2, "C0926", 0.0), (22.9, "C0928", 5.0, 1.3), (24.75, "C0919", 3.4, 1.3),
-    (26.5, "C0941", 0.5), (27.6, "C0917", 11.2), (29.1, "C0919", 10.2, 1.0), (31.3, "C0919", 13.6, 1.0), (33.5, "C0928", 19.4, 1.3),
+    (17.25, "G:set3", 0), (20.2, "C0926", 0.0), (22.9, "C0928", 5.0, 1.3), (24.75, "C0919", 3.4, 1.3),
+    (26.5, "G:nib2", 0), (29.1, "C0919", 10.2, 1.0), (31.3, "C0919", 13.6, 1.0), (33.5, "C0928", 19.4, 1.3),
     (35.05, "C0929", 1.0), (39.25, "C0930", 0.3), (41.75, "C0931", 0.0),
     (43.8, "C0928", 1.5), (46.3, "C0928", 23.0), (48.8, "C0919", 0.5), (51.1, "C0919", 24.0, 1.1),
     (53.4, "C0939", 7.2, 1.0), (55.0, "C0940", 37.5), (56.6, "C0915", 24.0, 1.0), (59.4, "C0917", 3.6, 0.9),
     (62.3, "C0929", 16.0, 1.0), (65.2, "C0937", 0.0), (68.0, "C0938", 0.0), (70.8, "C0927", 9.0, 1.0), (73.2, "C0937", 0.6, 1.0),
     (74.4, "C0921", 16.0), (76.7, "C0934", 2.0), (79.0, "F:C0934", 4.3),
-    (90.0, "C0934", 5.2), (94.0, "C0923", 0.0),
+    (90.0, "G:grid4", 0), (94.0, "C0923", 0.0),
     (99.0, "C0940", 21.0, 0.9), (102.2, "C0941", 2.5), (105.2, "C0921", 6.0, 1.0), (107.5, "C0925", 0.0),
     (110.3, "C0935", 0.0),
 ]
 END = 115.1
+# video collages: panels (clip, in-point, speed, appears at) in a layout of (x, y, w, h) boxes over a blurred backdrop
+COLLAGES = {
+    "set3": ([("C0932", 0.0, 1.0, 0.0), ("C0929", 13.6, 1.0, 0.45), ("C0915", 17.0, 1.0, 0.9)],
+             [(160, 170, 1120, 1560), (1360, 170, 1120, 1560), (2560, 170, 1120, 1560)]),
+    "nib2": ([("C0941", 0.5, 1.0, 0.0), ("C0917", 11.2, 1.0, 1.15)],
+             [(180, 170, 1700, 1560), (1960, 170, 1700, 1560)]),
+    "grid4": ([("C0934", 5.2, 1.0, 0.0), ("C0923", 0.0, 1.0, 0.35), ("C0929", 19.4, 1.0, 0.7), ("C0937", 0.0, 0.7, 1.05)],
+              [(190, 110, 1700, 860), (1950, 110, 1700, 860), (190, 1030, 1700, 860), (1950, 1030, 1700, 860)]),
+}
 PILLS = [                                   # things the voice does not say
     (10.6, 17.0, "набор Kuchertim"),
     (20.3, 22.85, "ошибочка: ложечек три — силиконовая, прозрачная и металлическая"),
@@ -127,6 +136,30 @@ def photo_frame(name, ph):
 
 def run(cmd): subprocess.run(cmd, check=True)
 
+def collage(src, work, name, d, out):
+    """video panels with white rounded frames sliding up one after another over a blurred, dimmed backdrop"""
+    panels, boxes = COLLAGES[name]; n = round(d * FPS); ins, fl = [], []
+    for k, ((c, a, sp, _), (x, y, w, h)) in enumerate(zip(panels, boxes)):
+        ins += ["-ss", f"{a:.3f}", "-t", f"{d * sp + 0.2:.3f}", "-i", f"{src}/{c}.MP4"]
+        m = Image.new("L", (w, h), 0); ImageDraw.Draw(m).rounded_rectangle((0, 0, w - 1, h - 1), 44, fill=255); m.save(f"{work}/cm_{w}x{h}.png")
+        fr = Image.new("RGBA", (w + 28, h + 28), (0, 0, 0, 0)); ImageDraw.Draw(fr).rounded_rectangle((0, 0, w + 27, h + 27), 56, fill=(255, 255, 255, 255))
+        fr.save(f"{work}/cf_{w}x{h}.png")
+    for k, (_, _, _, _) in enumerate(panels):
+        w, h = boxes[k][2:]; ins += ["-loop", "1", "-i", f"{work}/cm_{w}x{h}.png", "-loop", "1", "-i", f"{work}/cf_{w}x{h}.png"]
+    np_ = len(panels)
+    fl.append(f"[0:v]setpts=PTS/{panels[0][2]},fps={FPS},scale=480:270,boxblur=18:2,scale={W}:{H},eq=brightness=-0.10:saturation=0.9,setsar=1[b0]")
+    for k, ((c, a, sp, at), (x, y, w, h)) in enumerate(zip(panels, boxes)):
+        mi, fi = np_ + 2 * k, np_ + 2 * k + 1
+        fl.append(f"[{k}:v]setpts=(PTS-STARTPTS)/{sp},fps={FPS},scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},format=rgba[v{k}]")
+        fl.append(f"[{mi}:v]format=gray,fps={FPS}[m{k}];[v{k}][m{k}]alphamerge[r{k}]")
+        fl.append(f"[{fi}:v]fps={FPS},format=rgba[f{k}]")
+        yy = f"'{y}+90*pow(max(0,1-(t-{at})/0.35),3)'"
+        fl.append(f"[b{k}][f{k}]overlay=x={x - 14}:y={yy.replace(str(y) + '+', str(y - 14) + '+')}:enable='gte(t,{at})':shortest=1[c{k}]")
+        fl.append(f"[c{k}][r{k}]overlay=x={x}:y={yy}:enable='gte(t,{at})':shortest=1[b{k + 1}]")
+    fl.append(f"[b{np_}]format=yuv420p[o]")
+    run(["ffmpeg", "-v", "error", "-y"] + ins + ["-filter_complex", ";".join(fl), "-map", "[o]", "-frames:v", str(n),
+         "-c:v", "libx264", "-preset", "medium", "-crf", "16", "-r", str(FPS), "-an", out])
+
 _len = {}
 def clip_len(src, c):
     if c not in _len:
@@ -143,13 +176,18 @@ def steady(src, c, a, dur):
     m = np.array(json.load(open(p))[c]); seg = m[int(a * 5):max(int(a * 5) + 1, int((a + dur) * 5)), 0]
     return float(seg.mean()) if len(seg) else 99
 
+def piece_file(work, p):
+    """intermediate named by its content, so edits to SHOTS never reuse a stale file"""
+    t, d, c, a, sp, z = p
+    return f"{work}/p_{t:07.3f}_{d:.3f}_{c.replace(':', '-').replace('|', '+')}_{a:.3f}_{sp:.4f}_{z}.mp4"
+
 def pieces(src):
     """SHOTS → (start, dur, clip, in, speed, zoom). Long shots become ~1.4 s jump cuts, hand footage runs up to 1.35x.
     zoom (only with ZOOM): steady pieces take turns with a slow eased push-in / pull-out ("in" / "out")"""
     starts = [s[0] for s in SHOTS] + [END]; out = []; cyc = 0
     for i, sh in enumerate(SHOTS):
         t, c, a = sh[:3]; d = starts[i + 1] - t
-        if c.startswith("F:"): out.append((t, d, c, a, 1.0, 1.0)); continue
+        if c[:2] in ("F:", "G:"): out.append((t, d, c, a, 1.0, 1.0)); continue
         sp = sh[3] if len(sh) > 3 else float(np.clip((clip_len(src, c) - a - 0.12) / d, 0.8, 1.35))   # short clips slow down a touch rather than run out
         k = max(1, round(d / 1.4)) if d > 2.2 else 1
         for j in range(k):
@@ -223,6 +261,10 @@ def main(src, photos, work, frames_only=False):
     ph = {k: Image.open(os.path.join(photos, f"{i}.png")).convert("RGB")
           for i, k in enumerate(["spoon", "plate", "sweater", "jacket", "set", "cupside", "cuptop"], 1)}
     starts = [s[0] for s in SHOTS] + [END]
+    if frames_only == "collages":
+        for t, c, a in [x[:3] for x in SHOTS if x[1].startswith("G:")]:
+            i = [s[0] for s in SHOTS].index(t); collage(src, work, c[2:], starts[i + 1] - t, f"{work}/test_{c[2:]}.mp4")
+        return
     if frames_only == "freeze":
         (t, c, a), = [x for x in SHOTS if x[1].startswith("F:")]
         t0, t1 = FREEZE
@@ -235,12 +277,15 @@ def main(src, photos, work, frames_only=False):
         return
     # 1. shots → 4K intermediates (frame-exact durations)
     parts = []
-    for i, (t, d, c, a, sp, z) in enumerate(pieces(src)):
-        n = round((t + d) * FPS) - round(t * FPS); out = f"{work}/s{i:03d}.mp4"; parts.append(out)
+    for i, pc in enumerate(pieces(src)):
+        t, d, c, a, sp, z = pc
+        n = round((t + d) * FPS) - round(t * FPS); out = piece_file(work, pc); parts.append(out)
         if os.path.exists(out): continue
         enc = ["-c:v", "libx264", "-preset", "medium", "-crf", "16", "-pix_fmt", "yuv420p", "-r", str(FPS), "-an"]
         if c.startswith("F:"):
             freeze(src, ph, c[2:], a, t, t + d, out)
+        elif c.startswith("G:"):
+            collage(src, work, c[2:], (round((t + d) * FPS) - round(t * FPS)) / FPS, out)
         else:
             vf = f"setpts=PTS/{sp:.4f},fps={FPS}"
             if isinstance(z, str):                                    # slow eased push-in / pull-out
@@ -258,35 +303,9 @@ def main(src, photos, work, frames_only=False):
     fl = ";".join(f"[{k}:a]aresample=48000,afade=t=in:d=0.02,afade=t=out:st={durs[k]-0.06:.3f}:d=0.06,adelay={int(offs[k]*1000)}|{int(offs[k]*1000)}[v{k}]" for k in range(6))
     fl += ";" + "".join(f"[v{k}]" for k in range(6)) + f"amix=inputs=6:normalize=0,apad,atrim=0:{END},loudnorm=I=-15:TP=-1.5:LRA=9[a]"
     run(["ffmpeg", "-v", "error", "-y"] + ins + ["-filter_complex", fl, "-map", "[a]", "-ac", "2", "-c:a", "pcm_s16le", f"{work}/voice.wav"])
-    # 3. overlays: spray, subtitles, pills, title
-    words = json.load(open(f"{work}/words.json")); ov = []
-    spray_png(f"{work}/spray.png")
-    for j, (a, b, t) in enumerate(cues(words, offs)):
-        p = f"{work}/sub{j:03d}.png"; text_png(p, [t], 84, "second", H - 230); ov.append((a, b, p))
-    for j, (a, b, t) in enumerate(PILLS):
-        p = f"{work}/pill{j}.png"; pill_png(p, t); ov.append((a, b, p))
-    a, b, t1, t2 = TITLE; p = f"{work}/title.png"
-    img = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(img)
-    d.text((240, 330), t1, font=font("main", 120), fill=INK + (255,), anchor="lm")             # the wall left of the flowers
-    d.text((244, 480), t2, font=font("detail", 92), fill=INK + (255,), anchor="lm"); img.save(p); ov.append((a, b, p))
-    # one RGBA overlay track: a composed PNG per interval where the set of active layers is constant (low memory)
-    spray = Image.open(f"{work}/spray.png"); cuts = sorted({0.0, END} | {round(x, 2) for a, b, _ in ov for x in (a, b) if x < END})
-    lst = []
-    for k, (t0, t1) in enumerate(zip(cuts, cuts[1:])):
-        fr = spray.copy()
-        for a, b, p in ov:
-            if a <= t0 < b: fr = Image.alpha_composite(fr, Image.open(p))
-        q = f"{work}/ov{k:03d}.png"; fr.save(q); lst.append((q, t1 - t0))
-    with open(f"{work}/ov.txt", "w") as f:
-        for q, d in lst: f.write(f"file '{os.path.abspath(q)}'\nduration {d:.3f}\n")
-        f.write(f"file '{os.path.abspath(lst[-1][0])}'\n")
-    ins = ["-f", "concat", "-safe", "0", "-i", f"{work}/list.txt", "-i", f"{work}/voice.wav",
-           "-f", "concat", "-safe", "0", "-i", f"{work}/ov.txt"]
-    fl = (f"[2:v]fps={FPS},format=rgba[o];[0:v][o]overlay=0:0:eof_action=repeat,"
-          f"fade=t=in:d=0.5,fade=t=out:st={END-1.0}:d=1.0,format=yuv420p[v]")
-    run(["ffmpeg", "-v", "error", "-y"] + ins + ["-filter_complex", fl, "-map", "[v]", "-map", "1:a",
-         "-t", str(END), "-c:v", "libx264", "-preset", "medium", "-crf", "17", "-profile:v", "high", "-r", str(FPS),
-         "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", f"{work}/posuda_4k.mp4"])
+    # 3. frame-exact compositor: transitions, shrink moments, spray, word-by-word subtitles, pills, title
+    import posuda_compose
+    posuda_compose.render(work, offs, f"{work}/posuda_4k.mp4")
 
 if __name__ == "__main__":
-    main(*sys.argv[1:4], frames_only="freeze" if "--freeze-test" in sys.argv else "--frames" in sys.argv)
+    main(*sys.argv[1:4], frames_only="freeze" if "--freeze-test" in sys.argv else "collages" if "--collage-test" in sys.argv else "--frames" in sys.argv)

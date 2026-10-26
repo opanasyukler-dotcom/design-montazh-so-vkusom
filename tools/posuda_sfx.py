@@ -1,5 +1,5 @@
 """Sound design for the posuda review (posuda_reel.py timeline).
-  music  — a light original bed (F major, 96 bpm: soft pad, kalimba-like arpeggio, round bass, a whisper of shaker),
+  music  — a light, upbeat original bed (F major, 112 bpm: pad, pluck arp, kick/clap/hats, bouncy bass; breakdown on the freeze),
            synthesized here so there are no rights issues, ducked under the voice
   foley  — the camera's own sound of each shot (off by default: the blog asked for no background sound)
   sfx    — soft synthesized accents: whooshes on section changes, a pop for every pill, a shutter for every gift photo,
@@ -97,42 +97,51 @@ def reverb(x, sec=2.2, mix=0.28):
     return out
 
 def music(dur):
-    """light bed: F – C/E – Dm – Bb (and F – Am – Gm – C), 96 bpm, two bars of intro without bass/shaker"""
-    bpm = 96; beat = 60 / bpm; bar = 4 * beat; n = int(dur * SR); out = np.zeros((n, 2), np.float32)
-    hz = lambda m: 440 * 2 ** ((m - 69) / 12)
-    progA = [[53, 57, 60], [52, 55, 60], [50, 53, 57], [46, 50, 53]]    # F, C/E, Dm, Bb
-    progB = [[53, 57, 60], [45, 52, 57], [43, 50, 55], [48, 52, 55]]    # F, Am, Gm, C
-    rng = np.random.default_rng(5)
-    def tone(f, d, att, dec, harm, g, pan, start):
-        i = int(start * SR); m = min(int(d * SR), n - i)
-        if m <= 0: return
-        t = np.arange(m) / SR; y = np.zeros(m, np.float32)
+    """light, upbeat bed — 112 bpm, F – C/E – Dm – Bb / F – Am – Gm – C.
+    intro (pad, arp, then hats and kick) → full groove from «В наборе…» (kick, clap, hats, bouncy bass, 16th arp)
+    → breakdown on the gift freeze-frame (pad + arp, a riser into the drop) → groove again → ringing out"""
+    bpm = 112; beat = 60 / bpm; bar = 4 * beat; n = int(dur * SR); out = np.zeros((n, 2), np.float32)
+    hz = lambda m: 440 * 2 ** ((m - 69) / 12); rng = np.random.default_rng(5)
+    progA = [[53, 57, 60], [52, 55, 60], [50, 53, 57], [46, 50, 53]]
+    progB = [[53, 57, 60], [45, 52, 57], [43, 50, 55], [48, 52, 55]]
+    groove = lambda t: (17.25 - beat <= t < R.FREEZE[0]) or (R.FREEZE[1] <= t < dur - 3.0)
+    def add(y, start, pan=0.5):
+        i = int(start * SR); m = min(len(y), n - i)
+        if m > 0: out[i:i + m, 0] += y[:m] * (1 - pan) * 1.4; out[i:i + m, 1] += y[:m] * pan * 1.4
+    def tone(f, d, att, dec, harm, g):
+        m = int(d * SR); t = np.arange(m) / SR; y = np.zeros(m, np.float32)
         for k, a in harm: y += a * np.sin(2 * np.pi * f * k * t * (1 + 0.0004 * rng.standard_normal()))
-        y *= np.minimum(1, t / att) * np.exp(-t * dec) * env(m, 0, int(0.05 * SR)) * g
-        out[i:i + m, 0] += y * (1 - pan); out[i:i + m, 1] += y * pan
-    nb = int(dur / bar) + 1
-    for b in range(nb):
-        t0 = b * bar; ch = (progA if (b // 4) % 2 == 0 else progB)[b % 4]
-        for m in ch:                                                     # pad
-            tone(hz(m + 12), bar + 0.4, 0.6, 0.35, [(1, 1), (2, 0.18), (3, 0.05)], 0.035, 0.5, t0)
+        return y * np.minimum(1, t / att) * np.exp(-t * dec) * env(m, 0, int(0.03 * SR)) * g
+    def noise(d, dec, g, hp=2):
+        m = int(d * SR); z = rng.standard_normal(m + hp).astype(np.float32)
+        for _ in range(hp): z = np.diff(z)
+        return z[:m] * np.exp(-np.arange(m) / (dec * SR)) * g
+    kick = (lambda m: np.sin(2 * np.pi * np.cumsum(45 + 80 * np.exp(-np.arange(m) / SR * 30)) / SR) * np.exp(-np.arange(m) / SR * 9))(int(0.35 * SR)) * 0.5
+    clap = sum(np.pad(noise(0.14, 0.035, 0.16, 1), (int(k * 0.011 * SR), int(0.04 * SR)))[:int(0.15 * SR)] for k in range(3))
+    for b in range(int(dur / bar) + 1):
+        t0 = b * bar; ch = (progA if (b // 4) % 2 == 0 else progB)[b % 4]; g = groove(t0 + 0.1)
+        for m in ch: add(tone(hz(m + 12), bar + 0.3, 0.4, 0.4, [(1, 1), (2, 0.2), (3, 0.06)], 0.028), t0)        # pad
         arp = [ch[0] + 24, ch[1] + 24, ch[2] + 24, ch[1] + 36, ch[2] + 24, ch[1] + 24, ch[0] + 36, ch[2] + 24]
-        for k, m in enumerate(arp):                                     # kalimba-ish eighths
-            if b == 0 and k < 2: continue
-            tone(hz(m), 1.4, 0.004, 4.5, [(1, 1), (3.01, 0.12), (5.4, 0.04)], 0.05 * (1.0 if k % 2 == 0 else 0.72),
-                 0.5 + 0.28 * np.sin(k * 1.3 + b), t0 + k * beat / 2)
-        if b >= 2:                                                      # round bass on 1 and the «and» of 3
-            for off, d in ((0, 1.5 * beat), (2.5 * beat, 1.5 * beat)):
-                tone(hz(ch[0] - 12), d, 0.01, 1.6, [(1, 1), (2, 0.25)], 0.09, 0.5, t0 + off)
-            for k in range(8):                                          # whisper of shaker on the off-beats
-                if k % 2 == 1:
-                    i = int((t0 + k * beat / 2) * SR); m = min(int(0.06 * SR), n - i)
-                    if m > 0:
-                        z = np.diff(rng.standard_normal(m + 1)).astype(np.float32) * np.exp(-np.arange(m) / (0.012 * SR)) * 0.012
-                        out[i:i + m] += z[:, None]
-    out = reverb(out)
-    out[-int(2.5 * SR):] *= np.linspace(1, 0, int(2.5 * SR))[:, None] ** 1.5
-    out[:int(0.8 * SR)] *= np.linspace(0, 1, int(0.8 * SR))[:, None]
-    return out / (np.sqrt(np.mean(out ** 2)) + 1e-9) * db(-20)         # bed at -20 dBFS rms before ducking
+        steps = 16 if g else 8
+        for k in range(steps):                                                                                # pluck arp
+            m = arp[(k if steps == 8 else k // 2 + (k % 2) * 3) % 8]
+            add(tone(hz(m), 0.9, 0.003, 6.0, [(1, 1), (3.01, 0.12), (5.4, 0.04)], (0.045 if k % 2 == 0 else 0.03) * (0.8 if g else 1)),
+                t0 + k * bar / steps, 0.5 + 0.3 * np.sin(k * 1.3 + b))
+        if t0 >= 4.6 and (g or t0 < 17.25):                                                                  # hats
+            for k in range(8): add(noise(0.05, 0.012 if k % 2 else 0.02, 0.05 if k % 2 else 0.032), t0 + k * beat / 2, 0.62)
+        if t0 >= 10.3 - bar and (g or t0 < 17.25):                                                           # kick
+            for k in (0, 2) if not g else (0, 1.5, 2, 3.5)[:4 if b % 2 else 3]: add(kick, t0 + k * beat)
+        if g:
+            for k in (1, 3): add(clap, t0 + k * beat, 0.45)                                                  # clap
+            for off, oc in ((0, 0), (0.75, 0), (1.5, 12), (2, 0), (2.75, 0), (3.5, 12)):                      # bouncy bass
+                add(tone(hz(ch[0] - 12 + oc), 0.4, 0.005, 7.0, [(1, 1), (2, 0.3), (3, 0.08)], 0.11), t0 + off * beat)
+    r0, r1 = R.FREEZE[1] - 2.0, R.FREEZE[1]                                                                  # riser into the drop
+    m = int((r1 - r0) * SR); z = rng.standard_normal(m).astype(np.float32); z = np.diff(np.r_[0, z])
+    add(z * np.linspace(0, 1, m) ** 2 * 0.05, r0)
+    out = reverb(out, 1.6, 0.2)
+    out[-int(3.0 * SR):] *= np.linspace(1, 0, int(3.0 * SR))[:, None] ** 1.5
+    out[:int(0.5 * SR)] *= np.linspace(0, 1, int(0.5 * SR))[:, None]
+    return out / (np.sqrt(np.mean(out ** 2)) + 1e-9) * db(-19)         # bed at -19 dBFS rms before ducking
 
 def place(bus, x, t):
     i = int(t * SR); n = min(len(x), N - i); bus[i:i + n] += x[:n]
@@ -140,7 +149,7 @@ def place(bus, x, t):
 def main(src, voice_wav, master, out, mute=(), with_foley=False):
     v = read(voice_wav)[:N]; v = np.pad(v, ((0, N - len(v)), (0, 0)))
     fol = foley(src, set(mute)) if with_foley else np.zeros((N, 2), np.float32)
-    mus = music(R.END)
+    mus = limit(music(R.END), -9)                                # kicks never poke above the voice
     # duck the foley under the voice: envelope of the voice, 30 ms attack / 400 ms release, -9 dB while speaking
     lv = np.abs(v).mean(1); k = int(0.02 * SR); lv = np.convolve(lv, np.ones(k) / k, "same")
     talk = (lv > db(-38)).astype(np.float32); sm = np.zeros_like(talk); g = 0.0
