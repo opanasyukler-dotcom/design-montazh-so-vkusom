@@ -133,6 +133,9 @@ def clip_len(src, c):
         _len[c] = float(subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f"{src}/{c}.MP4"]))
     return _len[c]
 
+ZOOM = False                                # push-ins / pull-outs: switched off at the blog's request
+ZOOM_STEADY = ("in", 1.0, "out", 1.0)
+
 def steady(src, c, a, dur):
     """mean camera shift (px per 0.2 s at 192 px wide) over a source window, from motion.json if present"""
     p = os.path.join(src, "..", "motion.json")
@@ -142,7 +145,7 @@ def steady(src, c, a, dur):
 
 def pieces(src):
     """SHOTS → (start, dur, clip, in, speed, zoom). Long shots become ~1.4 s jump cuts, hand footage runs up to 1.35x.
-    zoom: steady pieces take turns with a slow eased push-in / pull-out ("in" / "out"), the rest alternate 1.0 / 1.1"""
+    zoom (only with ZOOM): steady pieces take turns with a slow eased push-in / pull-out ("in" / "out")"""
     starts = [s[0] for s in SHOTS] + [END]; out = []; cyc = 0
     for i, sh in enumerate(SHOTS):
         t, c, a = sh[:3]; d = starts[i + 1] - t
@@ -151,10 +154,8 @@ def pieces(src):
         k = max(1, round(d / 1.4)) if d > 2.2 else 1
         for j in range(k):
             tj = t + d * j / k; aj = a + (tj - t) * sp
-            if steady(src, c, aj, d / k * sp) < 1.2:
-                z = ("in", 1.0, "out", 1.0)[cyc % 4]; cyc += 1
-            else: z = 1.0 if j % 2 == 0 else 1.1
-            out.append((tj, d / k, c, aj, sp, z))
+            out.append((tj, d / k, c, aj, sp, ZOOM_STEADY[cyc % 4] if ZOOM and steady(src, c, aj, d / k * sp) < 1.2 else 1.0))
+            cyc += ZOOM and steady(src, c, aj, d / k * sp) < 1.2
     return out
 
 def polaroid(ph, size, tilt):

@@ -1,5 +1,7 @@
 """Sound design for the posuda review (posuda_reel.py timeline).
-  foley  — the camera's own sound of each shot (box, film, silicone, lids), cleaned, quiet, ducked under the voice
+  music  — a light original bed (F major, 96 bpm: soft pad, kalimba-like arpeggio, round bass, a whisper of shaker),
+           synthesized here so there are no rights issues, ducked under the voice
+  foley  — the camera's own sound of each shot (off by default: the blog asked for no background sound)
   sfx    — soft synthesized accents: whooshes on section changes, a pop for every pill, a shutter for every gift photo,
            bell sparkles on the «wow» lines
   python3 posuda_sfx.py SRC_DIR voice.wav master.mp4 out.mp4 [--mute-foley i,j]
@@ -84,12 +86,61 @@ def shutter(gain):
     y *= gain / np.abs(y).max()
     return np.stack([y, y], 1)
 
+def reverb(x, sec=2.2, mix=0.28):
+    rng = np.random.default_rng(11); n = int(sec * SR); t = np.arange(n) / SR
+    out = x * (1 - mix)
+    for ch in range(2):
+        ir = rng.standard_normal(n).astype(np.float32) * np.exp(-t * 6.9 / sec); ir /= np.sqrt((ir ** 2).sum())
+        L = len(x) + n; F = 1 << (L - 1).bit_length()
+        wet = np.fft.irfft(np.fft.rfft(x[:, ch], F) * np.fft.rfft(ir, F), F)[:len(x)]
+        out[:, ch] += wet.astype(np.float32) * mix * 1.4
+    return out
+
+def music(dur):
+    """light bed: F – C/E – Dm – Bb (and F – Am – Gm – C), 96 bpm, two bars of intro without bass/shaker"""
+    bpm = 96; beat = 60 / bpm; bar = 4 * beat; n = int(dur * SR); out = np.zeros((n, 2), np.float32)
+    hz = lambda m: 440 * 2 ** ((m - 69) / 12)
+    progA = [[53, 57, 60], [52, 55, 60], [50, 53, 57], [46, 50, 53]]    # F, C/E, Dm, Bb
+    progB = [[53, 57, 60], [45, 52, 57], [43, 50, 55], [48, 52, 55]]    # F, Am, Gm, C
+    rng = np.random.default_rng(5)
+    def tone(f, d, att, dec, harm, g, pan, start):
+        i = int(start * SR); m = min(int(d * SR), n - i)
+        if m <= 0: return
+        t = np.arange(m) / SR; y = np.zeros(m, np.float32)
+        for k, a in harm: y += a * np.sin(2 * np.pi * f * k * t * (1 + 0.0004 * rng.standard_normal()))
+        y *= np.minimum(1, t / att) * np.exp(-t * dec) * env(m, 0, int(0.05 * SR)) * g
+        out[i:i + m, 0] += y * (1 - pan); out[i:i + m, 1] += y * pan
+    nb = int(dur / bar) + 1
+    for b in range(nb):
+        t0 = b * bar; ch = (progA if (b // 4) % 2 == 0 else progB)[b % 4]
+        for m in ch:                                                     # pad
+            tone(hz(m + 12), bar + 0.4, 0.6, 0.35, [(1, 1), (2, 0.18), (3, 0.05)], 0.035, 0.5, t0)
+        arp = [ch[0] + 24, ch[1] + 24, ch[2] + 24, ch[1] + 36, ch[2] + 24, ch[1] + 24, ch[0] + 36, ch[2] + 24]
+        for k, m in enumerate(arp):                                     # kalimba-ish eighths
+            if b == 0 and k < 2: continue
+            tone(hz(m), 1.4, 0.004, 4.5, [(1, 1), (3.01, 0.12), (5.4, 0.04)], 0.05 * (1.0 if k % 2 == 0 else 0.72),
+                 0.5 + 0.28 * np.sin(k * 1.3 + b), t0 + k * beat / 2)
+        if b >= 2:                                                      # round bass on 1 and the «and» of 3
+            for off, d in ((0, 1.5 * beat), (2.5 * beat, 1.5 * beat)):
+                tone(hz(ch[0] - 12), d, 0.01, 1.6, [(1, 1), (2, 0.25)], 0.09, 0.5, t0 + off)
+            for k in range(8):                                          # whisper of shaker on the off-beats
+                if k % 2 == 1:
+                    i = int((t0 + k * beat / 2) * SR); m = min(int(0.06 * SR), n - i)
+                    if m > 0:
+                        z = np.diff(rng.standard_normal(m + 1)).astype(np.float32) * np.exp(-np.arange(m) / (0.012 * SR)) * 0.012
+                        out[i:i + m] += z[:, None]
+    out = reverb(out)
+    out[-int(2.5 * SR):] *= np.linspace(1, 0, int(2.5 * SR))[:, None] ** 1.5
+    out[:int(0.8 * SR)] *= np.linspace(0, 1, int(0.8 * SR))[:, None]
+    return out / (np.sqrt(np.mean(out ** 2)) + 1e-9) * db(-20)         # bed at -20 dBFS rms before ducking
+
 def place(bus, x, t):
     i = int(t * SR); n = min(len(x), N - i); bus[i:i + n] += x[:n]
 
-def main(src, voice_wav, master, out, mute=()):
+def main(src, voice_wav, master, out, mute=(), with_foley=False):
     v = read(voice_wav)[:N]; v = np.pad(v, ((0, N - len(v)), (0, 0)))
-    fol = foley(src, set(mute))
+    fol = foley(src, set(mute)) if with_foley else np.zeros((N, 2), np.float32)
+    mus = music(R.END)
     # duck the foley under the voice: envelope of the voice, 30 ms attack / 400 ms release, -9 dB while speaking
     lv = np.abs(v).mean(1); k = int(0.02 * SR); lv = np.convolve(lv, np.ones(k) / k, "same")
     talk = (lv > db(-38)).astype(np.float32); sm = np.zeros_like(talk); g = 0.0
@@ -97,6 +148,7 @@ def main(src, voice_wav, master, out, mute=()):
     for i in range(0, N, 48):                                     # 1 ms steps
         g += (talk[i] - g) * (up if talk[i] > g else dn) * 48; sm[i:i + 48] = g
     fol *= (db(-8) * sm + (1 - sm))[:, None] * db(5)
+    mus *= (db(-10) * sm + (1 - sm))[:, None]                     # music dips ~10 dB under the voice
     sfx = np.zeros((N, 2), np.float32)
     place(sfx, noise_sweep(0.9, 400, 5000, db(-20)), 0.0)                        # intro air
     place(sfx, bells([1318.5, 1568, 1975.5, 2637], db(-24)), 0.35)              # title sparkle
@@ -107,7 +159,7 @@ def main(src, voice_wav, master, out, mute=()):
     for t in R.SNAPS: place(sfx, shutter(db(-6)), t - 0.01)                      # щелк, щелк, щелк
     place(sfx, pop(db(-19)), R.GIFTS[0][3])                                      # the «подстилка» label
     place(sfx, bells([1046.5, 1318.5, 1568, 2093, 2637], db(-21), 0.09), 112.2) # «в полном восторге»
-    mix = v + fol + sfx
+    mix = v + fol + sfx + mus
     fade = np.ones(N, np.float32); fade[-SR:] = np.linspace(1, 0, SR); mix *= fade[:, None]
     peak = np.abs(mix).max()
     if peak > db(-1): mix *= db(-1) / peak
