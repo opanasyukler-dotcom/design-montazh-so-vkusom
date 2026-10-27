@@ -322,11 +322,11 @@ def subtitles(fr, t):
     for i, line in enumerate(SUB_LINES):
         t0 = line[0][1] - 0.08; t1 = min(line[-1][2] + 0.35, SUB_LINES[i + 1][0][1] - 0.08 if i + 1 < len(SUB_LINES) else 1e9)
         if not (t0 <= t < t1): continue
-        f = mont(46, 600); sp = f.getlength(" "); ims = [alpha_img(w, f) for w, _, _ in line]
+        f = mont(48, 300); sp = f.getlength(" "); ims = [alpha_img(w, f) for w, _, _ in line]   # thin Montserrat, like the small lines
         tw = sum(a.shape[1] - 8 for a in ims) + sp * (len(ims) - 1); x = 500 - tw / 2; h = 74
         op = min(1, (t - t0) / 0.12, (t1 - t) / 0.12)
         box = np.zeros((h, int(tw + 44)), np.uint8); cv2.rectangle(box, (0, 0), (box.shape[1] - 1, h - 1), 255, -1)
-        blend(fr, cv2.GaussianBlur(box, (0, 0), 1.2).astype(np.float32) / 255, x - 22, SUB_Y - h / 2, DEEP, 0.72 * op)
+        blend(fr, cv2.GaussianBlur(box, (0, 0), 1.2).astype(np.float32) / 255, x - 22, SUB_Y - h / 2, DEEP, 0.8 * op)
         for (w, a, e), im in zip(line, ims):
             col = PINK if a <= t < e + 0.05 else WHITE
             blend(fr, im, x - 4, SUB_Y - im.shape[0] / 2 + 3, col, op); x += im.shape[1] - 8 + sp
