@@ -31,7 +31,7 @@ def eback(x): x = cl(x); c = 1.7; return 1 + (c + 1) * (x - 1) ** 3 + c * (x - 1
 def lerp(a, b, p): return a + (b - a) * p
 
 # ---------------- voice edit: (block, source, [(in, out), …]) — whole sentences; parts inside one entry are joined with a 15 ms crossfade
-VO = [("A", "4355", [(8.70, 11.16), (11.40, 12.80)]),               # подумал-подумал и согласился. лучше раньше, чем позже. (stumble «рано» removed)
+VO = [("A", "4355", [(8.58, 11.16), (11.40, 12.80)]),               # подумал-подумал и согласился. лучше раньше, чем позже. (stumble «рано» removed)
       ("B", "4355", [(7.30, 8.40)]),                                 # давно надо было делать
       ("C1", "4316", [(0.02, 4.45)]),                                # сегодня у нас интересная операция: у нас мужчина, они не так часто у нас бывают
       ("C1b", "4316", [(4.66, 6.70), (7.44, 10.28)]),                # проблема в том, что у него избыточное отложение жира, поэтому и «фартук» (stumble removed)
@@ -65,7 +65,7 @@ def src_of(t, name):
         best = (a1, t0 + d)
     return best[0] + t - best[1]
 T_B = vstart("B") - 0.15; T_C1 = vstart("C1") - 0.2; T_C2 = vstart("C2") - 0.15; T_C3 = vstart("C3") - 0.12
-T_D = vstart("D") - 0.2; T_SL_END = T_D + 3.4; T_E = vstart("E") - 0.15; T_F = vend("E") + 0.35; DUR = T_F + 3.6
+T_D = vstart("D") - 0.2; T_SL_END = at_src("4355", 48.40); T_E = vstart("E") - 0.15; T_F = vend("E") + 0.35; DUR = T_F + 3.6
 T_FLANK = at_src("4316", 12.88); T_BELLY = at_src("4316", 14.60); T_ABDO = at_src("4316", 16.02)
 T_GLANDS = at_src("4316", 17.12); T_GOOD = at_src("4355", 51.52)
 
@@ -381,7 +381,7 @@ def s_c3(t):
 # D — «всё стоило того»: ДО/ПОСЛЕ slider, then three «2 недели» collages with shutter clicks
 HD = Drop(["ВСЁ СТОИЛО *ТОГО*"], 132, 70, 1520)
 def slider_x(lt): return W * (1 - 0.5 * eio((lt - 0.5) / 0.8) - 0.5 * eio((lt - 2.0) / 0.8))
-T_K = [T_SL_END + k * (T_E - T_SL_END) / 3 for k in range(3)]
+T_K = [at_src("4355", s_) for s_ in (48.40, 49.60, 51.00)]           # collage cuts sit in the pauses between his words
 def pill(fr, txt, t, t0, t1=1e9, y=1560):
     if t < t0 or t > t1 + 0.3: return
     op = eo((t - t0) / 0.3) * ((1 - eio((t - t1) / 0.3)) if t > t1 else 1)
@@ -547,7 +547,7 @@ def build_audio(path):
     for k in range(4): put(marimba(PENTA[k], 0.35), vstart("C1b") + 1.0 + k * 0.35, 0.14)   # zone dots
     for k, (_, t0) in enumerate(ITEMS): put(marimba(PENTA[k + 2], 0.45), t0 + 0.05, 0.22)   # checklist
     put(swell(0.9), T_GLANDS - 0.3, 0.07)
-    for tk in T_K: put(click(), tk - 0.01, 1.4)                                       # «щёлк» on every collage
+    for tk in T_K: put(click(), tk, 1.0)                                              # «щёлк» on every collage (in a pause)
     put(glass(1174.7), T_F + 0.3, 0.16)
     for i, f in enumerate([PENTA[0], PENTA[2], PENTA[3], PENTA[5]]): put(marimba(f, 0.6), T_F + 1.2 + i * 0.12, 0.12)
     sfx[:n] *= 1 - 0.8 * np.clip(dd, 0, 1)
