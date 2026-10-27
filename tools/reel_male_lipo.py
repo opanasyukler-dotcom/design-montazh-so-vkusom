@@ -598,13 +598,14 @@ def build_audio(path):
         w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR); w.writeframes((mix * 32767).astype(np.int16).tobytes())
 
 def make_cover(path):
-    """everything inside the centre 3:4 (y 240-1680) that the profile grid shows"""
-    fr = BG.copy()
+    """everything inside the centre 3:4 (y 240-1680) that the profile grid shows; a deeper navy than the video"""
+    CBG = np.clip(np.float32([0, 10, 36]) / 255 * (1 + 0.3 * np.exp(-(((xx - 540) / 900) ** 2 + ((yy - 520) / 900) ** 2)))[..., None], 0, 1).astype(np.float32)
+    fr = CBG.copy()
     for k, img in enumerate([BEF, AFT]):
         im = cv2.resize(img[200:1640], None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
         x0 = k * 540; fr[350:350 + im.shape[0], x0:x0 + 540] = im[:, :540]
     fr[350:1070, 538:542] = PINK; chip(fr, "ДО", 40, 380); chip(fr, "ПОСЛЕ", 580, 380)
-    m = np.clip((yy[:, :1] - 900) / 200, 0, 1)[..., None]; fr = fr * (1 - m) + BG * m
+    m = np.clip((yy[:, :1] - 900) / 200, 0, 1)[..., None]; fr = fr * (1 - m) + CBG * m
     lg = logo_alpha(320); blend(fr, lg, 540 - 160, 270, PINK)
     hd = Drop(["ЛУЧШЕ РАНЬШЕ,", "*ЧЕМ ПОЗЖЕ*"], 128, 70, 1150, maxw=840); hd.draw(fr, 99, 0)
     ty = Track(["история пациента", "после комплексной коррекции"], 34, 72, 0, 400); ty.y = 1150 + hd.h + 60 + ty.top; ty.draw(fr, 99, 0)
