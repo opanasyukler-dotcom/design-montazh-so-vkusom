@@ -304,12 +304,14 @@ def bazaart_crop(name, box):
 
 
 def s1():
-    """before (front) on black, the question on top, the poll room under the body"""
-    im = bazaart_crop("IMG_8714.JPG", (0.04, 0.03, 0.96, 0.03 + 0.92 * 2048 / 3640 * 16 / 9)).resize((W, H), Image.LANCZOS)
-    cv = im.convert("RGBA")
-    b = Block().head("А ЕСЛИ ОБЪЁМ ГРУДИ\nМЕНЯ УСТРАИВАЕТ,\nНО ФОРМА УЖЕ НЕТ?", 52, gap=0)
-    ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, 110); cv.alpha_composite(ly)
-    save_jpg(cv, "01_forma.jpg")                                   # poll «Что бы вы хотели изменить?» under the body
+    """before (front) filling the whole slide (chin to thighs); the question straight on it, low, under the usual fade"""
+    w = 0.62; box = (0.20, 0.185, 0.20 + w, 0.185 + w * 2048 / 3640 * 16 / 9)
+    cv = bazaart_crop("IMG_8714.JPG", box).resize((W, H), Image.LANCZOS)
+    b = Block().head("А ЕСЛИ ОБЪЁМ ГРУДИ\nМЕНЯ УСТРАИВАЕТ,\nНО ФОРМА УЖЕ НЕТ?", 54, gap=0)
+    top = H - 90 - b.h
+    cv = Image.fromarray((np.asarray(cv, np.float32) * (1 - fade(top + 50, 320, 0.85))).astype(np.uint8)).convert("RGBA")
+    ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top); cv.alpha_composite(ly)
+    save_jpg(cv, "01_forma.jpg")                                   # the poll sticker goes above the text, on the thighs
 
 
 def s2():
