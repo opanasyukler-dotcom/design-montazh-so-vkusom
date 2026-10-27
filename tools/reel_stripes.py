@@ -5,7 +5,7 @@
 Brand system of the other reels (navy, powder pink, Bebas Neue + Montserrat, logo), cut fast for short attention spans:
 a teaser of ПОСЛЕ under tape strips that peel off, ДО on the surgeon's phone and in the studio, a checklist that ticks
 on every named procedure over changing ДО angles, donor zones lighting up on the body, the scar close-up traced in pink,
-the silhouette, three ДО (top) / ПОСЛЕ (bottom) collages cut neck to fingertips with shutter clicks, the live «мы очень
+the silhouette, three ПОСЛЕ (top) / ДО (bottom) collages cut neck to fingertips with shutter clicks, the live «мы очень
 довольны» and the closing card. Whole sentences only; faces are blurred; ПОСЛЕ photos get a light skin retouch that keeps
 the scars visible.
 
@@ -261,7 +261,7 @@ for n in ("1637", "1643", "1645"): PH[n] = soft(PH[n])
 SCAR_IM = soft(PH.pop("1651"), False)
 COLLS = []
 for b, a in (("0305", "1637"), ("0310", "1643"), ("0313", "1645")):
-    COLLS.append(np.vstack([panel(PH[b], b), panel(PH[a], a)]).astype(np.float32))
+    COLLS.append(np.vstack([panel(PH[a], a), panel(PH[b], b)]).astype(np.float32))   # ПОСЛЕ on top, ДО below
 CHK = [box_frame(PH["0305"], (342, 300, 1942, 3144)), box_frame(PH["0310"], (300, 300, 1900, 3144)),
        box_frame(PH["0305"], (342, 900, 1942, 3744)), box_frame(PH["0313"], (300, 900, 1900, 3744))]   # ДО: chest · ¾ chest · belly · flank
 OPEN = PH["1637"]; FINAL = anon(cv2.resize(PH["1637"], (W, H), interpolation=cv2.INTER_AREA), 60)
@@ -517,12 +517,12 @@ def s_f(t):
     for k, (x, y) in enumerate([(215, 640), (865, 640), (540, 380)]): sparkle(fr, x, y, 30, t, T_SWAP + 0.2 + 0.15 * k)
     return fr
 
-# G — three ДО (top) / ПОСЛЕ (bottom) collages, neck to fingertips, with a shutter click on every cut
+# G — three ПОСЛЕ (top) / ДО (bottom) collages, neck to fingertips, with a shutter click on every cut
 COLL8 = [(np.clip(c, 0, 1) * 255).astype(np.uint8) for c in COLLS]
 def s_g(t):
     k = max(i for i, tk in enumerate(T_K) if t >= tk - 1e-6); lt = t - T_K[k]
     fr = full(COLL8[k], 0.5, 0.5, 1 + 0.03 * (1 - eo(lt / 0.35)))
-    fr[957:963] = PINK; chip(fr, "ДО", 40, 280); chip(fr, "ПОСЛЕ", 40, 1000)
+    fr[957:963] = PINK; chip(fr, "ПОСЛЕ", 40, 280); chip(fr, "ДО", 40, 1000)
     return flash_in(fr, t, T_K[k], 0.18) if k else fr
 
 # Q — live: «вам всё нравится?» — «мы очень довольны»
