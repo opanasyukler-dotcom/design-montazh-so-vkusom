@@ -296,29 +296,20 @@ SUBS = {
     'S10': [('Поэтому', 0.08, 0.5), ('перед', 0.5, 0.68), ('операцией', 0.68, 1.38), ('я', 1.38, 1.58), ('всегда', 1.58, 1.96), ('спрашиваю,', 1.96, 2.62), ('сможете', 2.86, 3.46), ('ли', 3.46, 3.62), ('вы', 3.62, 3.88), ('реально', 3.88, 4.36), ('соблюдать', 4.36, 4.98), ('режим.', 4.98, 5.28)],
     'S11': [('Если', 0.04, 0.44), ('нет,', 0.44, 0.94), ('лучше', 1.38, 1.7), ('выбрать', 1.7, 2.16), ('другое', 2.16, 2.68), ('время.', 2.68, 2.94)],}
 SUB_Y = 1420                                                           # Instagram Reels safe zone: x <= 940, y 250-1500
-def _sub_lines():
-    out = []
-    for b, s_, parts, t0, d in SEG:
-        line = []
-        for k, (w, a, e) in enumerate(SUBS[b]):
-            line.append((w, t0 + a, t0 + e))
-            txt = " ".join(x[0] for x in line)
-            if len(txt) >= 22 or w[-1] in ".,?!" and len(txt) >= 12 or k == len(SUBS[b]) - 1:
-                out.append(line); line = []
-    return out
-SUB_LINES = _sub_lines()
+def _sub_words():
+    """one word at a time: each stays until the next one starts (or a beat after it ends)"""
+    out = [(w.strip(",."), t0 + a, t0 + e) for b, s_, parts, t0, d in SEG for w, a, e in SUBS[b]]
+    return [(w, a, min(e + 0.3, out[i + 1][1] - 0.04) if i + 1 < len(out) else e + 0.3) for i, (w, a, e) in enumerate(out)]
+SUB_WORDS = _sub_words()
 def subtitles(fr, t):
-    for i, line in enumerate(SUB_LINES):
-        t0 = line[0][1] - 0.08; t1 = min(line[-1][2] + 0.35, SUB_LINES[i + 1][0][1] - 0.08 if i + 1 < len(SUB_LINES) else 1e9)
-        if not (t0 <= t < t1): continue
-        f = mont(48, 300); sp = f.getlength(" "); ims = [alpha_img(w, f) for w, _, _ in line]   # thin Montserrat, like the small lines
-        tw = sum(a.shape[1] - 8 for a in ims) + sp * (len(ims) - 1); x = 500 - tw / 2; h = 74
-        op = min(1, (t - t0) / 0.12, (t1 - t) / 0.12)
-        box = np.zeros((h, int(tw + 44)), np.uint8); cv2.rectangle(box, (0, 0), (box.shape[1] - 1, h - 1), 255, -1)
-        blend(fr, cv2.GaussianBlur(box, (0, 0), 1.2).astype(np.float32) / 255, x - 22, SUB_Y - h / 2, DEEP, 0.8 * op)
-        for (w, a, e), im in zip(line, ims):
-            col = PINK if a <= t < e + 0.05 else WHITE
-            blend(fr, im, x - 4, SUB_Y - im.shape[0] / 2 + 3, col, op); x += im.shape[1] - 8 + sp
+    for w, a, e in SUB_WORDS:
+        t0 = a - 0.04
+        if not (t0 <= t < e): continue
+        p = eo((t - t0) / 0.12); im = scaled(alpha_img(w, mont(60, 300)), 0.85 + 0.15 * p)   # thin Montserrat, pops in
+        h = 84; bw = im.shape[1] + 40; op = min(1, (e - t) / 0.06)
+        box = np.zeros((h, int(bw)), np.uint8); cv2.rectangle(box, (0, 0), (box.shape[1] - 1, h - 1), 255, -1)
+        blend(fr, cv2.GaussianBlur(box, (0, 0), 1.2).astype(np.float32) / 255, 500 - bw / 2, SUB_Y - h / 2, DEEP, 0.8 * op)
+        blend(fr, im, 500 - im.shape[1] / 2, SUB_Y - im.shape[0] / 2 + 3, WHITE, op)
 def lift(hd, bottom=1230):
     """bottom-anchor a headline inside the safe zone"""
     hd.y = bottom - hd.h; return hd
@@ -419,7 +410,7 @@ def card(fr, kind, cx, cy, s, op, t_icon, t=0.0):
 
 # ---------------- scenes ----------------
 # S1 — straight into the question
-H1 = lift(Drop(["А ЕСЛИ Я НЕМНОГО", "*НАРУШУ РЕЖИМ?*"], 140, 70, 0, maxw=860), 1230)
+H1 = lift(Drop(["А ЕСЛИ Я НЕМНОГО", "*НАРУШУ РЕЖИМ?*"], 96, 70, 0, maxw=860), 1320)   # below the chin (≈ y 940 at the tightest punch-in)
 def s1(t):
     fr = fullshot(t, 1.10, -0.06, 0, 2.9); shade(fr, GBOT)
     k = eback((t - 0.35) / 0.35); wob = 6 * np.sin(t * 9) * (1 - cl((t - 0.35) / 1.5))
@@ -427,7 +418,7 @@ def s1(t):
     H1.draw(fr, t, 0.05); return shake(fr, t, 0.35, 8)
 
 # S2–S3 — the result bar: «хирург» fills in the operating room, «вы» stays open
-HB = Drop(["РЕЗУЛЬТАТ ОПЕРАЦИИ ="], 92, 0, 900, maxw=780)
+HB = Drop(["РЕЗУЛЬТАТ ОПЕРАЦИИ ="], 80, 0, 900, maxw=780)
 HB.x = 540 - max(r[1] for r in HB.rows) / 2
 BX0, BX1, BY0, BY1 = 150, 930, 1020, 1120                              # inside the Reels safe zone (x ≤ 940)
 def result_bar(fr, t, t0, fill1, fill2, y0=BY0, y1=BY1, x0=BX0, x1=BX1, f_lab=None, small=False):
@@ -451,11 +442,11 @@ def s2(t):
     return fr
 
 # S4 — «после этого начинается этап…»: full screen, the headline, the bar's second half fills on «пациента»
-H4 = lift(Drop(["ПОСЛЕ ОПЕРАЦИИ ВАША ЧАСТЬ", "РАБОТЫ *ТОЛЬКО НАЧИНАЕТСЯ*"], 100, 70, 0, maxw=860), 1170)
+H4 = lift(Drop(["ПОСЛЕ ОПЕРАЦИИ ВАША ЧАСТЬ", "РАБОТЫ *ТОЛЬКО НАЧИНАЕТСЯ*"], 72, 70, 0, maxw=860), 1255)
 def s4(t):
     t0 = T_S["S4"]; fr = fullshot(t, 1.0 + bump(t, T_FILL2, 0.04), 0.05, t0, 5.0); shade(fr, GBOT); shade(fr, GBOT * 0.4)
     H4.draw(fr, t, t0 + 0.15)
-    if t > t0 + 0.6: result_bar(fr, t, t0 + 0.6, 1.0, eio((t - T_FILL2) / 0.6), 1200, 1262, 70, 690, small=True)
+    if t > t0 + 0.6: result_bar(fr, t, t0 + 0.6, 1.0, eio((t - T_FILL2) / 0.6), 1280, 1330, 70, 590, small=True)
     return fr
 
 # S5 — the deck of «что мешает»: each card pops, gets its pink ✕ and files into the row under the circle
@@ -471,7 +462,7 @@ def s5(t):
         if t < nxt:
             s = eback((t - ti) / 0.3); card(fr, kind, BIG[0], BIG[1], s, 1, eo((t - ti - 0.05) / 0.45))
             if i < 5: xmark(fr, BIG[0] + 104, BIG[1] - 104, 22, (t - ti - 0.5) / 0.35)
-            sz = fit_size(lab, 780, 74); text_c(fr, lab, 540, 1268, bebas(sz), PINK if i == 5 else WHITE, eo((t - ti - 0.1) / 0.3))
+            sz = fit_size(lab, 780, 64); text_c(fr, lab, 540, 1268, bebas(sz), PINK if i == 5 else WHITE, eo((t - ti - 0.1) / 0.3))
         else:
             q = eio((t - nxt) / 0.35); (sx, sy) = SLOT(i); cx, cy = lerp(BIG[0], sx, q), lerp(BIG[1], sy, q); s = lerp(1, 0.4, q)
             card(fr, kind, cx, cy, s, 1, 1); xmark(fr, cx + 104 * s, cy - 104 * s, 22 * s + 4, 1, th=max(4, int(8 * s)))
@@ -487,24 +478,24 @@ def s6(t):
     if lt > 0:
         typing = lt < 0.9; s = eback(lt / 0.3)
         if typing:
-            w, h = 190 * s, 96 * s; x0, y0 = 110, 1130 - h
+            w, h = 170 * s, 84 * s; x0, y0 = 110, 1300 - h
         else:
-            q = eo((lt - 0.9) / 0.3); w, h = lerp(190, 800, q), lerp(96, 236, q); x0, y0 = 110, 1130 - h
+            q = eo((lt - 0.9) / 0.3); w, h = lerp(170, 590, q), lerp(84, 170, q); x0, y0 = 110, 1300 - h
         blend(fr, rrect(x0, y0, x0 + w, y0 + h, 40), 0, 0, WHITE, 0.97)
         fill_poly(fr, [(x0 + 30, y0 + h - 4), (x0 + 74, y0 + h - 4), (x0 + 18, y0 + h + 34)], WHITE, 0.97)
         if typing:
             for k in range(3):
                 b = 0.5 + 0.5 * np.sin(lt * 9 - k * 0.9); m = np.zeros((H, W), np.uint8)
-                cv2.circle(m, (int(x0 + 52 + k * 44), int(y0 + h / 2 - 6 * b)), int(11 * s), 255, -1, cv2.LINE_AA); blend(fr, m.astype(np.float32) / 255, 0, 0, NAVY, 0.4 + 0.6 * b)
+                cv2.circle(m, (int(x0 + 46 + k * 40), int(y0 + h / 2 - 6 * b)), int(10 * s), 255, -1, cv2.LINE_AA); blend(fr, m.astype(np.float32) / 255, 0, 0, NAVY, 0.4 + 0.6 * b)
         elif lt > 1.05:
-            op = eo((lt - 1.05) / 0.25); f = bebas(84)
+            op = eo((lt - 1.05) / 0.25); f = bebas(60)
             a1 = alpha_img("МНЕ УЖЕ ХОРОШО.", f); a2 = alpha_img("МОЖЕТ, УЖЕ МОЖНО?", f)
-            blend(fr, a1, x0 + 40, y0 + 26, NAVY, op); blend(fr, a2, x0 + 40, y0 + 26 + 96, NAVY, op)
-        tr = Track(["сообщение пациентки"], 28, 112, 0, 300); tr.y = 1130 - 236 - 50 + tr.top; tr.draw(fr, t, t0 + 1.2)
+            blend(fr, a1, x0 + 34, y0 + 20, NAVY, op); blend(fr, a2, x0 + 34, y0 + 20 + 70, NAVY, op)
+        tr = Track(["сообщение пациентки"], 28, 112, 0, 300); tr.y = 1300 - 170 - 46 + tr.top; tr.draw(fr, t, t0 + 1.2)
     return fr
 
 # S7 — the key line, word by word, with a punch on every line
-K1 = Drop(["ОРГАНИЗМ НЕ"], 140, 70, 985, maxw=860); K2 = Drop(["*УСКОРЯЕТСЯ*"], 160, 70, 985 + 132, maxw=860); K3 = Drop(["ОТ НАШЕГО ЖЕЛАНИЯ"], 140, 70, 985 + 132 + 150, maxw=860)
+K1 = Drop(["ОРГАНИЗМ НЕ"], 92, 70, 1095, maxw=860); K2 = Drop(["*УСКОРЯЕТСЯ*"], 108, 70, 1095 + 88, maxw=860); K3 = Drop(["ОТ НАШЕГО ЖЕЛАНИЯ"], 92, 70, 1095 + 88 + 102, maxw=860)
 def s7(t):
     z = 1.12 + sum(bump(t, tk, 0.035, 0.35) for tk in T_KEY); fr = fullshot(t, z); shade(fr, GBOT); fr *= 0.78; fr += 0.22 * DEEP
     K1.draw(fr, t, T_KEY[0] - 0.15, dur=0.25); K2.draw(fr, t, T(31.58) - 0.1, dur=0.25); K3.draw(fr, t, T_KEY[2] - 0.1, dur=0.25)
@@ -514,7 +505,7 @@ def s7(t):
     return shake(fr, t, T(31.58), 7, 0.3)
 
 # S8 — «не для галочки»: a big tick is drawn — and struck out
-H8 = Drop(["НЕ ДЛЯ *ГАЛОЧКИ*"], 120, 0, 1232, maxw=780); H8.x = 540 - H8.rows[0][1] / 2
+H8 = Drop(["НЕ ДЛЯ *ГАЛОЧКИ*"], 100, 0, 1236, maxw=780); H8.x = 540 - H8.rows[0][1] / 2
 T8 = Track(["рекомендации"], 34, 540, 0, 300, center=True)
 def s8(t):
     t0 = T_S["S8"]; fr = circle_layout(t, t0)
@@ -529,7 +520,7 @@ def s8(t):
     return fr
 
 # S9 — what the regime is for: three healing steps tick in under the headline
-H9 = Drop(["РЕЖИМ ПОСЛЕ ОПЕРАЦИИ", "ЭТО *ЧАСТЬ РЕЗУЛЬТАТА*"], 86, 70, 880, maxw=860)
+H9 = Drop(["РЕЖИМ ПОСЛЕ ОПЕРАЦИИ", "ЭТО *ЧАСТЬ РЕЗУЛЬТАТА*"], 76, 70, 885, maxw=860)
 HEAL = [("plus", "ТКАНИ СПОКОЙНО ЗАЖИВАЮТ"), ("drop", "ОТЁК УХОДИТ"), ("spark", "РЕЗУЛЬТАТ ФОРМИРУЕТСЯ ПРАВИЛЬНО")]
 def s9(t):
     t0 = T_S["S9"]; fr = circle_layout(t, t0, morph=False); H9.draw(fr, t, t0 + 0.1)
@@ -543,7 +534,7 @@ def s9(t):
     return fr
 
 # S10–S11 — the question with ДА / НЕТ; «нет» gets pressed, the calendar moves on
-H10 = lift(Drop(["СМОЖЕТЕ ЛИ ВЫ РЕАЛЬНО", "*СОБЛЮДАТЬ РЕЖИМ?*"], 112, 70, 0, maxw=860), 1150)
+H10 = lift(Drop(["СМОЖЕТЕ ЛИ ВЫ РЕАЛЬНО", "*СОБЛЮДАТЬ РЕЖИМ?*"], 78, 70, 0, maxw=860), 1222)
 def button(fr, txt, cx, cy, op, on=0.0, sc=1.0):
     w, h = 250 * sc, 92 * sc; x0, y0 = cx - w / 2, cy - h / 2
     blend(fr, rrect(x0, y0, x0 + w, y0 + h, 46 * sc), 0, 0, NAVY * (1 - on) + PINK * on, 0.88 * op)
@@ -563,7 +554,7 @@ def s10(t):
     H10.draw(fr, t, T_ASK - 0.1)
     op = eo((t - T_ASK - 0.7) / 0.3); on = eo((t - T_NO) / 0.2) if t > T_NO else 0.0
     if op > 0:
-        button(fr, "ДА", 360, 1235, op * (1 - 0.6 * on)); button(fr, "НЕТ", 720, 1235, op, on, 1 + bump(t, T_NO, 0.15, 0.3))
+        button(fr, "ДА", 190, 1285, op * (1 - 0.6 * on), 0.0, 0.8); button(fr, "НЕТ", 420, 1285, op, on, 0.8 + bump(t, T_NO, 0.12, 0.3))
     flip_calendar(fr, t, T_TIME - 0.1)
     return fr
 
