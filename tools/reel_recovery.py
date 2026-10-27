@@ -419,7 +419,7 @@ def card(fr, kind, cx, cy, s, op, t_icon, t=0.0):
 
 # ---------------- scenes ----------------
 # S1 — straight into the question
-H1 = lift(Drop(["А ЕСЛИ Я НЕМНОГО", "*НАРУШУ РЕЖИМ?*"], 140, 70, 0, maxw=880), 1230)
+H1 = lift(Drop(["А ЕСЛИ Я НЕМНОГО", "*НАРУШУ РЕЖИМ?*"], 140, 70, 0, maxw=860), 1230)
 def s1(t):
     fr = fullshot(t, 1.10, -0.06, 0, 2.9); shade(fr, GBOT)
     k = eback((t - 0.35) / 0.35); wob = 6 * np.sin(t * 9) * (1 - cl((t - 0.35) / 1.5))
@@ -427,9 +427,9 @@ def s1(t):
     H1.draw(fr, t, 0.05); return shake(fr, t, 0.35, 8)
 
 # S2–S3 — the result bar: «хирург» fills in the operating room, «вы» stays open
-HB = Drop(["РЕЗУЛЬТАТ ОПЕРАЦИИ ="], 92, 0, 900, maxw=900)
+HB = Drop(["РЕЗУЛЬТАТ ОПЕРАЦИИ ="], 92, 0, 900, maxw=780)
 HB.x = 540 - max(r[1] for r in HB.rows) / 2
-BX0, BX1, BY0, BY1 = 110, 970, 1020, 1120
+BX0, BX1, BY0, BY1 = 150, 930, 1020, 1120                              # inside the Reels safe zone (x ≤ 940)
 def result_bar(fr, t, t0, fill1, fill2, y0=BY0, y1=BY1, x0=BX0, x1=BX1, f_lab=None, small=False):
     xm = (x0 + x1) / 2; p_out = eio((t - t0) / 0.6)
     rr = 22 if not small else 14
@@ -451,7 +451,7 @@ def s2(t):
     return fr
 
 # S4 — «после этого начинается этап…»: full screen, the headline, the bar's second half fills on «пациента»
-H4 = lift(Drop(["ПОСЛЕ ОПЕРАЦИИ ВАША ЧАСТЬ", "РАБОТЫ *ТОЛЬКО НАЧИНАЕТСЯ*"], 100, 70, 0, maxw=880), 1170)
+H4 = lift(Drop(["ПОСЛЕ ОПЕРАЦИИ ВАША ЧАСТЬ", "РАБОТЫ *ТОЛЬКО НАЧИНАЕТСЯ*"], 100, 70, 0, maxw=860), 1170)
 def s4(t):
     t0 = T_S["S4"]; fr = fullshot(t, 1.0 + bump(t, T_FILL2, 0.04), 0.05, t0, 5.0); shade(fr, GBOT); shade(fr, GBOT * 0.4)
     H4.draw(fr, t, t0 + 0.15)
@@ -471,7 +471,7 @@ def s5(t):
         if t < nxt:
             s = eback((t - ti) / 0.3); card(fr, kind, BIG[0], BIG[1], s, 1, eo((t - ti - 0.05) / 0.45))
             if i < 5: xmark(fr, BIG[0] + 104, BIG[1] - 104, 22, (t - ti - 0.5) / 0.35)
-            sz = fit_size(lab, 900, 74); text_c(fr, lab, 540, 1268, bebas(sz), PINK if i == 5 else WHITE, eo((t - ti - 0.1) / 0.3))
+            sz = fit_size(lab, 780, 74); text_c(fr, lab, 540, 1268, bebas(sz), PINK if i == 5 else WHITE, eo((t - ti - 0.1) / 0.3))
         else:
             q = eio((t - nxt) / 0.35); (sx, sy) = SLOT(i); cx, cy = lerp(BIG[0], sx, q), lerp(BIG[1], sy, q); s = lerp(1, 0.4, q)
             card(fr, kind, cx, cy, s, 1, 1); xmark(fr, cx + 104 * s, cy - 104 * s, 22 * s + 4, 1, th=max(4, int(8 * s)))
@@ -504,7 +504,7 @@ def s6(t):
     return fr
 
 # S7 — the key line, word by word, with a punch on every line
-K1 = Drop(["ОРГАНИЗМ НЕ"], 140, 70, 985, maxw=900); K2 = Drop(["*УСКОРЯЕТСЯ*"], 160, 70, 985 + 132, maxw=900); K3 = Drop(["ОТ НАШЕГО ЖЕЛАНИЯ"], 140, 70, 985 + 132 + 150, maxw=900)
+K1 = Drop(["ОРГАНИЗМ НЕ"], 140, 70, 985, maxw=860); K2 = Drop(["*УСКОРЯЕТСЯ*"], 160, 70, 985 + 132, maxw=860); K3 = Drop(["ОТ НАШЕГО ЖЕЛАНИЯ"], 140, 70, 985 + 132 + 150, maxw=860)
 def s7(t):
     z = 1.12 + sum(bump(t, tk, 0.035, 0.35) for tk in T_KEY); fr = fullshot(t, z); shade(fr, GBOT); fr *= 0.78; fr += 0.22 * DEEP
     K1.draw(fr, t, T_KEY[0] - 0.15, dur=0.25); K2.draw(fr, t, T(31.58) - 0.1, dur=0.25); K3.draw(fr, t, T_KEY[2] - 0.1, dur=0.25)
@@ -514,7 +514,7 @@ def s7(t):
     return shake(fr, t, T(31.58), 7, 0.3)
 
 # S8 — «не для галочки»: a big tick is drawn — and struck out
-H8 = Drop(["НЕ ДЛЯ *ГАЛОЧКИ*"], 120, 0, 1232, maxw=900); H8.x = 540 - H8.rows[0][1] / 2
+H8 = Drop(["НЕ ДЛЯ *ГАЛОЧКИ*"], 120, 0, 1232, maxw=780); H8.x = 540 - H8.rows[0][1] / 2
 T8 = Track(["рекомендации"], 34, 540, 0, 300, center=True)
 def s8(t):
     t0 = T_S["S8"]; fr = circle_layout(t, t0)
@@ -529,7 +529,7 @@ def s8(t):
     return fr
 
 # S9 — what the regime is for: three healing steps tick in under the headline
-H9 = Drop(["РЕЖИМ ПОСЛЕ ОПЕРАЦИИ", "ЭТО *ЧАСТЬ РЕЗУЛЬТАТА*"], 86, 70, 880, maxw=900)
+H9 = Drop(["РЕЖИМ ПОСЛЕ ОПЕРАЦИИ", "ЭТО *ЧАСТЬ РЕЗУЛЬТАТА*"], 86, 70, 880, maxw=860)
 HEAL = [("plus", "ТКАНИ СПОКОЙНО ЗАЖИВАЮТ"), ("drop", "ОТЁК УХОДИТ"), ("spark", "РЕЗУЛЬТАТ ФОРМИРУЕТСЯ ПРАВИЛЬНО")]
 def s9(t):
     t0 = T_S["S9"]; fr = circle_layout(t, t0, morph=False); H9.draw(fr, t, t0 + 0.1)
@@ -538,12 +538,12 @@ def s9(t):
         if t < ti: continue
         y = 1100 + k * 95; s = eback((t - ti) / 0.3)
         icon(fr, kind, 120, y, 0.36 * s, eo((t - ti) / 0.4), t=(t - ti) / 1.5)
-        a = alpha_img(lab, bebas(fit_size(lab, 760, 64))); p = eo((t - ti - 0.1) / 0.35); a2 = a.copy(); a2[:, int(a.shape[1] * p):] = 0
+        a = alpha_img(lab, bebas(fit_size(lab, 740, 64))); p = eo((t - ti - 0.1) / 0.35); a2 = a.copy(); a2[:, int(a.shape[1] * p):] = 0
         blend(fr, a2, 190, y - a.shape[0] / 2 + 6, WHITE)
     return fr
 
 # S10–S11 — the question with ДА / НЕТ; «нет» gets pressed, the calendar moves on
-H10 = lift(Drop(["СМОЖЕТЕ ЛИ ВЫ РЕАЛЬНО", "*СОБЛЮДАТЬ РЕЖИМ?*"], 112, 70, 0, maxw=880), 1150)
+H10 = lift(Drop(["СМОЖЕТЕ ЛИ ВЫ РЕАЛЬНО", "*СОБЛЮДАТЬ РЕЖИМ?*"], 112, 70, 0, maxw=860), 1150)
 def button(fr, txt, cx, cy, op, on=0.0, sc=1.0):
     w, h = 250 * sc, 92 * sc; x0, y0 = cx - w / 2, cy - h / 2
     blend(fr, rrect(x0, y0, x0 + w, y0 + h, 46 * sc), 0, 0, NAVY * (1 - on) + PINK * on, 0.88 * op)
@@ -568,7 +568,7 @@ def s10(t):
     return fr
 
 # END — closing card
-HZ = Drop(["ЛУЧШЕ ПЕРЕНЕСТИ ОПЕРАЦИЮ,", "ЧЕМ НЕ ДАТЬ СЕБЕ", "*НОРМАЛЬНО ВОССТАНОВИТЬСЯ*"], 104, 70, 760, maxw=900)
+HZ = Drop(["ЛУЧШЕ ПЕРЕНЕСТИ ОПЕРАЦИЮ,", "ЧЕМ НЕ ДАТЬ СЕБЕ", "*НОРМАЛЬНО ВОССТАНОВИТЬСЯ*"], 104, 70, 760, maxw=860)
 def s_end(t):
     lt = t - T_END; fr = gbg(t)
     lg = logo_alpha(320); blend(fr, lg, 540 - 160, 420, PINK, eo((lt - 0.1) / 0.5))
@@ -726,7 +726,7 @@ def make_cover(path):
     d = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2); m = np.clip(r - d + 0.5, 0, 1)[..., None]; fr = fr * (1 - m) + sub * m; ring(fr, cx, cy, r + 3)
     lg = logo_alpha(300); blend(fr, lg, 540 - 150, 262, PINK)
     icon(fr, "warn", 790, 450, 0.6)
-    hd = Drop(["А ЕСЛИ Я НЕМНОГО", "НАРУШУ *РЕКОМЕНДАЦИИ?*"], 110, 70, 1040, maxw=900); hd.draw(fr, 99, 0)
+    hd = Drop(["А ЕСЛИ Я НЕМНОГО", "НАРУШУ *РЕКОМЕНДАЦИИ?*"], 110, 70, 1040, maxw=860); hd.draw(fr, 99, 0)
     ty = Track(["что реально может повлиять", "на восстановление"], 34, 72, 0, 400); ty.y = 1040 + hd.h + 56 + ty.top; ty.draw(fr, 99, 0)
     cv2.imwrite(path, cv2.cvtColor((np.clip(fr, 0, 1) * 255).astype(np.uint8), cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])
 
