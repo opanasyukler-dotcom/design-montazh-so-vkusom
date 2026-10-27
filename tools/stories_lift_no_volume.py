@@ -351,24 +351,17 @@ def s4():
 
 
 def s5():
-    """the clinic's before/after collage (front) on top on its own black, the invitation below"""
-    b = (Block().body("Если вы тоже думаете:", 31, wght=500, gap=4)
-         .body("«Грудь у меня есть, просто хочется вернуть форму»", 31, gap=12)
-         .head("НЕ НУЖНО АВТОМАТИЧЕСКИ ВЫБИРАТЬ ИМПЛАНТЫ", 40, gap=12)
-         .body("На консультации посмотрим ваше ДО и обсудим, достаточно ли в вашем случае подтяжки.", 29, gap=12)
-         .body("Для записи напишите в Direct «КОНСУЛЬТАЦИЯ» или свяжитесь с нами по телефону", 29, gap=8)
-         .plate("+7 926 636 30 00", 32, wght=600, gap=8)
-         .body("в WhatsApp, Telegram или MAX.", 29, gap=0))
-    top = H - 60 - b.h
-    col = photo("IMG_8725.PNG").resize((W, H), Image.LANCZOS)
-    a = np.asarray(col).max(2) > 22; ys, xs = np.nonzero(a)
-    col = col.crop((0, ys.min(), W, ys.max()))                     # the collage without its black top / bottom
-    ah = top - 40; s = ah / col.height; col = col.resize((int(W * s), ah), Image.LANCZOS)
-    cv = Image.new("RGB", (W, H), (0, 0, 0)); cv.paste(col, ((W - col.width) // 2, 20)); cv = cv.convert("RGBA")
-    ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top)
-    for lab, yy in [("после", 40), ("до", 20 + ah // 2 + 20)]:
-        p = pill(lab, 26); ly.alpha_composite(p, ((W - col.width) // 2 + 20 if col.width < W - 200 else 40, yy))
-    cv.alpha_composite(ly); save_jpg(cv, "08_konsultaciya.jpg")
+    """the clinic's before/after collage (front) full screen; a short invitation straight on it, low on the before
+    half under the usual fade — the result on top stays open"""
+    cv = photo("IMG_8725.PNG").resize((W, H), Image.LANCZOS)
+    b = (Block().head("ГРУДЬ ЕСТЬ, ПРОСТО ХОЧЕТСЯ ВЕРНУТЬ ФОРМУ?", 44, gap=10)
+         .body("Импланты не обязательны. На консультации обсудим, достаточно ли подтяжки.", 31, gap=12)
+         .body("Запись: Direct «КОНСУЛЬТАЦИЯ» или", 31, gap=8)
+         .plate("+7 926 636 30 00 · WhatsApp, Telegram, MAX", 29, wght=600, gap=0))
+    top = H - 70 - b.h
+    cv = Image.fromarray((np.asarray(cv, np.float32) * (1 - fade(top + 50, 300, 0.85))).astype(np.uint8)).convert("RGBA")
+    ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top); cv.alpha_composite(ly)
+    save_jpg(cv, "08_konsultaciya.jpg")
 
 
 # the clinic's before/after collages (after on top, before below), as they are — no text
