@@ -1,4 +1,4 @@
-"""5 Instagram stories (1080x1920), a light series with one accent: if the own volume is enough, the breast does not
+"""8 Instagram stories (1080x1920), a light series with one accent: if the own volume is enough, the breast does not
 have to be enlarged — breast lift without implants.
 
 Old story design: Inter Bold caps headlines + Montserrat, brand navy + white, black fade under the text, static text,
@@ -368,9 +368,15 @@ def s5():
     ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b.draw(ly, MARGIN, top)
     for lab, yy in [("после", 40), ("до", 20 + ah // 2 + 20)]:
         p = pill(lab, 26); ly.alpha_composite(p, ((W - col.width) // 2 + 20 if col.width < W - 200 else 40, yy))
-    cv.alpha_composite(ly); save_jpg(cv, "05_konsultaciya.jpg")
+    cv.alpha_composite(ly); save_jpg(cv, "08_konsultaciya.jpg")
 
 
-STORIES = {1: s1, 2: s2, 3: s3, 4: s4, 5: s5}
+# the clinic's before/after collages (after on top, before below), as they are — no text
+def c1(): save_jpg(photo("IMG_8725.PNG").resize((W, H), Image.LANCZOS), "05_kollazh_pryamo.jpg")
+def c2(): save_jpg(photo("IMG_8726.PNG").resize((W, H), Image.LANCZOS), "06_kollazh_3-4.jpg")
+def c3(): save_jpg(photo("IMG_8727.PNG").resize((W, H), Image.LANCZOS), "07_kollazh_sboku.jpg")
+
+
+STORIES = {1: s1, 2: s2, 3: s3, 4: s4, 5: c1, 6: c2, 7: c3, 8: s5}
 for k, fn in STORIES.items():
     if not ONLY or k in ONLY: fn()
