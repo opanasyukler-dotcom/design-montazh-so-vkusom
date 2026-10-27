@@ -518,13 +518,11 @@ def s_f(t):
     return fr
 
 # G — three ДО (top) / ПОСЛЕ (bottom) collages, neck to fingertips, with a shutter click on every cut
-ANG = ["ФАС", "ВПОЛОБОРОТА", "ПРОФИЛЬ"]
 COLL8 = [(np.clip(c, 0, 1) * 255).astype(np.uint8) for c in COLLS]
 def s_g(t):
     k = max(i for i, tk in enumerate(T_K) if t >= tk - 1e-6); lt = t - T_K[k]
     fr = full(COLL8[k], 0.5, 0.5, 1 + 0.03 * (1 - eo(lt / 0.35)))
     fr[957:963] = PINK; chip(fr, "ДО", 40, 280); chip(fr, "ПОСЛЕ", 40, 1000)
-    a = alpha_img(ANG[k], mont(30, 600)); chip(fr, ANG[k], 940 - a.shape[1] - 34, 280)
     return flash_in(fr, t, T_K[k], 0.18) if k else fr
 
 # Q — live: «вам всё нравится?» — «мы очень довольны»
