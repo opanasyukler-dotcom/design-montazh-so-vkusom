@@ -380,7 +380,7 @@ def pulse_dot(fr, x, y, t, t0, r=16):
     path_draw(fr, [(x + rr * np.cos(a), y + rr * np.sin(a)) for a in np.linspace(0, 2 * np.pi, 40)], 1, PINK, 3, op=1 - u)
 def mapM(M, x, y): return M[0, 0] * x + M[0, 2], M[1, 1] * y + M[1, 2]
 
-# A — a teaser of ПОСЛЕ: tape strips lie across the belly scar, then peel off one by one; the picture stays half-hidden
+# A — a teaser of ПОСЛЕ: a soft-focus window opens a little; the picture stays half-hidden
 HA = lift(Drop(["СЕГОДНЯ СНЯЛИ", "*СТРИПЫ*"], 150, 70, 0, maxw=840), 1240)
 TA = Track(["показываю результат комплексной операции"], 32, 72, 0, 300)
 STRIPS = [(258 + k * 94, 812 + (k % 2) * 10, (-1) ** k * 4 + 2) for k in range(7)]
@@ -400,7 +400,6 @@ def s_a(t):
     r = 0.55 + 0.25 * eo((t - T_PEEL[-1] - 0.2) / 0.8)                # the window opens a little — never the full result
     d = np.sqrt(((xx - 540) / (380 * r)) ** 2 + ((yy - 820) / (300 * r)) ** 2); m = np.clip(1.5 - d, 0, 1)[..., None] * min(1, 0.35 + t / 1.2)
     fr = bl * (1 - m) + sharp * m; fr *= 1 - 0.45 * (1 - m); fr += 0.45 * (1 - m) * DEEP; shade(fr, VIG * 2); shade(fr, GBOT)
-    for (x, y, a), tp in zip(STRIPS, T_PEEL): tape(fr, x, y, a, (t - tp) / 0.55)
     lg = logo_alpha(320); blend(fr, lg, 500 - 160, 290, PINK, eo((t + 0.1) / 0.5) * 0.9)
     HA.draw(fr, t, 0.15); TA.y = HA.y + HA.h + 46 + TA.top; TA.draw(fr, t, 0.9)
     return fr
@@ -667,7 +666,6 @@ def build_audio(path):
     mus = track(n) * ((G_GAP - (G_GAP - G_VO) * np.clip(dd, 0, 1)) * fade)[:, None]
     sfx = np.zeros(n + 2 * SR)
     def put(x, t, g): i = int(max(0, t) * SR); seg = sfx[i:i + len(x)]; seg += x[:len(seg)] * g
-    for tp in T_PEEL: put(paper(0.16, 5000), tp, 0.10); put(pop(1500, 700, 0.08), tp + 0.03, 0.07)   # strips peel off
     for k in range(3): put(marimba(PENTA[k + 1], 0.4), T_B2 + 0.15 + 0.3 * k, 0.18)                   # ДО pins
     for k, t0 in enumerate(T_ITEMS): put(marimba(PENTA[k + 2], 0.45), t0 + 0.05, 0.22)               # checklist
     for k, t0 in enumerate(T_ZONES): put(water(480 + 140 * k, 1700 + 200 * k), t0 - 0.05, 0.28)      # donor zones
