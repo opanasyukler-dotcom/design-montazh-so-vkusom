@@ -337,6 +337,9 @@ def circle_layout(t, t0, morph=True):
 def fullshot(t, z=1.0, dz=0.0, t0=0.0, dur=3.0):
     """the take full screen; z = punch-in (≤ 1.14), dz = slow drift"""
     return full(SUR(t), FACE[0] / W, FACE[1] / H, z + dz * eio((t - t0) / dur))
+def pull(t, t0, z0=1.16, z1=1.0, d=1.4):
+    """camera pull-back: the shot starts tight and eases out to the wide framing"""
+    return lerp(z0, z1, eo(cl((t - t0) / d)))
 def bump(t, t0, a=0.05, d=0.3): return a * (1 - eo((t - t0) / d)) if t >= t0 else 0.0
 def shake(fr, t, t0, amp=10, d=0.35):
     if not (t0 <= t < t0 + d): return fr
@@ -412,15 +415,15 @@ def card(fr, kind, cx, cy, s, op, t_icon, t=0.0):
 # S1 — straight into the question
 H1 = lift(Drop(["А ЕСЛИ Я НЕМНОГО", "*НАРУШУ РЕЖИМ?*"], 96, 70, 0, maxw=860), 1320)   # below the chin (≈ y 940 at the tightest punch-in)
 def s1(t):
-    fr = fullshot(t, 1.10, -0.06, 0, 2.9); shade(fr, GBOT)
+    fr = fullshot(t, pull(t, 0, 1.16, 1.0, 2.6)); shade(fr, GBOT)
     k = eback((t - 0.35) / 0.35); wob = 6 * np.sin(t * 9) * (1 - cl((t - 0.35) / 1.5))
     if k > 0: icon(fr, "warn", 820 + wob, 430, 0.75 * k, eo((t - 0.35) / 0.4))
     H1.draw(fr, t, 0.05); return shake(fr, t, 0.35, 8)
 
-# S2–S3 — the result bar: «хирург» fills in the operating room, «вы» stays open
-HB = Drop(["РЕЗУЛЬТАТ ОПЕРАЦИИ ="], 80, 0, 900, maxw=780)
+# S2–S3 — full screen pulling back; the result bar: «хирург» fills in the operating room, «вы» stays open
+HB = Drop(["РЕЗУЛЬТАТ ОПЕРАЦИИ ="], 72, 0, 1092, maxw=780)
 HB.x = 540 - max(r[1] for r in HB.rows) / 2
-BX0, BX1, BY0, BY1 = 150, 930, 1020, 1120                              # inside the Reels safe zone (x ≤ 940)
+BX0, BX1, BY0, BY1 = 150, 930, 1180, 1262                              # inside the Reels safe zone (x ≤ 940)
 def result_bar(fr, t, t0, fill1, fill2, y0=BY0, y1=BY1, x0=BX0, x1=BX1, f_lab=None, small=False):
     xm = (x0 + x1) / 2; p_out = eio((t - t0) / 0.6)
     rr = 22 if not small else 14
@@ -429,22 +432,23 @@ def result_bar(fr, t, t0, fill1, fill2, y0=BY0, y1=BY1, x0=BX0, x1=BX1, f_lab=No
     if p_out > 0:
         rrect_line(fr, x0, y0, x0 + (x1 - x0) * p_out, y1, rr, WHITE, 3, 0.9)
         if p_out >= 1: path_draw(fr, [(xm, y0 + 6), (xm, y1 - 6)], 1, WHITE, 3, op=0.8)
-    f = f_lab or bebas(64 if not small else 34)
+    f = f_lab or bebas(56 if not small else 34)
     if fill1 > 0.5: text_c(fr, "ХИРУРГ", (x0 + xm) / 2, (y0 + y1) / 2 + 3, f, NAVY, cl((fill1 - 0.5) * 2))
     if fill2 > 0.5: text_c(fr, "ВЫ", (xm + x1) / 2, (y0 + y1) / 2 + 3, f, NAVY, cl((fill2 - 0.5) * 2))
     elif p_out >= 1 and not small: text_c(fr, "?", (xm + x1) / 2, (y0 + y1) / 2 + 3, f, WHITE, 0.6 + 0.4 * np.sin(t * 6) ** 2)
 def s2(t):
-    t0 = T_S["S2"]; fr = circle_layout(t, t0)
+    t0 = T_S["S2"]; t3 = T_S["S3"]                                       # full screen, pulling back; S3 is a jump cut that pulls back again
+    fr = fullshot(t, pull(t, t3, 1.14, 1.02, 1.4) if t >= t3 else pull(t, t0, 1.16, 1.0, 1.6)); shade(fr, GBOT); shade(fr, GBOT * 0.5)
     HB.draw(fr, t, t0 + 0.25); f1 = eio((t - T_FILL1) / 0.7)
     result_bar(fr, t, t0 + 0.5, f1, 0)
-    lab = Track(["операционная"], 30, 0, 0, 300, center=True); lab.x, lab.y = (BX0 + 540) / 2, BY1 + 40 + lab.top; lab.draw(fr, t, T_FILL1 + 0.3)
-    lab2 = Track(["восстановление"], 30, 0, 0, 300, center=True); lab2.x, lab2.y = (540 + BX1) / 2, BY1 + 40 + lab2.top; lab2.draw(fr, t, T_FILL1 + 0.7)
+    lab = Track(["операционная"], 30, 0, 0, 300, center=True); lab.x, lab.y = (BX0 + 540) / 2, BY1 + 30 + lab.top; lab.draw(fr, t, T_FILL1 + 0.3)
+    lab2 = Track(["восстановление"], 30, 0, 0, 300, center=True); lab2.x, lab2.y = (540 + BX1) / 2, BY1 + 30 + lab2.top; lab2.draw(fr, t, T_FILL1 + 0.7)
     return fr
 
 # S4 — «после этого начинается этап…»: full screen, the headline, the bar's second half fills on «пациента»
 H4 = lift(Drop(["ПОСЛЕ ОПЕРАЦИИ ВАША ЧАСТЬ", "РАБОТЫ *ТОЛЬКО НАЧИНАЕТСЯ*"], 72, 70, 0, maxw=860), 1255)
 def s4(t):
-    t0 = T_S["S4"]; fr = fullshot(t, 1.0 + bump(t, T_FILL2, 0.04), 0.05, t0, 5.0); shade(fr, GBOT); shade(fr, GBOT * 0.4)
+    t0 = T_S["S4"]; fr = fullshot(t, pull(t, t0, 1.14, 1.0, 1.5) + bump(t, T_FILL2, 0.04)); shade(fr, GBOT); shade(fr, GBOT * 0.4)
     H4.draw(fr, t, t0 + 0.15)
     if t > t0 + 0.6: result_bar(fr, t, t0 + 0.6, 1.0, eio((t - T_FILL2) / 0.6), 1280, 1330, 70, 590, small=True)
     return fr
@@ -504,18 +508,18 @@ def s7(t):
         if 0 < u < 0.5: ring(fr, 540, 1150, 200 + 900 * eo(u / 0.5), 0.5 * (1 - u / 0.5), 4)
     return shake(fr, t, T(31.58), 7, 0.3)
 
-# S8 — «не для галочки»: a big tick is drawn — and struck out
-H8 = Drop(["НЕ ДЛЯ *ГАЛОЧКИ*"], 100, 0, 1236, maxw=780); H8.x = 540 - H8.rows[0][1] / 2
-T8 = Track(["рекомендации"], 34, 540, 0, 300, center=True)
+# S8 — «не для галочки»: full screen pulling back; a tick is drawn — and struck out
+H8 = Drop(["НЕ ДЛЯ *ГАЛОЧКИ*"], 96, 300, 1182, maxw=630)
+T8 = Track(["рекомендации"], 32, 300, 0, 300)
 def s8(t):
-    t0 = T_S["S8"]; fr = circle_layout(t, t0)
-    T8.y = 890 + T8.top; T8.draw(fr, t, t0 + 0.2)
-    sx = 10 * np.sin((t - T_NOT) * 40) * (1 - cl((t - T_NOT) / 0.4)) if t > T_NOT else 0; cx, cy, b = 540 + sx, 1080, 100
+    t0 = T_S["S8"]; fr = fullshot(t, pull(t, t0, 1.16, 1.0, 1.4)); shade(fr, GBOT); shade(fr, GBOT * 0.5)
+    T8.y = 1120 + T8.top; T8.draw(fr, t, t0 + 0.2)
+    sx = 10 * np.sin((t - T_NOT) * 40) * (1 - cl((t - T_NOT) / 0.4)) if t > T_NOT else 0; cx, cy, b, k = 190 + sx, 1222, 66, 0.66
     p = eio((t - t0 - 0.25) / 0.4)
     if p > 0:
-        blend(fr, rrect(cx - b, cy - b, cx + b, cy + b, 24), 0, 0, NAVY, 0.85 * p); rrect_line(fr, cx - b, cy - b, cx + b, cy + b, 24, WHITE, 6, p)
-        path_draw(fr, [(cx - 52, cy + 4), (cx - 14, cy + 44), (cx + 60, cy - 50)], eio((t - t0 - 0.6) / 0.35), PINK, 16)
-        if t > T_NOT: path_draw(fr, [(cx - 140, cy + 90), (cx + 140, cy - 90)], eio((t - T_NOT) / 0.25), WHITE, 12)
+        blend(fr, rrect(cx - b, cy - b, cx + b, cy + b, 18), 0, 0, NAVY, 0.85 * p); rrect_line(fr, cx - b, cy - b, cx + b, cy + b, 18, WHITE, 5, p)
+        path_draw(fr, [(cx - 52 * k, cy + 4 * k), (cx - 14 * k, cy + 44 * k), (cx + 60 * k, cy - 50 * k)], eio((t - t0 - 0.6) / 0.35), PINK, 12)
+        if t > T_NOT: path_draw(fr, [(cx - 92, cy + 60), (cx + 92, cy - 60)], eio((t - T_NOT) / 0.25), WHITE, 9)
     H8.draw(fr, t, T_NOT - 0.1)
     return fr
 
@@ -523,7 +527,7 @@ def s8(t):
 H9 = Drop(["РЕЖИМ ПОСЛЕ ОПЕРАЦИИ", "ЭТО *ЧАСТЬ РЕЗУЛЬТАТА*"], 76, 70, 885, maxw=860)
 HEAL = [("plus", "ТКАНИ СПОКОЙНО ЗАЖИВАЮТ"), ("drop", "ОТЁК УХОДИТ"), ("spark", "РЕЗУЛЬТАТ ФОРМИРУЕТСЯ ПРАВИЛЬНО")]
 def s9(t):
-    t0 = T_S["S9"]; fr = circle_layout(t, t0, morph=False); H9.draw(fr, t, t0 + 0.1)
+    t0 = T_S["S9"]; fr = circle_layout(t, t0); H9.draw(fr, t, t0 + 0.1)
     for k, (kind, lab) in enumerate(HEAL):
         ti = T_HEAL[k] - 0.12
         if t < ti: continue
@@ -550,7 +554,7 @@ def flip_calendar(fr, t, t0, cx=820, cy=440):
         fill_poly(fr, [(cx - 78 * s, y_top), (cx + 78 * s, y_top), (cx + 78 * s, y), (cx - 78 * s, y)], WHITE, 0.35 * (1 - u))
 def s10(t):
     t0 = T_S["S10"]; late = t >= T_S["S11"]                             # S11 is a jump cut: tighter framing
-    fr = fullshot(t, 1.12 if late else 1.0, -0.04 if late else 0.06, T_S["S11"] if late else t0, 3.0); shade(fr, GBOT); shade(fr, GBOT * 0.4)
+    fr = fullshot(t, pull(t, T_S["S11"], 1.14, 1.04, 2.0) if late else pull(t, t0, 1.16, 1.0, 1.8)); shade(fr, GBOT); shade(fr, GBOT * 0.4)
     H10.draw(fr, t, T_ASK - 0.1)
     op = eo((t - T_ASK - 0.7) / 0.3); on = eo((t - T_NO) / 0.2) if t > T_NO else 0.0
     if op > 0:
@@ -568,7 +572,7 @@ def s_end(t):
     return fr
 
 SCENES = [(0, s1), (T_S["S2"], s2), (T_S["S4"], s4), (T_S["S5"], s5), (T_S["S6"], s6), (T_S["S7"], s7), (T_S["S8"], s8), (T_S["S9"], s9), (T_S["S10"], s10), (T_END, s_end)]
-TRANS = {T_S["S4"]: ("zoom", 0.35), T_S["S6"]: ("zoom", 0.35), T_S["S7"]: ("flash", 0.2), T_S["S9"]: ("diag", 0.4), T_S["S10"]: ("zoom", 0.35), T_END: ("iris", 0.5)}
+TRANS = {T_S["S8"]: ("flash", 0.18), T_S["S4"]: ("zoom", 0.35), T_S["S6"]: ("zoom", 0.35), T_S["S7"]: ("flash", 0.2), T_S["S10"]: ("zoom", 0.35), T_END: ("iris", 0.5)}
 def push(old, new, p):
     e = eio(p); x = int(W * e); fr = np.empty_like(old); fr[:, :W - x] = old[:, x:]; fr[:, W - x:] = new[:, :x]
     if 0 < x < W: fr[:, max(0, W - x - 2):W - x + 2] = PINK
