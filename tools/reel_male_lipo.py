@@ -616,7 +616,7 @@ def make_cover(path):
     fr[350:1070, 538:542] = PINK; chip(fr, "ДО", 40, 380); chip(fr, "ПОСЛЕ", 580, 380)
     m = np.clip((yy[:, :1] - 900) / 200, 0, 1)[..., None]; fr = fr * (1 - m) + CBG * m
     lg = logo_alpha(320); blend(fr, lg, 540 - 160, 270, PINK)
-    hd = Drop(["ЛУЧШЕ РАНЬШЕ,", "*ЧЕМ ПОЗЖЕ*"], 128, 70, 1150, maxw=840); hd.draw(fr, 99, 0)
+    hd = Drop(["МУЖЧИНЫ ТОЖЕ", "*ОПЕРИРУЮТСЯ*"], 128, 70, 1150, maxw=840); hd.draw(fr, 99, 0)
     ty = Track(["история пациента", "после комплексной коррекции"], 34, 72, 0, 400); ty.y = 1150 + hd.h + 60 + ty.top; ty.draw(fr, 99, 0)
     cv2.imwrite(path, cv2.cvtColor((np.clip(fr, 0, 1) * 255).astype(np.uint8), cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])
 
