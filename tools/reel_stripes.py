@@ -566,8 +566,6 @@ def render(t):
     return fn(t)
 def render(t, _base=render):
     fr = np.asarray(_base(t), np.float32).copy(); subtitles(fr, t)
-    bar = np.ones((5, 870), np.float32); blend(fr, bar, 70, 252, WHITE, 0.18)          # progress line along the top of the safe zone
-    w = max(1, int(870 * t / DUR)); blend(fr, bar[:, :w], 70, 252, PINK, 0.95)
     return fr
 
 # ---------------- audio ----------------
