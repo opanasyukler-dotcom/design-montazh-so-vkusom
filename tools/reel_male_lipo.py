@@ -5,10 +5,10 @@
 Brand system of the other reels (navy, powder pink, Bebas Neue + Montserrat, logo). The patient's own words carry it:
 his quote first (no ДО until 0:04), then ДО with a flipping calendar («долго откладывал»), the surgeon's plan with a
 checklist ticked on every named zone, a ДО/ПОСЛЕ slider on «всё стоило того», three «2 недели» collages with shutter
-clicks, logo outro. Whole sentences only; the patient stays anonymous (face blurred).
+clicks, «ранний результат», final ПОСЛЕ with the headline. Whole sentences only; the patient stays anonymous (face blurred).
 
 usage:
-  REEL_SRC=<folder with IMG_4316/4342/4355.MOV, IMG_8746/8749/8752/8755-8757.JPG, logo.png, music.wav> python3 tools/reel_male_lipo.py [--preview t1,t2 | --cover | --audio-only]
+  REEL_SRC=<folder with IMG_4316/4342/4355.MOV, IMG_8740.HEIC, IMG_8743/8744/8746/8749/8755-8757.JPG, logo.png, music.wav> python3 tools/reel_male_lipo.py [--preview t1,t2 | --cover | --audio-only]
 Sources are first normalised into $REEL_SRC/_work (1080x1920, 30 fps; voices 48 kHz mono wav):
   ffmpeg -i IMG_x.MOV -vf "scale=1080:1920:flags=lanczos,fps=30,format=yuv420p" -an -c:v libx264 -crf 14 _work/IMG_x.mp4
   ffmpeg -i IMG_4355.MOV -vn -ac 1 -ar 48000 _work/IMG_4355.wav   (same for IMG_4316)
@@ -33,12 +33,13 @@ def lerp(a, b, p): return a + (b - a) * p
 # ---------------- voice edit: (block, source, [(in, out), …]) — whole sentences; parts inside one entry are joined with a 15 ms crossfade
 VO = [("A", "4355", [(8.70, 11.16), (11.40, 12.80)]),               # подумал-подумал и согласился. лучше раньше, чем позже. (stumble «рано» removed)
       ("B", "4355", [(7.30, 8.40)]),                                 # давно надо было делать
-      ("C", "4316", [(10.66, 16.52)]),                               # будем делать липосакцию боков, липосакцию живота, сделаем абдоминопластику
-      ("C2", "4316", [(20.50, 23.30)]),                              # и будем делать ещё липосакцию молочных желёз мужчине
-      ("D", "4355", [(45.08, 47.92)]),                               # всё стоило того, я знал, на что шёл
-      ("E", "4355", [(48.06, 52.75)]),                               # результат… я начинаю видеть его, и в целом я доволен
-      ("E2", "4355", [(52.88, 55.35)])]                              # а это пока с отёком ещё, ещё нужно всё уменьшиться
-GAP = {"B": 0.35, "C": 1.9, "C2": 0.35, "D": 0.5, "E": 0.9, "E2": 0.25}   # the ДО hold after «давно надо было делать», slider hold after D
+      ("C1", "4316", [(0.02, 4.45)]),                                # сегодня у нас интересная операция: у нас мужчина, они не так часто у нас бывают
+      ("C1b", "4316", [(4.66, 6.70), (7.44, 10.28)]),                # проблема в том, что у него избыточное отложение жира, поэтому и «фартук» (stumble removed)
+      ("C2", "4316", [(10.66, 16.52)]),                              # будем делать липосакцию боков, липосакцию живота, сделаем абдоминопластику
+      ("C3", "4316", [(16.54, 23.30)]),                              # также у него молочные железы избыточно объёмные. и будем делать ещё липосакцию молочных желёз
+      ("D", "4355", [(45.08, 52.75)]),                               # всё стоило того, я знал, на что шёл. результат… я начинаю видеть его, и в целом я доволен
+      ("E", "4355", [(52.88, 55.35)])]                               # а это пока с отёком ещё, ещё нужно всё уменьшиться
+GAP = {"B": 0.35, "C1": 1.4, "C1b": 0.3, "C2": 0.35, "C3": 0.3, "D": 0.45, "E": 0.3}   # the ДО hold after «давно надо было делать»
 SEG = []; _t = 0.25
 for _b, _s, _parts in VO:
     if SEG: _t += GAP[_b]
@@ -63,9 +64,10 @@ def src_of(t, name):
         if t < t0: return a0 - (t0 - t) if best is None else min(best[0] + t - best[1], a0)
         best = (a1, t0 + d)
     return best[0] + t - best[1]
-T_B = vstart("B") - 0.15; T_C = vstart("C") - 0.2; T_D = vstart("D") - 0.2; T_E = vstart("E") - 0.15
-T_END = vend("E2") + 0.35; DUR = T_END + 3.2
-T_FLANK = at_src("4316", 12.88); T_BELLY = at_src("4316", 14.60); T_ABDO = at_src("4316", 16.02); T_CHEST = at_src("4316", 22.48)
+T_B = vstart("B") - 0.15; T_C1 = vstart("C1") - 0.2; T_C2 = vstart("C2") - 0.15; T_C3 = vstart("C3") - 0.12
+T_D = vstart("D") - 0.2; T_SL_END = T_D + 3.4; T_E = vstart("E") - 0.15; T_F = vend("E") + 0.35; DUR = T_F + 3.6
+T_FLANK = at_src("4316", 12.88); T_BELLY = at_src("4316", 14.60); T_ABDO = at_src("4316", 16.02)
+T_GLANDS = at_src("4316", 17.12); T_GOOD = at_src("4355", 51.52)
 
 # ---------------- fonts & text bitmaps ----------------
 FD = os.path.join(ROOT, "fonts"); _FC = {}
@@ -219,16 +221,24 @@ def anon(img, y=180):
     """blur everything above `y` (face)"""
     top = img[:y + 80].astype(np.float32); bl = cv2.resize(cv2.GaussianBlur(cv2.resize(top, None, fx=0.12, fy=0.12), (0, 0), 3), (W, y + 80))
     m = np.clip((y + 40 - np.arange(y + 80)) / 80, 0, 1)[:, None, None]; out = img.copy(); out[:y + 80] = (top * (1 - m) + bl * m).astype(np.uint8); return out
-def photo(n):
-    return np.asarray(ImageOps.exif_transpose(Image.open(os.path.join(SRC, f"IMG_{n}.JPG"))).convert("RGB").resize((W, H), Image.LANCZOS)).copy()
+def photo(n, ext="JPG"):
+    if ext == "HEIC":
+        import pillow_heif; pillow_heif.register_heif_opener()
+    return ImageOps.exif_transpose(Image.open(os.path.join(SRC, f"IMG_{n}.{ext}"))).convert("RGB")
+def frame_of(im, box):
+    """crop `box` (source px, 9:16) and scale it DOWN to the frame — never enlarged"""
+    return np.asarray(im.crop(box).resize((W, H), Image.LANCZOS)).copy()
 def cutout(n, dy=0):
-    """Bazaart cut-outs: crop to the torso (never enlarged: the source is 2048 px wide), app watermark dropped"""
-    im = np.asarray(ImageOps.exif_transpose(Image.open(os.path.join(SRC, f"IMG_{n}.JPG"))).convert("RGB"))
-    s = im.shape[1] / W; x0, y0, x1, y1 = [int(v * s) for v in (140, 380, 940, 1450)]; y0 -= dy; y1 -= dy
+    """Bazaart cut-outs: crop to the torso (the source is 2048 px wide, so this is a down-scale), app watermark dropped"""
+    im = np.asarray(photo(n)); s = im.shape[1] / W; x0, y0, x1, y1 = [int(v * s) for v in (140, 380, 940, 1450)]; y0 -= dy; y1 -= dy
     c = cv2.resize(im[y0:y1, x0:x1], (W, int(W * (y1 - y0) / (x1 - x0))), interpolation=cv2.INTER_AREA)
     fr = np.zeros((H, W, 3), np.uint8); fr[230:230 + c.shape[0]] = c[:H - 230]; return fr
 BEF, AFT = cutout(8749), cutout(8746, 92)                             # ПОСЛЕ sits 92 px higher in its photo: nipple stickers line up
-COLLS = [photo(n) for n in (8755, 8756, 8757)]                          # «2 недели 3 дня после операции», ПОСЛЕ on top, ДО below
+CHEST_BOX = (294, 700, 2894, 5322); CHEST = frame_of(photo(8740, "HEIC"), CHEST_BOX)   # ДО chest, face cropped away
+STICK = [((888 - 294) * W / 2600, (1620 - 700) * W / 2600), ((2300 - 294) * W / 2600, (1640 - 700) * W / 2600)]
+COLLS = [np.asarray(photo(n).resize((W, H), Image.LANCZOS)) for n in (8755, 8756, 8757)]   # «2 недели 3 дня после операции»
+EARLY = anon(np.asarray(photo(8743).resize((W, H), Image.LANCZOS)).copy(), 170)
+FINAL = anon(np.asarray(photo(8744).resize((W, H), Image.LANCZOS)).copy(), 170)
 
 def cover(img, w, h, fx=0.5, fy=0.5, z=1.0):
     ih, iw = img.shape[:2]; s = max(w / iw, h / ih) * z
@@ -286,17 +296,17 @@ def diag_wipe(old, new, p):
     fr = old * (1 - m) + new * m; return (fr * (1 - ln) + PINK * ln).astype(np.float32)
 
 # ---------------- scenes ----------------
-# A — the patient's face (blurred at the source), his quote; nothing of ДО yet
+# A — only the patient's face (blurred at the source); his quote
 HA = Drop(["ЛУЧШЕ РАНЬШЕ,", "*ЧЕМ ПОЗЖЕ*"], 150, 70, 1180)
 TA = Track(["история пациента после комплексной коррекции"], 34, 72, 0, 300)
 def s_a(t):
-    fr = full(V["4355"].at(src_of(t, "4355")), 0.5, 0.36, lerp(1.06, 1.16, eio(t / 4.3))); shade(fr, VIG); shade(fr, GBOT)
+    fr = full(V["4355"].at(src_of(t, "4355")), 0.5, 0.3, lerp(1.25, 1.35, eio(t / 4.3))); shade(fr, VIG); shade(fr, GBOT)   # face & shoulders, no body
     lg = logo_alpha(360); blend(fr, lg, 540 - 180, 210, PINK, eo((t + 0.1) / 0.5) * 0.9)
     HA.draw(fr, t, -0.2); TA.y = HA.y + HA.h + 70 + TA.top; TA.draw(fr, t, 0.9)
     return fr
 
-# B — ДО for the first time; a calendar flips its pages, then a pink tick: «долго откладывал, но решился»
-HB = Drop(["ДОЛГО ОТКЛАДЫВАЛ,", "*НО В ИТОГЕ РЕШИЛСЯ*"], 120, 70, 1250)
+# B — ДО for the first time; a calendar flips its pages, then a pink tick
+HB = Drop(["ДОЛГО ДУМАЛ,", "*НО В ИТОГЕ РЕШИЛСЯ*"], 124, 70, 1250)
 def calendar(fr, t, t0, cx=880, cy=1020, w=150):
     lt = t - t0
     if lt < 0: return
@@ -305,60 +315,73 @@ def calendar(fr, t, t0, cx=880, cy=1020, w=150):
     fill_poly(fr, box, NAVY, 0.85); path_draw(fr, box, 1, WHITE, 3, True)
     fill_poly(fr, [(cx - hw, cy - hh), (cx + hw, cy - hh), (cx + hw, cy - hh + 34 * s), (cx - hw, cy - hh + 34 * s)], PINK)
     for dx in (-0.45, 0.45): path_draw(fr, [(cx + dx * hw, cy - hh - 14 * s), (cx + dx * hw, cy - hh + 10 * s)], 1, WHITE, 5)
-    n_flip = 6; fl = (lt - 0.4) / 0.22                                 # pages flip one after another
+    n_flip = 6; fl = (lt - 0.4) / 0.22
     if 0 < fl < n_flip:
         u = fl % 1; y_top = cy - hh + 34 * s; y = lerp(cy + hh, y_top, eio(u))
         fill_poly(fr, [(cx - hw + 4, y_top), (cx + hw - 4, y_top), (cx + hw - 4, y), (cx - hw + 4, y)], WHITE, 0.25 * (1 - u))
-    for i in range(3):                                                  # day dots
+    for i in range(3):
         for j in range(4):
             x = cx - hw + (26 + j * 33) * s; y = cy - hh + (60 + i * 30) * s
             if s > 0.5: fill_poly(fr, [(x + 4 * np.cos(a), y + 4 * np.sin(a)) for a in np.linspace(0, 2 * np.pi, 8)], WHITE, 0.6)
     if fl >= n_flip:
-        q = eio((fl - n_flip) * 0.22 / 0.35)
-        path_draw(fr, [(cx - 34, cy + 14), (cx - 8, cy + 40), (cx + 40, cy - 14)], q, PINK, 10)
+        path_draw(fr, [(cx - 34, cy + 14), (cx - 8, cy + 40), (cx + 40, cy - 14)], eio((fl - n_flip) * 0.22 / 0.35), PINK, 10)
 def s_b(t):
     lt = t - T_B; fr = full(anon(V["4342"].at(22.0 + lt * 0.9)), 0.5, 0.4, lerp(1.12, 1.02, eio(lt / 1.5))); shade(fr, VIG); shade(fr, GBOT)
     chip(fr, "ДО", 40, 250, eo((lt - 0.2) / 0.3)); HB.draw(fr, t, T_B + 0.25); calendar(fr, t, T_B + 0.6)
     return fr
 
-# C — the surgeon's plan; a checklist ticks every zone she names
-HC = Drop(["КОМПЛЕКСНАЯ *КОРРЕКЦИЯ*"], 110, 70, 250)
-ITEMS = [("ЛИПОСАКЦИЯ БОКОВ", T_FLANK), ("ЛИПОСАКЦИЯ ЖИВОТА", T_BELLY), ("АБДОМИНОПЛАСТИКА", T_ABDO), ("ЛИПОСАКЦИЯ ГРУДИ", T_CHEST)]
-def checklist(fr, t, x=80, y0=1170, dy=96):
-    for k, (lab, t0) in enumerate(ITEMS):
+# C1 — the surgeon at the monitor; «не одну зону»: zone dots light up one by one
+HC1 = Drop(["КОРРЕКТИРОВАЛИ", "*НЕ ОДНУ ЗОНУ*"], 130, 70, 1240)
+def zone_dots(fr, t, t0, x0=80, y=1560):
+    for k in range(4):
+        lt = t - t0 - k * 0.35
+        if lt < 0: continue
+        s = eback(lt / 0.3); m = np.zeros((H, W), np.uint8); cv2.circle(m, (x0 + 22 + k * 64, y), int(16 * s), 255, -1, cv2.LINE_AA)
+        blend(fr, m.astype(np.float32) / 255, 0, 0, PINK)
+        rr = 22 + 14 * ((lt * 1.2) % 1); path_draw(fr, [(x0 + 22 + k * 64 + rr * np.cos(a), y + rr * np.sin(a)) for a in np.linspace(0, 2 * np.pi, 30)], 1, PINK, 2, op=1 - (lt * 1.2) % 1)
+def s_c1(t):
+    lt = t - T_C1; fr = full(V["4316"].at(src_of(t, "4316")), 0.5, 0.4, lerp(1.0, 1.06, eio(lt / 10)))
+    shade(fr, GBOT); band = np.clip(1 - np.abs(yy[:, :1] - 1610) / 90, 0, 1)[..., None] * 0.9; shade(fr, band)   # burned-in subtitles
+    HC1.draw(fr, t, vstart("C1b") + 0.1); zone_dots(fr, t, vstart("C1b") + 1.0)
+    return fr
+
+# C2 — belly and flanks ДО; the three procedures tick in as she names them
+ITEMS = [("ЛИПОСАКЦИЯ БОКОВ", T_FLANK), ("ЛИПОСАКЦИЯ ЖИВОТА", T_BELLY), ("АБДОМИНОПЛАСТИКА", T_ABDO)]
+def checklist(fr, t, items, x=80, y0=1250, dy=110, size=84):
+    for k, (lab, t0) in enumerate(items):
         lt = t - t0 + 0.15
         if lt < 0: continue
-        y = y0 + k * dy; s = eback(lt / 0.3); b = 26 * s
-        box = [(x + 26 - b, y + 26 - b), (x + 26 + b, y + 26 - b), (x + 26 + b, y + 26 + b), (x + 26 - b, y + 26 + b)]
+        y = y0 + k * dy; s = eback(lt / 0.3); b = 28 * s
+        box = [(x + 28 - b, y + 28 - b), (x + 28 + b, y + 28 - b), (x + 28 + b, y + 28 + b), (x + 28 - b, y + 28 + b)]
         path_draw(fr, box, 1, PINK, 4, True)
-        path_draw(fr, [(x + 12, y + 28), (x + 23, y + 40), (x + 44, y + 12)], eio((lt - 0.2) / 0.3), PINK, 6)
-        a = alpha_img(lab, bebas(70)); p = eo((lt - 0.1) / 0.4); a2 = a.copy(); a2[:, int(a.shape[1] * p):] = 0
-        blend(fr, a2, x + 80, y + 26 - a.shape[0] / 2 + 4, WHITE)
-def s_c(t):
-    lt = t - T_C; fr = full(V["4316"].at(src_of(t, "4316")), 0.5, 0.4, lerp(1.0, 1.06, eio(lt / 10)))
-    shade(fr, GTOP); shade(fr, GBOT)
-    band = np.clip(1 - np.abs(yy[:, :1] - 1610) / 90, 0, 1)[..., None] * 0.9; shade(fr, band)   # the burned-in subtitles of the source
-    HC.draw(fr, t, T_C + 0.3); checklist(fr, t)
+        path_draw(fr, [(x + 13, y + 30), (x + 25, y + 43), (x + 47, y + 13)], eio((lt - 0.2) / 0.3), PINK, 6)
+        a = alpha_img(lab, bebas(size)); p = eo((lt - 0.1) / 0.4); a2 = a.copy(); a2[:, int(a.shape[1] * p):] = 0
+        blend(fr, a2, x + 84, y + 28 - a.shape[0] / 2 + 6, WHITE)
+def s_c2(t):
+    lt = t - T_C2; fr = full(anon(V["4342"].at(0.5 + lt * 0.9)), 0.5, 0.58, lerp(1.22, 1.12, eio(lt / 6))); shade(fr, VIG); shade(fr, GBOT)
+    chip(fr, "ДО", 40, 250); checklist(fr, t, ITEMS)
     return fr
 
-# D — ДО/ПОСЛЕ slider on «всё стоило того»
+# C3 — chest ДО (photo, scaled down); both sides get a dashed pink outline
+HC3 = Drop(["ДОПОЛНИТЕЛЬНО ПОРАБОТАЛИ", "*С ОБЛАСТЬЮ ГРУДИ*"], 112, 70, 1300)
+def dashed_ellipse(fr, cx, cy, rx, ry, p, col=PINK):
+    n = 36; m = int(n * p)
+    for i in range(m):
+        if i % 2: continue
+        a0, a1 = -np.pi / 2 + 2 * np.pi * i / n, -np.pi / 2 + 2 * np.pi * (i + 1) / n
+        path_draw(fr, [(cx + rx * np.cos(a), cy + ry * np.sin(a)) for a in np.linspace(a0, a1, 5)], 1, col, 5)
+def s_c3(t):
+    lt = t - T_C3; z = lerp(1.0, 1.08, eio(lt / 6.5)); fr, M = cover(CHEST, W, H, 0.5, 0.25, z); shade(fr, VIG); shade(fr, GBOT)
+    for k, (x, y) in enumerate(STICK):
+        px, py = M[0, 0] * x + M[0, 2], M[1, 1] * y + M[1, 2]
+        dashed_ellipse(fr, px, py + 20, 190 * z, 150 * z, eio((t - T_GLANDS - 0.15 * k) / 0.8))
+    chip(fr, "ДО", 40, 250); HC3.draw(fr, t, T_C3 + 0.3)
+    return fr
+
+# D — «всё стоило того»: ДО/ПОСЛЕ slider, then three «2 недели» collages with shutter clicks
 HD = Drop(["ВСЁ СТОИЛО *ТОГО*"], 132, 70, 1520)
-TD = Track(["«я знал, на что шёл»"], 36, 72, 0, 300)
 def slider_x(lt): return W * (1 - 0.5 * eio((lt - 0.5) / 0.8) - 0.5 * eio((lt - 2.0) / 0.8))
-def s_d(t):
-    lt = t - T_D; xd = int(slider_x(lt)); fr = BEF.astype(np.float32) / 255; a = AFT.astype(np.float32) / 255
-    fr[:, xd:] = a[:, xd:]; shade(fr, GBOT * 0.9)
-    if 0 < xd < W:
-        fr[230:1680, max(0, xd - 2):xd + 2] = PINK
-        m = np.zeros((H, W), np.uint8); cv2.circle(m, (xd, 900), 32, 255, -1, cv2.LINE_AA); blend(fr, m.astype(np.float32) / 255, 0, 0, PINK)
-        ar = alpha_img("‹ ›", mont(36, 600)); blend(fr, ar, xd - ar.shape[1] / 2, 900 - ar.shape[0] / 2 - 2, NAVY)
-    chip(fr, "ДО", 40, 250, eo((lt - 0.1) / 0.3) * cl((xd - 160) / 120)); chip(fr, "ПОСЛЕ", 875, 250, cl((W - 200 - xd) / 120))
-    HD.draw(fr, t, T_D + 0.2); TD.y = HD.y + HD.h + 60 + TD.top; TD.draw(fr, t, T_D + 0.9)
-    return fr
-
-# E — three «2 недели» collages, flash + shutter on each; short pills for «я доволен» / «пока ещё с отёком»
-T_K = [T_E, T_E + (T_END - T_E) / 3, T_E + 2 * (T_END - T_E) / 3]
-T_EDEMA = vstart("E2")
+T_K = [T_SL_END + k * (T_E - T_SL_END) / 3 for k in range(3)]
 def pill(fr, txt, t, t0, t1=1e9, y=1560):
     if t < t0 or t > t1 + 0.3: return
     op = eo((t - t0) / 0.3) * ((1 - eio((t - t1) / 0.3)) if t > t1 else 1)
@@ -366,27 +389,41 @@ def pill(fr, txt, t, t0, t1=1e9, y=1560):
     box = np.zeros((h, w), np.uint8); cv2.rectangle(box, (0, 0), (w - 1, h - 1), 255, -1); blend(fr, box.astype(np.float32) / 255, x, y, NAVY, 0.88 * op)
     ln = np.zeros((h, w), np.uint8); cv2.rectangle(ln, (1, 1), (w - 2, h - 2), 255, 2, cv2.LINE_AA); blend(fr, ln.astype(np.float32) / 255, x, y, PINK, op)
     blend(fr, a, x + 30 - 4, y + (h - a.shape[0]) / 2 + 4, WHITE, op)
-def s_e(t):
-    k = max(i for i, tk in enumerate(T_K) if t >= tk); lt = t - T_K[k]
-    fr = COLLS[k].astype(np.float32) / 255
-    chip(fr, "ПОСЛЕ", 30, 240); chip(fr, "ДО", 30, 1070)
-    pill(fr, "Я ДОВОЛЕН", t, at_src("4355", 51.52) - 0.1, T_EDEMA - 0.2); pill(fr, "ПОКА ЕЩЁ С ОТЁКОМ", t, T_EDEMA + 0.1)
-    f = 1 - eo(lt / 0.18); return fr * (1 - f) + f
-
-# END — the quote again + logo
-HZ = Drop(["ЛУЧШЕ РАНЬШЕ,", "*ЧЕМ ПОЗЖЕ*"], 150, 70, 560)
-def s_end(t):
-    lt = t - T_END; fr = BG.copy(); HZ.draw(fr, t, T_END + 0.2)
-    w = 640; lg = logo_alpha(w); h = lg.shape[0]; x0, y0 = 540 - w / 2, 1180 - h / 2; sp = int(w * _split / _lg.shape[1])
-    mk, wd = lg[:, :sp].copy(), lg[:, sp:].copy()
-    y2, x2 = np.mgrid[0:mk.shape[0], 0:mk.shape[1]]; a2 = (np.arctan2(x2 - mk.shape[1] / 2, -(y2 - mk.shape[0] / 2)) % (2 * np.pi)) / (2 * np.pi)
-    mk *= np.clip((eio((lt - 0.9) / 0.9) - a2) * 20, 0, 1); wd[:, int(wd.shape[1] * eio((lt - 1.3) / 0.8)):] = 0
-    blend(fr, mk, x0, y0, PINK); blend(fr, wd, x0 + sp, y0, PINK)
-    ty = Track(["пластический хирург"], 40, 540, 0, 300, WHITE, True); ty.y = y0 + h + 70 + ty.top; ty.draw(fr, t, T_END + 1.9)
+def s_d(t):
+    lt = t - T_D
+    if t >= T_SL_END:
+        k = max(i for i, tk in enumerate(T_K) if t >= tk); fr = COLLS[k].astype(np.float32) / 255
+        chip(fr, "ПОСЛЕ", 30, 240); chip(fr, "ДО", 30, 1070); pill(fr, "Я ДОВОЛЕН", t, T_GOOD - 0.1)
+        f = 1 - eo((t - T_K[k]) / 0.18); return fr * (1 - f) + f
+    xd = int(slider_x(lt)); fr = BEF.astype(np.float32) / 255; a = AFT.astype(np.float32) / 255
+    fr[:, xd:] = a[:, xd:]; shade(fr, GBOT * 0.9)
+    if 0 < xd < W:
+        fr[230:1680, max(0, xd - 2):xd + 2] = PINK
+        m = np.zeros((H, W), np.uint8); cv2.circle(m, (xd, 900), 32, 255, -1, cv2.LINE_AA); blend(fr, m.astype(np.float32) / 255, 0, 0, PINK)
+        ar = alpha_img("‹ ›", mont(36, 600)); blend(fr, ar, xd - ar.shape[1] / 2, 900 - ar.shape[0] / 2 - 2, NAVY)
+    chip(fr, "ДО", 40, 250, eo((lt - 0.1) / 0.3) * cl((xd - 160) / 120)); chip(fr, "ПОСЛЕ", 875, 250, cl((W - 200 - xd) / 120))
+    HD.draw(fr, t, T_D + 0.2)
     return fr
 
-SCENES = [(0, s_a), (T_B, s_b), (T_C, s_c), (T_D, s_d), (T_E, s_e), (T_END, s_end)]
-TRANS = {T_B: ("flash", 0.3), T_C: ("zoom", 0.5), T_D: ("iris", 0.6), T_E: ("push", 0.45), T_END: ("zoom", 0.5)}
+# E — early result, honest about the swelling
+HE = Drop(["ЭТО ЕЩЁ РАННИЙ", "*РЕЗУЛЬТАТ*"], 140, 70, 1240)
+TE = Track(["отёк будет постепенно уходить"], 38, 72, 0, 300)
+def s_e(t):
+    lt = t - T_E; fr = full(EARLY, 0.5, 0.42, lerp(1.0, 1.05, eio(lt / 3.0))); shade(fr, GBOT)
+    chip(fr, "ПОСЛЕ", 40, 250); HE.draw(fr, t, T_E + 0.25); TE.y = HE.y + HE.h + 70 + TE.top; TE.draw(fr, t, T_E + 0.9)
+    return fr
+
+# F — final: ПОСЛЕ photo, the headline, logo
+HF = Drop(["КОМПЛЕКСНАЯ КОРРЕКЦИЯ", "*ФИГУРЫ У МУЖЧИНЫ*"], 116, 70, 1250)
+TF = Track(["дальше будем показывать", "восстановление и результат"], 36, 72, 0, 300)
+def s_f(t):
+    lt = t - T_F; fr = full(FINAL, 0.5, 0.42, lerp(1.0, 1.06, eio(lt / 3.6))); shade(fr, GBOT)
+    lg = logo_alpha(360); blend(fr, lg, 540 - 180, 200, PINK, eo((lt - 0.2) / 0.5))
+    chip(fr, "ПОСЛЕ", 40, 330, eo((lt - 0.3) / 0.3)); HF.draw(fr, t, T_F + 0.3); TF.y = HF.y + HF.h + 70 + TF.top; TF.draw(fr, t, T_F + 1.1)
+    return fr
+
+SCENES = [(0, s_a), (T_B, s_b), (T_C1, s_c1), (T_C2, s_c2), (T_C3, s_c3), (T_D, s_d), (T_E, s_e), (T_F, s_f)]
+TRANS = {T_B: ("flash", 0.3), T_C1: ("zoom", 0.5), T_C2: ("diag", 0.55), T_C3: ("push", 0.45), T_D: ("iris", 0.6), T_E: ("zoom", 0.5), T_F: ("iris", 0.6)}
 def push(old, new, p):
     e = eio(p); x = int(W * e); fr = np.empty_like(old); fr[:, :W - x] = old[:, x:]; fr[:, W - x:] = new[:, :x]
     if 0 < x < W: fr[:, max(0, W - x - 2):W - x + 2] = PINK
@@ -402,6 +439,7 @@ def render(t):
         if kind == "iris": return iris(old, new, p, 540, 900)
         if kind == "zoom": return zoom_through(old, new, p)
         if kind == "push": return push(old, new, p)
+        if kind == "diag": return diag_wipe(old, new, p)
     return fn(t)
 
 # ---------------- audio ----------------
@@ -506,11 +544,12 @@ def build_audio(path):
     put(felt(70, 0.5), 0.0, 0.45); put(glass(1174.7), 0.05, 0.1)
     for k in range(6): put(paper(0.12, 4500), T_B + 0.6 + 0.4 + k * 0.22, 0.16)     # calendar pages
     put(marimba(PENTA[4], 0.5), T_B + 0.6 + 0.4 + 6 * 0.22, 0.22)                    # tick
-    for k, (_, t0) in enumerate(ITEMS): put(marimba(PENTA[k + 1], 0.45), t0 + 0.05, 0.22)   # checklist ticks rise in pitch
-    put(swell(0.9), T_D + 0.1, 0.06)
+    for k in range(4): put(marimba(PENTA[k], 0.35), vstart("C1b") + 1.0 + k * 0.35, 0.14)   # zone dots
+    for k, (_, t0) in enumerate(ITEMS): put(marimba(PENTA[k + 2], 0.45), t0 + 0.05, 0.22)   # checklist
+    put(swell(0.9), T_GLANDS - 0.3, 0.07)
     for tk in T_K: put(click(), tk - 0.01, 1.4)                                       # «щёлк» on every collage
-    put(glass(1174.7), T_END + 0.9, 0.2); put(glass(1760), T_END + 1.25, 0.12)
-    for i, f in enumerate([PENTA[0], PENTA[2], PENTA[3], PENTA[5]]): put(marimba(f, 0.6), T_END + 1.9 + i * 0.12, 0.12)
+    put(glass(1174.7), T_F + 0.3, 0.16)
+    for i, f in enumerate([PENTA[0], PENTA[2], PENTA[3], PENTA[5]]): put(marimba(f, 0.6), T_F + 1.2 + i * 0.12, 0.12)
     sfx[:n] *= 1 - 0.8 * np.clip(dd, 0, 1)
     mix = vo[:, None] + mus + sfx[:n, None] * np.float64([[0.92, 1.0]])
     mix *= 10 ** (1.0 / 20); mix /= max(1, np.abs(mix).max() / 0.95)
