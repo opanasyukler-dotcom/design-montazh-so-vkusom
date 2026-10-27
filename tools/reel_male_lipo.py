@@ -340,11 +340,14 @@ def lift(hd, bottom=1230):
 # A — only the patient's face (blurred at the source); his quote
 HA = lift(Drop(["ЛУЧШЕ РАНЬШЕ,", "*ЧЕМ ПОЗЖЕ*"], 140, 70, 0, maxw=840), 1190)
 TA = Track(["история пациента после", "комплексной коррекции"], 32, 72, 0, 300)
+HC0 = lift(Drop(["МУЖЧИНЫ ТОЖЕ", "*ОПЕРИРУЮТСЯ*"], 140, 70, 0, maxw=840), 1230)
 def s_c0(t):
-    """the reel opens on the surgeon: «у нас мужчины, они не так часто у нас бывают»"""
+    """the reel opens on the surgeon: «у нас мужчины, они не так часто у нас бывают» under the headline"""
     fr = full(V["4316"].at(src_of(t, "4316")), 0.5, 0.4, lerp(1.0, 1.05, eio(t / 3.0))); shade(fr, GBOT)
     band = np.clip(1.3 - np.abs(yy[:, :1] - 1610) / 110, 0, 1)[..., None] * 0.97; shade(fr, band)   # burned-in subtitles
     lg = logo_alpha(320); blend(fr, lg, 500 - 160, 290, PINK, eo((t + 0.1) / 0.5) * 0.9)
+    shade(fr, np.clip(1.25 - np.abs(yy[:, :1] - 1140) / 230, 0, 1)[..., None] * 0.6)   # the clinic wall is bright: a soft dark band under the headline
+    HC0.draw(fr, t, 0.05)
     return fr
 def s_a(t):
     lt = t - T_A; fr = full(V["4355"].at(src_of(t, "4355")), 0.5, 0.3, lerp(1.25, 1.35, eio(lt / 4.3))); shade(fr, VIG); shade(fr, GBOT)   # face & shoulders, no body
