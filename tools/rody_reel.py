@@ -168,7 +168,7 @@ def render(src, work, out, mic=None):
     ins = []
     for s0, o0, s1, o1, lab, hand in INSERTS:
         t0 = starts[s0] + o0; t1 = (starts[s1] + (SEGS[s1][1] - SEGS[s1][0]) + o1) if o1 <= 0 else starts[s1] + o1
-        ins.append((t0, t1, label_patch(lab) if lab else None, script_patch(hand, 180)))         # Gogol runs wide
+        ins.append((t0, t1, label_patch(lab) if lab else None, script_patch(hand, 150 if len(hand) > 12 else 180)))   # Gogol runs wide: long lines smaller, clear of her hair
     card_l, card_h = label_patch("В СЛЕДУЮЩЕЙ ЧАСТИ", 58), script_patch("Продолжение", 260)
     # audio: voice + effects
     punch = [starts[k] for k, s in enumerate(SEGS) if s[2] >= 1.18 and k > 0]
