@@ -1,7 +1,8 @@
 """@mcg.va — Reels 1 «Я думала, самое страшное — это роды. Но нет» (intro to the maternity-ward story), 16:9 like the source.
 Source C0973 (№5, 3:21), 3840x2160 @ 25.  Minimal look: brown-moody grade (luts/mcgva_brown_moody.cube),
 punch-ins / slow push-ins and pull-outs on the face, thin Montserrat for labels and word-by-word subtitles, Gogol
-handwriting for the inserts (written on with a wipe), a blurred end card «продолжение в следующей части».
+handwriting for the inserts (written on with a wipe) while the picture eases into a square card on a dark blurred
+backdrop, extra punch-ins inside long takes, a deeper «cinema» finish (S-curve, vignette, fine grain), a blurred end card.
 Cuts sit in the pauses (energy-checked); each join gets a 25 ms raised-cosine fade so nothing clicks.
   python3 rody_reel.py SRC.mov WORK_DIR [--mic REC.m4a]  → WORK_DIR/rody_4k.mp4 (voice from the mic recording, sfx inside)
   python3 rody_reel.py SRC.mov WORK_DIR --cover    → WORK_DIR/cover_4k.jpg
@@ -21,6 +22,13 @@ LUT = os.path.join(ROOT, "luts", "mcgva_brown_moody.cube")                      
 SCRIPT_FONT = os.path.join(ROOT, "skills", "montage-svg-typography", "Шрифты", "Коллекция шрифтов", "Gogol-Regular.otf")
 INK = (43, 31, 26)                                 # #2B1F1A from the brown palette
 BLUSH = (220, 225, 231)                            # #DCE1E7 — the palette's pale cool grey, for highlighted words
+CREAM = (232, 228, 222)                            # type on the dark square-mode backdrop
+CINEMA_IN = "curves=all='0/0.025 0.25/0.2 0.5/0.48 0.75/0.79 1/0.965'"            # deeper S, lifted brown blacks
+CINEMA_OUT = "vignette=angle=PI/5,noise=c0s=6:c0f=t+u"                            # soft vignette + fine moving grain
+SQUARE = (1440, 0.31, 0.46)                        # square-mode card: side, centre x, centre y (fractions)
+# extra punch-ins inside long takes: segment → [(source time, zoom)]; the zoom drifts +3 % inside each step
+STEPS = {2: [(37.72, 1.00), (40.80, 1.28)], 4: [(51.06, 1.00), (53.82, 1.30)],
+         7: [(64.50, 1.00), (67.95, 1.32)], 12: [(189.56, 1.22), (193.62, 1.40)]}
 FACE = (0.485, 0.42)                               # zoom centre (fraction of the frame): her face sits in the upper third
 END_CARD = 3.0
 
@@ -143,18 +151,38 @@ def zoom_frame(fr, z, cx=FACE[0], cy=FACE[1]):
     M = np.float32([[z, 0, -x0 * z], [0, z, -y0 * z]])
     return cv2.warpAffine(fr, M, (W, H), flags=cv2.INTER_LINEAR)
 
-def script_patch(text, size):
-    f = ImageFont.truetype(SCRIPT_FONT, size); return text_patch(text, f, INK, sh=0.0)
+def script_patch(text, size, col=INK):
+    f = ImageFont.truetype(SCRIPT_FONT, size); return text_patch(text, f, col, sh=0.0)
 
-def tracked(text, f, track):
+def square_frame(fr, k):
+    """k 0..1: the full frame eases into a square card on the left over its own blurred, darkened copy"""
+    if k <= 0.001: return fr
+    side, fx, fy = SQUARE; s = side; cxs, cys = fx * W, fy * H
+    # display rect: full frame → square; content rect: full frame → a square of the frame around her face
+    dw, dh = W + (s - W) * k, H + (s - H) * k; dx, dy = (W / 2) + (cxs - W / 2) * k - dw / 2, (H / 2) + (cys - H / 2) * k - dh / 2
+    cw = W + (H - W) * k; ccx = W / 2 + (FACE[0] * W - W / 2) * k; cx0 = float(np.clip(ccx - cw / 2, 0, W - cw))
+    content = fr[:, int(cx0):int(cx0 + cw)]
+    card = cv2.resize(content, (max(2, int(dw)), max(2, int(dh))), interpolation=cv2.INTER_AREA)
+    sm = cv2.GaussianBlur(cv2.resize(fr, (384, 216), interpolation=cv2.INTER_AREA), (0, 0), 9)
+    bg = cv2.resize(sm, (W, H)).astype(np.float32) * (1 - 0.55 * k) + np.array([43, 31, 26], np.float32) * 0.25 * k
+    bg = bg.clip(0, 255).astype(np.uint8)
+    sh = np.zeros((H // 8, W // 8), np.uint8); cv2.rectangle(sh, (int(dx / 8), int((dy + 40) / 8)), (int((dx + dw) / 8), int((dy + dh + 40) / 8)), int(170 * k), -1)
+    sh = cv2.resize(cv2.GaussianBlur(sh, (0, 0), 6), (W, H)).astype(np.uint16)
+    bg = (bg.astype(np.uint16) * (255 - sh[..., None]) >> 8).astype(np.uint8)
+    x0, y0 = int(round(dx)), int(round(dy)); h, w = card.shape[:2]
+    xa, ya, xb, yb = max(x0, 0), max(y0, 0), min(x0 + w, W), min(y0 + h, H)
+    bg[ya:yb, xa:xb] = card[ya - y0:yb - y0, xa - x0:xb - x0]
+    return bg
+
+def tracked(text, f, track, col=INK):
     """letter-spaced line as an RGBA patch (tracking in px between glyphs)"""
     adv = [f.getlength(c) + track for c in text]; w = int(sum(adv) - track) + 80; h = int(f.size * 1.6) + 80
     im = Image.new("RGBA", (w, h), (0, 0, 0, 0)); d = ImageDraw.Draw(im); x = 40
-    for c, a in zip(text, adv): d.text((x, h / 2), c, font=f, fill=INK + (255,), anchor="lm"); x += a
+    for c, a in zip(text, adv): d.text((x, h / 2), c, font=f, fill=col + (255,), anchor="lm"); x += a
     return np.asarray(im, np.float32)
 
-def label_patch(text, size=62):
-    return tracked(text, font("second", size, 300), size * 0.28)
+def label_patch(text, size=62, col=INK):
+    return tracked(text, font("second", size, 300), size * 0.28, col)
 
 def render(src, work, out, mic=None):
     words = json.load(open(f"{work}/words.json"))
@@ -168,10 +196,12 @@ def render(src, work, out, mic=None):
     ins = []
     for s0, o0, s1, o1, lab, hand in INSERTS:
         t0 = starts[s0] + o0; t1 = (starts[s1] + (SEGS[s1][1] - SEGS[s1][0]) + o1) if o1 <= 0 else starts[s1] + o1
-        ins.append((t0, t1, label_patch(lab) if lab else None, script_patch(hand, 150 if len(hand) > 12 else 180)))   # Gogol runs wide: long lines smaller, clear of her hair
+        ins.append((t0, t1, label_patch(lab, 60, CREAM) if lab else None, script_patch(hand, 190 if len(hand) > 12 else 230, CREAM)))
     card_l, card_h = label_patch("В СЛЕДУЮЩЕЙ ЧАСТИ", 58), script_patch("Продолжение", 260)
     # audio: voice + effects
     punch = [starts[k] for k, s in enumerate(SEGS) if s[2] >= 1.18 and k > 0]
+    punch += [starts[k] + st[0] - SEGS[k][0] for k, sts in STEPS.items() for st in sts[1:]]
+    punch += [t for t0, t1, _, _ in ins for t in (t0 + 0.3, t1 + 0.3)]                       # into / out of the square
     hits = [starts[7] + (68.00 - SEGS[7][0]), starts[10] + (173.72 - SEGS[10][0])]
     mix = sfx(v, full, [(t0 + (0.45 if l is not None else 0.0), 0.8) for t0, _, l, _ in ins], punch, hits, total)
     mix *= min(1, FX.db(-1) / (np.abs(mix).max() + 1e-9))
@@ -179,41 +209,49 @@ def render(src, work, out, mic=None):
                    input=mix.astype(np.float32).tobytes(), check=True)
     wr = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS),
                            "-i", "-", "-i", f"{work}/mix.wav", "-map", "0:v", "-map", "1:a", "-t", f"{full:.3f}",
-                           "-vf", f"fade=t=in:d=0.3,fade=t=out:st={full - 0.6:.3f}:d=0.6", "-c:v", "libx264", "-preset", "medium",
+                           "-vf", f"format=yuv420p,{CINEMA_OUT},fade=t=in:d=0.3,fade=t=out:st={full - 0.6:.3f}:d=0.6", "-c:v", "libx264", "-preset", "medium",
                            "-crf", "17", "-profile:v", "high", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "256k",
                            "-movflags", "+faststart", out], stdin=subprocess.PIPE)
     sz = W * H * 3; fi = 0; last = None
     y = np.linspace(0, 1, H, dtype=np.float32); r0 = int(0.62 * H)
     spray = (256 * (1 - np.clip((y[r0:] - 0.62) / 0.38, 0, 1) ** 1.6 * 0.45)).astype(np.uint16)
+    def square_k(t):
+        return max([ease((t - t0) / 0.45) * (1 - ease((t - t1) / 0.45)) for t0, t1, _, _ in ins if t0 <= t < t1 + 0.45] or [0.0])
     def overlays(fr, t):
         fr[r0:] = (fr[r0:].astype(np.uint16) * spray[:, None, None] >> 8).astype(np.uint8)
+        sq = 0.0
         for t0, t1, lp, hp in ins:
-            if not (t0 <= t < t1 + 0.35): continue
-            k_out = 1 - ease((t - t1) / 0.35); cx = int(0.81 * W); y0 = int(0.30 * H)
+            if not (t0 <= t < t1 + 0.45): continue
+            sq = ease((t - t0) / 0.45) * (1 - ease((t - t1) / 0.45)); cx = int(0.70 * W); yc = int(0.46 * H)
             if lp is not None:
-                k = ease((t - t0) / 0.35) * k_out; lx = min(cx - lp.shape[1] // 2, W - 150 - lp.shape[1])   # never off the edge
-                blend(fr, lp, lx, int(y0 - lp.shape[0] / 2 + 30 * (1 - k)), k)
-            tw = t0 + (0.45 if lp is not None else 0.0); k = (t - tw) / 0.8                 # handwriting: wipe on
+                k = ease((t - t0 - 0.3) / 0.35) * (1 - ease((t - t1) / 0.3))
+                blend(fr, lp, cx - lp.shape[1] // 2, int(yc - 150 - lp.shape[0] / 2 + 30 * (1 - k)), k)
+            tw = t0 + (0.6 if lp is not None else 0.35); k = (t - tw) / 0.8                  # handwriting: wipe on
             if k > 0:
                 w = hp.shape[1]; cut = int(w * min(1, ease(k)) * 1.1); p = hp.copy()
                 if cut < w:
                     ramp = np.clip((cut - np.arange(w)) / 60, 0, 1)[None, :, None]; p[..., 3:4] *= ramp
-                blend(fr, p, min(cx - w // 2, W - 110 - w), int(y0 + 150 - hp.shape[0] / 2), k_out)
+                blend(fr, p, min(cx - w // 2, W - 110 - w), int(yc + 30 - hp.shape[0] / 2), 1 - ease((t - t1) / 0.3))
         for a, b, ps in subs:
             if a <= t < b:
-                f = int((t - a) * FPS); p = ps[min(f, 2)]; blend(fr, p, (W - p.shape[1]) // 2, H - 300 - p.shape[0] // 2, min(1, (f + 1) / 2))
+                f = int((t - a) * FPS); p = ps[min(f, 2)]; sx = W / 2 + (SQUARE[1] * W - W / 2) * sq   # under the square while it is on
+                blend(fr, p, int(sx - p.shape[1] / 2), H - 300 - p.shape[0] // 2, min(1, (f + 1) / 2))
     for k, (a, b, z0, z1, _) in enumerate(SEGS):
         m = round((starts[k] + b - a) * FPS) - round(starts[k] * FPS)
         rd = subprocess.Popen(["ffmpeg", "-v", "error", "-ss", f"{a:.3f}", "-i", src, "-frames:v", str(m),
-                               "-vf", f"lut3d=file={LUT}:interp=tetrahedral", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                               "-vf", f"lut3d=file={LUT}:interp=tetrahedral,{CINEMA_IN}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
                               stdout=subprocess.PIPE, bufsize=sz * 2)
         for j in range(m):
             buf = rd.stdout.read(sz)
             fr = np.frombuffer(buf, np.uint8).reshape(H, W, 3).copy() if len(buf) == sz else last.copy()
             last = fr; u = j / max(m - 1, 1)
-            if z0 != z1 and k == 8: z = z0 + (z1 - z0) * ease(j / (0.3 * FPS))                 # «хапнула»: a quick punch
+            ts = a + j / FPS
+            if k in STEPS:                                                                   # punch-in steps + slow drift
+                st = [p for p in STEPS[k] if p[0] <= ts + 1e-6][-1]; nx = [p[0] for p in STEPS[k] if p[0] > ts] + [b]
+                z = st[1] * (1 + 0.03 * ease((ts - st[0]) / max(nx[0] - st[0], 0.1)))
+            elif z0 != z1 and k == 8: z = z0 + (z1 - z0) * ease(j / (0.3 * FPS))           # «хапнула»: a quick punch
             else: z = z0 + (z1 - z0) * ease(u)
-            fr = zoom_frame(fr, z); t = fi / FPS; overlays(fr, t); wr.stdin.write(fr.tobytes()); fi += 1
+            t = fi / FPS; fr = square_frame(zoom_frame(fr, z), square_k(t)); overlays(fr, t); wr.stdin.write(fr.tobytes()); fi += 1
         rd.kill()
     # end card: the last frame freezes, blurs and veils, then «Продолжение / в следующей части»
     still = zoom_frame(last, SEGS[-1][3])
@@ -233,7 +271,7 @@ def render(src, work, out, mic=None):
     wr.stdin.close(); wr.wait()
 
 def cover(src, work, at=60.0):
-    raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(at), "-i", src, "-frames:v", "1", "-vf", f"lut3d=file={LUT}",
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(at), "-i", src, "-frames:v", "1", "-vf", f"lut3d=file={LUT},{CINEMA_IN},vignette=angle=PI/5",
                           "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, check=True).stdout
     fr = np.frombuffer(raw, np.uint8).reshape(H, W, 3).copy(); fr = zoom_frame(fr, 1.08, 0.47, 0.45)
     cx = int(0.80 * W); y = int(0.30 * H)
