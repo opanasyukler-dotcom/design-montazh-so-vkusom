@@ -196,7 +196,7 @@ def render(src, work, out, mic=None):
     ins = []
     for s0, o0, s1, o1, lab, hand in INSERTS:
         t0 = starts[s0] + o0; t1 = (starts[s1] + (SEGS[s1][1] - SEGS[s1][0]) + o1) if o1 <= 0 else starts[s1] + o1
-        ins.append((t0, t1, label_patch(lab, 60, CREAM) if lab else None, script_patch(hand, 190 if len(hand) > 12 else 230, CREAM)))
+        ins.append((t0, t1, label_patch(lab, 60, CREAM) if lab else None, script_patch(hand, 165 if len(hand) > 12 else 230, CREAM)))
     card_l, card_h = label_patch("В СЛЕДУЮЩЕЙ ЧАСТИ", 58), script_patch("Продолжение", 260)
     # audio: voice + effects
     punch = [starts[k] for k, s in enumerate(SEGS) if s[2] >= 1.18 and k > 0]
@@ -222,7 +222,8 @@ def render(src, work, out, mic=None):
         sq = 0.0
         for t0, t1, lp, hp in ins:
             if not (t0 <= t < t1 + 0.45): continue
-            sq = ease((t - t0) / 0.45) * (1 - ease((t - t1) / 0.45)); cx = int(0.70 * W); yc = int(0.46 * H)
+            sq = ease((t - t0) / 0.45) * (1 - ease((t - t1) / 0.45)); yc = int(0.46 * H)
+            left = int(SQUARE[1] * W + SQUARE[0] / 2 + 90); cx = (left + W - 110) // 2     # centred in the space right of the card
             if lp is not None:
                 k = ease((t - t0 - 0.3) / 0.35) * (1 - ease((t - t1) / 0.3))
                 blend(fr, lp, cx - lp.shape[1] // 2, int(yc - 150 - lp.shape[0] / 2 + 30 * (1 - k)), k)
@@ -231,7 +232,7 @@ def render(src, work, out, mic=None):
                 w = hp.shape[1]; cut = int(w * min(1, ease(k)) * 1.1); p = hp.copy()
                 if cut < w:
                     ramp = np.clip((cut - np.arange(w)) / 60, 0, 1)[None, :, None]; p[..., 3:4] *= ramp
-                blend(fr, p, min(cx - w // 2, W - 110 - w), int(yc + 30 - hp.shape[0] / 2), 1 - ease((t - t1) / 0.3))
+                blend(fr, p, max(left - 40, min(cx - w // 2, W - 110 - w)), int(yc + 30 - hp.shape[0] / 2), 1 - ease((t - t1) / 0.3))
         for a, b, ps in subs:
             if a <= t < b:
                 f = int((t - a) * FPS); p = ps[min(f, 2)]; sx = W / 2 + (SQUARE[1] * W - W / 2) * sq   # under the square while it is on
