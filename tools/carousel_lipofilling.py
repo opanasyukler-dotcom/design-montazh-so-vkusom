@@ -21,16 +21,63 @@ SLIDES = [
     ("02_lift_no", 4.93, 10.67),
     ("03_chose_lipofilling", 10.67, 19.20),
     ("04_donor_zones", 19.20, 23.07),
-    ("05_volume", 23.07, 29.20, "fit"),
-    ("06_not_a_lift", 29.20, 36.60, "fit"),
-    ("07_this_task", 36.60, None, "fit"),
+    # headline band (top of the reel) stacked over the footage band (bottom of the reel): full 4:5, no side bars
+    ("05_volume", 23.07, 29.20, "stack", (0.07, 0.36), (0.585, 1.0)),
+    ("06_not_a_lift", 29.20, 36.60, "stack", (0.06, 0.335), (0.378, 1.0)),
+    ("07_this_task", 36.60, None, "stack", (0.05, 0.34), (0.585, 1.0)),
 ]
 
 
 G = "0x%02x%02x%02x" % ct.GRAPHITE
 
 
-def cut(name, a, b, mode="crop"):
+def stack(name, a, b, top, bot):
+    """top band at native scale + bottom band filling the rest of the 4:5 frame, soft seam between them"""
+    import numpy as np, cv2
+    SH = 1920
+    dur = (b or float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", REEL],
+                                     capture_output=True, text=True).stdout)) - a
+    t0, t1 = int(top[0] * SH), int(top[1] * SH); b0, b1 = int(bot[0] * SH), int(bot[1] * SH)
+    ha = t1 - t0; hb = H - ha; seam = 60
+    rd = subprocess.Popen(["ffmpeg", "-v", "error", "-ss", f"{a:.3f}", "-t", f"{dur:.3f}", "-i", REEL,
+                           "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE)
+    tmp = f"{OUT}/_{name}_v.mp4"
+    wr = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", "30",
+                           "-i", "-", "-c:v", "libx264", "-preset", "medium", "-crf", "17", "-pix_fmt", "yuv420p", tmp],
+                          stdin=subprocess.PIPE)
+    k = np.linspace(0, 1, seam, dtype=np.float32)[:, None, None]; k = k * k * (3 - 2 * k)
+    while True:
+        buf = rd.stdout.read(W * SH * 3)
+        if len(buf) < W * SH * 3: break
+        f = np.frombuffer(buf, np.uint8).reshape(SH, W, 3)
+        A = f[t0:t1].astype(np.float32)
+        Bsrc = f[b0:b1]
+        if b1 - b0 <= hb:  # native scale; the seam rows come from just above the band, so nothing repeats
+            ext = f[max(b1 - hb - seam, 0):b1].astype(np.float32)
+            B = ext[-hb:]; Bseam = ext[:seam] if len(ext) >= hb + seam else B[:seam] * 0 + A[-1:]
+        else:  # taller than the room left: scale the footage down over its own (already blurred) background
+            s = hb / (b1 - b0); fw = int(W * s) // 2 * 2
+            fg = cv2.resize(Bsrc, (fw, hb), interpolation=cv2.INTER_AREA).astype(np.float32)
+            bg = cv2.GaussianBlur(cv2.resize(Bsrc, (W, hb), interpolation=cv2.INTER_AREA), (0, 0), 25).astype(np.float32)
+            m = np.ones((hb, fw, 1), np.float32); e = 70
+            r = np.linspace(0, 1, e, dtype=np.float32)[None, :, None]; m[:, :e] *= r; m[:, -e:] *= r[:, ::-1]
+            x = (W - fw) // 2; B = bg.copy(); B[:, x:x + fw] = bg[:, x:x + fw] * (1 - m) + fg * m
+            Bseam = np.repeat(bg[:1], seam, 0)  # plain blurred background under the seam
+        out = np.empty((H, W, 3), np.float32)
+        out[:ha] = A; out[ha:] = B
+        out[ha - seam:ha] = A[ha - seam:] * (1 - k) + Bseam * k  # soft seam between the two bands
+        wr.stdin.write(np.clip(out, 0, 255).astype(np.uint8).tobytes())
+    wr.stdin.close(); wr.wait(); rd.wait()
+    fo = max(dur - 0.12, 0)
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", tmp, "-ss", f"{a:.3f}", "-t", f"{dur:.3f}", "-i", REEL,
+                    "-map", "0:v", "-map", "1:a", "-c:v", "copy",
+                    "-af", f"afade=t=in:d=0.06,afade=t=out:st={fo:.3f}:d=0.12",
+                    "-c:a", "aac", "-b:a", "160k", "-shortest", "-movflags", "+faststart", f"{OUT}/{name}.mp4"], check=True)
+    os.remove(tmp)
+
+
+def cut(name, a, b, mode="crop", top=None, bot=None):
+    if mode == "stack": return stack(name, a, b, top, bot)
     dur = (b or float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", REEL],
                                      capture_output=True, text=True).stdout)) - a
     fo = max(dur - 0.12, 0)
