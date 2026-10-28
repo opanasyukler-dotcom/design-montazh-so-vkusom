@@ -158,31 +158,22 @@ def add_badge(name, cx, cy, r=165):
 
 
 def cta():
-    """surgeon on top, what the consultation covers, then how to book: the profile header and its links, annotated"""
+    """info slide in the surgeon's dark style: what the consultation covers, then how to book (annotated profile screenshots)"""
     from PIL import Image, ImageDraw
-    import numpy as np
-    PH = 600
     ct.LILAC = LILAC_D  # the rule under the heading follows the same pink
-    # surgeon looking into the camera, taken from the reel below its captions: whole face stays clear of the fade
-    fr = os.path.join(OUT, "_frame.png")
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "12.4", "-i", REEL, "-frames:v", "1", fr], check=True)
-    ph = Image.open(fr).convert("RGBA").crop((0, 640, W, 640 + PH)); os.remove(fr)
-    c = Image.new("RGBA", (W, H), ct.WHITE + (255,)); c.alpha_composite(ph, (0, 0))
-    ct.put_logo(c, y=56, alpha=0.95)
-    arr = np.zeros((H, W, 4), np.uint8); arr[..., :3] = 255
-    p = np.clip((np.arange(H)[:, None] - (PH - 140)) / 140, 0, 1); p = np.broadcast_to(p, (H, W))
-    arr[..., 3] = (p * p * (3 - 2 * p) * 255).astype(np.uint8)
-    c.alpha_composite(Image.fromarray(arr, "RGBA"))
-    bw = 900; x = (W - bw) // 2
-    y = ct.Block(bw, "center").head("На консультации разберём", 54, 8, color=ct.INK).rule(0.12, 16).draw(c, x, PH - 70)
+    c = Image.new("RGBA", (W, H), ct.GRAPHITE + (255,))
+    c.alpha_composite(ct.vgrad(0, H, 0, 0.55, (8, 10, 14)))  # slightly deeper towards the bottom
+    ct.put_logo(c, y=196, alpha=0.95)
+    d = ImageDraw.Draw(c); bw = 920; x = (W - bw) // 2
+    y = ct.Block(bw, "center").head("На консультации разберём", 78, 14).rule(0.14, 28).draw(c, x, 284)
     items = ["подойдёт ли вам липофилинг", "есть ли донорские зоны", "какой объём можно добавить",
              "нужна ли подтяжка или импланты"]
-    f = ct.mont(26, 500); d = ImageDraw.Draw(c)
+    f = ct.mont(31, 500)
     for it in items:
         tw = f.getlength(it); x0 = (W - tw) / 2
-        d.ellipse((x0 - 22, y + 11, x0 - 13, y + 20), fill=LILAC_D); d.text((x0, y), it, font=f, fill=ct.INK); y += 37
-    y += 14
-    fh = ct.bebas(42); t = "КАК ЗАПИСАТЬСЯ"; d.text(((W - fh.getlength(t)) / 2, y), t, font=fh, fill=ct.INK); y += 56
+        d.ellipse((x0 - 26, y + 13, x0 - 15, y + 24), fill=LILAC_D); d.text((x0, y), it, font=f, fill=ct.WHITE); y += 48
+    y += 40
+    fh = ct.bebas(54); t = "КАК ЗАПИСАТЬСЯ"; d.text(((W - fh.getlength(t)) / 2, y), t, font=fh, fill=ct.WHITE); y += 78
     # screenshots: profile header (step 1) and the links sheet (step 2)
     shots = [("profile_header.jpg", [(30, 805, 760, 890)], "1", "Нажмите на ссылку\nв шапке профиля"),
              ("profile_links.jpg", [(30, 180, 1000, 310), (30, 660, 1000, 790)], "2", "Выберите WhatsApp\nили Telegram")]
@@ -200,12 +191,12 @@ def cta():
         m = Image.new("L", card.size, 0); ImageDraw.Draw(m).rounded_rectangle((0, 0, card.width - 1, card.height - 1), radius=22 * S, fill=255)
         card.putalpha(m); card = card.resize((w_, hgt), Image.LANCZOS)
         c.alpha_composite(card, (x0, y))
-        # number badge on the card's top-left corner
-        d.ellipse((x0 - 16, y - 16, x0 + 36, y + 36), fill=LILAC_D, outline=ct.WHITE, width=4)
-        d.text((x0 + 10, y + 11), num, font=ct.bebas(40), fill=ct.INK, anchor="mm")
-        fc = ct.mont(25, 500)
+        d.rounded_rectangle((x0 - 1, y - 1, x0 + w_, y + hgt), radius=22, outline=LILAC_D + (140,), width=2)  # card edge on the dark ground
+        d.ellipse((x0 - 18, y - 18, x0 + 36, y + 36), fill=LILAC_D, outline=ct.GRAPHITE, width=4)
+        d.text((x0 + 9, y + 10), num, font=ct.bebas(40), fill=ct.INK, anchor="mm")
+        fc = ct.mont(27, 500)
         for li, ln in enumerate(cap.split("\n")):
-            d.text((x0 + w_ / 2, y + hgt + 20 + li * 33), ln, font=fc, fill=ct.INK, anchor="ma")
+            d.text((x0 + w_ / 2, y + hgt + 24 + li * 36), ln, font=fc, fill=ct.WHITE, anchor="ma")
         x0 += w_ + gap
     ct.save_jpg(c, f"{OUT}/08_cta.jpg")
 
