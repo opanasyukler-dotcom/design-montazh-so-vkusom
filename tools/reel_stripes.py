@@ -380,28 +380,26 @@ def pulse_dot(fr, x, y, t, t0, r=16):
     path_draw(fr, [(x + rr * np.cos(a), y + rr * np.sin(a)) for a in np.linspace(0, 2 * np.pi, 40)], 1, PINK, 3, op=1 - u)
 def mapM(M, x, y): return M[0, 0] * x + M[0, 2], M[1, 1] * y + M[1, 2]
 
-# A — a teaser of ПОСЛЕ: a soft-focus window opens a little; the picture stays half-hidden
-HA = lift(Drop(["СЕГОДНЯ СНЯЛИ", "*СТРИПЫ*"], 150, 70, 0, maxw=840), 1240)
-TA = Track(["показываю результат комплексной операции"], 32, 72, 0, 300)
-STRIPS = [(258 + k * 94, 812 + (k % 2) * 10, (-1) ** k * 4 + 2) for k in range(7)]
-T_PEEL = [0.95 + 0.2 * k for k in range(7)]
-def tape(fr, x, y, ang, p, w=34, h=200):
-    """one Steri-Strip across the incision: lies flat, then peels up, spins and flies off (p 0→1)"""
-    if p >= 1: return
-    e = eio(p); cx = x + (x - 540) * 0.6 * e; cy = y - 900 * e ** 1.4; a = ang + 260 * e * (1 if x > 540 else -1); sc = 1 + 0.3 * e
-    pts = cv2.boxPoints(((cx, cy), (w * sc, h * sc), a)); sh = cv2.boxPoints(((cx + 6, cy + 8), (w * sc, h * sc), a))
-    fill_poly(fr, sh, DEEP, 0.25 * (1 - e)); fill_poly(fr, pts, np.float32([0.97, 0.95, 0.92]), 0.95 * (1 - e ** 3))
-    for k in range(1, 6):                                                # the fibre lines on the tape
-        q = k / 6; p0 = pts[0] + (pts[3] - pts[0]) * q; p1 = pts[1] + (pts[2] - pts[1]) * q
-        path_draw(fr, [p0, p1], 1, np.float32([0.85, 0.82, 0.8]), 1, op=0.6 * (1 - e ** 3))
+# A — ДО turns into ПОСЛЕ: both photos aligned neck → fingertips, a pink slider sweeps across, then ПОСЛЕ holds
+HA = lift(Drop(["ДЕЛАЕМ ГРУДЬ", "И ЖИВОТ", "*ЗА ОДНУ ОПЕРАЦИЮ:*"], 120, 70, 0, maxw=840), 1300)
+def aligned(im, n, top=250, body=1450):
+    """the whole photo scaled DOWN so neck→fingertips spans `body` px from y=`top`, body centred; the face above is blurred"""
+    y0, y1, cx = NECK[n]; s = body / (y1 - y0); r = cv2.resize(im, None, fx=s, fy=s, interpolation=cv2.INTER_AREA)
+    ox, oy = int(cx * s - 540), int(y0 * s - top); P = 1200
+    r = cv2.copyMakeBorder(r, P, P, P, P, cv2.BORDER_REPLICATE)[P + oy:P + oy + H, P + ox:P + ox + W]
+    return anon(np.ascontiguousarray(r), top - 10)
+A_BEF, A_AFT = aligned(PH["0305"], "0305"), aligned(PH["1637"], "1637")
+T_SWEEP = (0.95, 1.85)
 def s_a(t):
-    z = lerp(1.32, 1.22, eio(t / 3.3)); sharp = full(OPEN, 0.5, 0.42, z)
-    bl = cv2.GaussianBlur(cv2.resize(sharp, (W // 4, H // 4)), (0, 0), 6); bl = cv2.resize(bl, (W, H))
-    r = 0.55 + 0.25 * eo((t - T_PEEL[-1] - 0.2) / 0.8)                # the window opens a little — never the full result
-    d = np.sqrt(((xx - 540) / (380 * r)) ** 2 + ((yy - 820) / (300 * r)) ** 2); m = np.clip(1.5 - d, 0, 1)[..., None] * min(1, 0.35 + t / 1.2)
-    fr = bl * (1 - m) + sharp * m; fr *= 1 - 0.45 * (1 - m); fr += 0.45 * (1 - m) * DEEP; shade(fr, VIG * 2); shade(fr, GBOT)
-    lg = logo_alpha(320); blend(fr, lg, 500 - 160, 290, PINK, eo((t + 0.1) / 0.5) * 0.9)
-    HA.draw(fr, t, 0.15); TA.y = HA.y + HA.h + 46 + TA.top; TA.draw(fr, t, 0.9)
+    z = lerp(1.06, 1.0, eio(t / 3.3)); b = full(A_BEF, 0.5, 0.45, z); a = full(A_AFT, 0.5, 0.45, z)
+    xd = int(W * (1 - eio((t - T_SWEEP[0]) / (T_SWEEP[1] - T_SWEEP[0]))))            # slider runs right → left, ПОСЛЕ follows it
+    fr = b.copy(); fr[:, xd:] = a[:, xd:]; shade(fr, GBOT)
+    if 0 < xd < W:
+        fr[:, max(0, xd - 3):xd + 3] = PINK
+        m = np.zeros((H, W), np.uint8); cv2.circle(m, (xd, 760), 34, 255, -1, cv2.LINE_AA); blend(fr, m.astype(np.float32) / 255, 0, 0, PINK)
+        ar = alpha_img("‹ ›", mont(36, 600)); blend(fr, ar, xd - ar.shape[1] / 2, 760 - ar.shape[0] / 2 - 2, NAVY)
+    chip(fr, "ДО", 40, 280, cl((xd - 200) / 120)); chip(fr, "ПОСЛЕ", 40, 280, cl((W - 300 - xd) / 200))
+    HA.draw(fr, t, 0.15)
     return fr
 
 # B — ДО: first on the surgeon's phone, then in the studio with the three problem zones pinned
@@ -664,6 +662,7 @@ def build_audio(path):
     mus = track(n) * ((G_GAP - (G_GAP - G_VO) * np.clip(dd, 0, 1)) * fade)[:, None]
     sfx = np.zeros(n + 2 * SR)
     def put(x, t, g): i = int(max(0, t) * SR); seg = sfx[i:i + len(x)]; seg += x[:len(seg)] * g
+    put(marimba(PENTA[4], 0.5), T_SWEEP[1], 0.16)                                                      # ПОСЛЕ revealed
     for k in range(3): put(marimba(PENTA[k + 1], 0.4), T_B2 + 0.15 + 0.3 * k, 0.18)                   # ДО pins
     for k, t0 in enumerate(T_ITEMS): put(marimba(PENTA[k + 2], 0.45), t0 + 0.05, 0.22)               # checklist
     for k, t0 in enumerate(T_ZONES): put(water(480 + 140 * k, 1700 + 200 * k), t0 - 0.05, 0.28)      # donor zones
