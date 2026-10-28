@@ -29,6 +29,10 @@ BLUSH = (220, 225, 231)                            # #DCE1E7 — the palette's p
 CREAM = (232, 228, 222)                            # type on the dark square-mode backdrop
 CINEMA_IN = "curves=all='0/0.025 0.25/0.2 0.5/0.48 0.75/0.79 1/0.965'"            # deeper S, lifted brown blacks
 CINEMA_OUT = "vignette=angle=PI/5,noise=c0s=6:c0f=t+u"                            # soft vignette + fine moving grain
+GRADE = True                                       # --no-grade: source colours untouched (no LUT, curves, vignette, grain)
+YUV2RGB = "scale=in_color_matrix=bt709:in_range=tv,format=rgb24"                    # exact BT.709 both ways, no colour shift
+RGB2YUV = "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p"
+TAGS = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "iec61966-2-4", "-color_range", "tv"]  # as the camera
 SQUARE = (1440, 0.31, 0.46)                        # square-mode card: side, centre x, centre y (fractions)
 # extra punch-ins inside long takes: segment → [(source time, zoom)]; the zoom drifts +3 % inside each step
 STEPS = {2: [(37.72, 1.00), (40.80, 1.28)], 4: [(51.06, 1.00), (53.82, 1.30)],
@@ -338,8 +342,9 @@ def render(src, work, out, mic=None, retouch=None):
                    input=mix.astype(np.float32).tobytes(), check=True)
     wr = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS),
                            "-i", "-", "-i", f"{work}/mix.wav", "-map", "0:v", "-map", "1:a", "-t", f"{full:.3f}",
-                           "-vf", f"format=yuv420p,{CINEMA_OUT},fade=t=in:d=0.3,fade=t=out:st={full - 0.6:.3f}:d=0.6", "-c:v", "libx264", "-preset", "medium",
-                           "-crf", "17", "-profile:v", "high", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "256k",
+                           "-vf", f"{RGB2YUV}," + (f"{CINEMA_OUT}," if GRADE else "") + f"fade=t=in:d=0.3,fade=t=out:st={full - 0.6:.3f}:d=0.6",
+                           "-c:v", "libx264", "-preset", "slow", "-crf", "12" if not GRADE else "17", "-profile:v", "high",
+                           "-pix_fmt", "yuv420p"] + TAGS + ["-c:a", "aac", "-b:a", "320k",
                            "-movflags", "+faststart", out], stdin=subprocess.PIPE)
     sz = W * H * 3; fi = 0; last = None
     yy = np.linspace(0, 1, H, dtype=np.float32); r0 = int(0.62 * H)
@@ -417,7 +422,7 @@ def render(src, work, out, mic=None, retouch=None):
     for k, (a, b, z0, z1, _) in enumerate(SEGS):
         m = round((starts[k] + b - a) * FPS) - round(starts[k] * FPS)
         rd = subprocess.Popen(["ffmpeg", "-v", "error", "-ss", f"{a:.3f}", "-i", src, "-frames:v", str(m),
-                               "-vf", f"lut3d=file={LUT}:interp=tetrahedral,{CINEMA_IN}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                               "-vf", YUV2RGB + (f",lut3d=file={LUT}:interp=tetrahedral,{CINEMA_IN}" if GRADE else ""), "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
                               stdout=subprocess.PIPE, bufsize=sz * 2)
         for j in range(m):
             buf = rd.stdout.read(sz)
@@ -454,7 +459,8 @@ def render(src, work, out, mic=None, retouch=None):
     wr.stdin.close(); wr.wait()
 
 def cover(src, work, at=60.0, retouch=None):
-    raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(at), "-i", src, "-frames:v", "1", "-vf", f"lut3d=file={LUT},{CINEMA_IN},vignette=angle=PI/5",
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(at), "-i", src, "-frames:v", "1",
+                          "-vf", YUV2RGB + (f",lut3d=file={LUT},{CINEMA_IN},vignette=angle=PI/5" if GRADE else ""),
                           "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, check=True).stdout
     fr = np.frombuffer(raw, np.uint8).reshape(H, W, 3).copy()
     if retouch is not None: fr = retouch.apply(fr)
@@ -469,6 +475,7 @@ if __name__ == "__main__":
     src, work = sys.argv[1:3]
     mic = sys.argv[sys.argv.index("--mic") + 1] if "--mic" in sys.argv else None
     rt = None
+    if "--no-grade" in sys.argv: GRADE = False
     if "--retouch" in sys.argv:                                            # needs the mediapipe venv
         import face_retouch; rt = face_retouch.Retoucher(sys.argv[sys.argv.index("--retouch") + 1])
     if "--cover" in sys.argv: cover(src, work, retouch=rt)
