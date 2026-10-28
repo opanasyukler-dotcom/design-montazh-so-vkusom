@@ -80,6 +80,7 @@ SQUARE_ICON = "flames"                             # doodle drawn under the squa
 CARD_SCRIPT, CARD_LABEL = "Продолжение", "В СЛЕДУЮЩЕЙ ЧАСТИ"
 COVER_LINES, COVER_SCRIPT, COVER_AT = ("САМОЕ СТРАШНОЕ", "НАЧАЛОСЬ"), "после родов", ("main", 60.0)
 OUT_NAME = "rody_4k.mp4"
+COVER_SCRIPT_PX = 250
 
 def seg_src(k): return SEG_SRC[k] if SEG_SRC else "main"
 
@@ -433,11 +434,12 @@ def render(srcd, work, out, retouch=None):
         pw = int(W * min(t / full, 1)); fr[0:10, :pw] = (fr[0:10, :pw] * 0.3 + np.array(CREAM) * 0.7).astype(np.uint8)   # progress line
     for k, (a, b, z0, z1, _) in enumerate(SEGS):
         m = round((starts[k] + b - a) * FPS) - round(starts[k] * FPS)
-        rd = subprocess.Popen(["ffmpeg", "-v", "error", "-ss", f"{a:.3f}", "-i", srcd[seg_src(k)]["video"], "-frames:v", str(m),
+        pre = round(max(0.0, -a) * FPS)                                     # voice starts before the clip: hold frame 0
+        rd = subprocess.Popen(["ffmpeg", "-v", "error", "-ss", f"{max(a, 0.0):.3f}", "-i", srcd[seg_src(k)]["video"], "-frames:v", str(m),
                                "-vf", YUV2RGB + (f",lut3d=file={LUT}:interp=tetrahedral,{CINEMA_IN}" if GRADE else ""), "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
                               stdout=subprocess.PIPE, bufsize=sz * 2)
         for j in range(m):
-            buf = rd.stdout.read(sz)
+            buf = rd.stdout.read(sz) if (j == 0 or j >= pre) else b""          # b"" → repeat the last frame
             fr = np.frombuffer(buf, np.uint8).reshape(H, W, 3).copy() if len(buf) == sz else last.copy()
             if retouch is not None and len(buf) == sz: fr = retouch.apply(fr)             # natural skin + soft makeup
             last = fr; u = j / max(m - 1, 1)
@@ -481,7 +483,7 @@ def cover(srcd, work, retouch=None):
     cx = int(0.80 * W); y = int(0.30 * H)
     for line in COVER_LINES:
         p = label_patch(line, 92); blend(fr, p, cx - p.shape[1] // 2, y - p.shape[0] // 2); y += 150
-    p = script_patch(COVER_SCRIPT, 250); blend(fr, p, min(cx - p.shape[1] // 2, W - 110 - p.shape[1]), y + 90 - p.shape[0] // 2)
+    p = script_patch(COVER_SCRIPT, COVER_SCRIPT_PX); blend(fr, p, min(cx - p.shape[1] // 2, W - 110 - p.shape[1]), y + 90 - p.shape[0] // 2)
     Image.fromarray(fr).save(f"{work}/cover_4k.jpg", quality=95, subsampling=0)
 
 if __name__ == "__main__":
