@@ -3,7 +3,8 @@ Source C0973 (№5, 3:21), 3840x2160 @ 25.  Minimal look: brown-moody grade (lut
 punch-ins / slow push-ins and pull-outs on the face, thin Montserrat for labels and word-by-word subtitles, Gogol
 handwriting drawn on by a pencil (with hand-drawn underlines and sparkles), labels typed on with key clicks, one
 insert where the picture eases into a square card on a dark blurred backdrop, micro shakes on the heavy words, a thin
-progress line, key-word subtitles that bounce in, extra punch-ins inside long takes, a deeper «cinema» finish (S-curve, vignette, fine grain), a blurred end card.
+progress line, key-word subtitles that bounce in, hand-drawn animated doodles (?!, hospital, clapper that claps, dream
+cloud, pin, ₽ coin, magic wand, flames, heart) drawn by the pencil on the free wall, real CC0 key clicks for typing, extra punch-ins inside long takes, a deeper «cinema» finish (S-curve, vignette, fine grain), a blurred end card.
 Cuts sit in the pauses (energy-checked); each join gets a 25 ms raised-cosine fade so nothing clicks.
   python3 rody_reel.py SRC.mov WORK_DIR [--mic REC.m4a]  → WORK_DIR/rody_4k.mp4 (voice from the mic recording, sfx inside)
   python3 rody_reel.py SRC.mov WORK_DIR --cover    → WORK_DIR/cover_4k.jpg
@@ -16,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from stories_kit import font
 from posuda_compose import text_patch, blend, ease
 import posuda_sfx as FX
+import doodles
 
 W, H, FPS, SR = 3840, 2160, 25, 48000
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -58,6 +60,11 @@ INSERTS = [
     (11, 0.1, 12, 2.6, "И ДА,", "я рожала платно", "wall", "double"),
 ]
 TYPE_STEP = 0.05                                   # one typed letter of a label
+KEYS_DIR = os.path.join(ROOT, "sfx", "keyboard")   # real key presses, CC0 (sfx/keyboard/LICENSE.txt)
+# hand-drawn animated doodles on the free wall left of her: (segment, source from, source to, icon, colour key)
+DOODLES = [(1, 34.05, 36.80, "qmark"), (2, 42.95, 45.92, "hospital"), (5, 58.70, 61.55, "clapper"), (6, 61.60, 63.28, "cloud"),
+           (10, 172.95, 174.86, "pin"), (11, 182.70, 184.20, "ruble"), (12, 189.60, 190.90, "ruble"), (12, 190.95, 193.55, "wand")]
+DOODLE_BOX = (0.085, 0.17, 0.25)                   # x, y (fractions of the frame), size (fraction of the height)
 HITS_SRC = [(7, 68.00), (8, 73.12), (10, 173.72), (11, 183.50)]   # micro shake + low hit: «ужасный», «хапнула», «Юдина», «платно»
 
 def timeline():
@@ -140,6 +147,24 @@ def pencil_noise(dur, seed, gain):
     y = z * env_ * (0.6 + grain * 2) * FX.env(n, 300, 1200)
     return np.stack([y, y * 0.92], 1) * (gain / (np.abs(y).max() + 1e-9))
 
+_KEYS = []
+def key_sample(rng, gain):
+    """a recorded key press (onset-aligned, peak-normalised), random pick, slight level/pan variation"""
+    if not _KEYS:
+        for f in sorted(os.listdir(KEYS_DIR)):
+            if not f.endswith(".wav"): continue
+            x = FX.read(os.path.join(KEYS_DIR, f))[:, 0]; e = np.abs(x); on = max(int(np.argmax(e > e.max() * 0.2)) - int(0.004 * SR), 0)
+            y = x[on:on + int(0.16 * SR)]; y = y * FX.env(len(y), 0, int(0.03 * SR)); _KEYS.append(y / (np.abs(y).max() + 1e-9))
+    y = _KEYS[rng.integers(len(_KEYS))] * gain * rng.uniform(0.7, 1.0); pan = rng.uniform(0.4, 0.6)
+    return np.stack([y * (1 - pan) * 2, y * pan * 2], 1).astype(np.float32)
+
+def clap_snd(gain):
+    """the clapper shutting: a dry wooden clack"""
+    n = int(0.12 * SR); t = np.arange(n) / SR; rng = np.random.default_rng(2)
+    z = np.diff(rng.standard_normal(n + 1)).astype(np.float32) * np.exp(-t / 0.006)
+    y = z * 0.7 + np.sin(2 * np.pi * 1150 * t) * np.exp(-t * 70) * 0.5 + np.sin(2 * np.pi * 420 * t) * np.exp(-t * 45) * 0.4
+    y *= gain / np.abs(y).max(); return np.stack([y, y], 1).astype(np.float32)
+
 def key_click(rng, gain, space=False):
     """one key of a soft keyboard: click + small body resonance + thock, and the key coming back up"""
     n = int(0.09 * SR); t = np.arange(n) / SR; y = np.zeros(n, np.float32)
@@ -152,13 +177,15 @@ def key_click(rng, gain, space=False):
     y *= gain * rng.uniform(0.75, 1.0) / (np.abs(y).max() + 1e-9); pan = rng.uniform(0.4, 0.6)
     return np.stack([y * (1 - pan) * 2, y * pan * 2], 1)
 
-def sfx(v, keys, pencils, punch_times, hits, ticks, card_t):
+def sfx(v, keys, pencils, punch_times, hits, ticks, card_t, claps=(), twinkles=()):
     N = len(v); bus = np.zeros((N, 2), np.float32); rng = np.random.default_rng(9)
     def place(x, t):
         i = int(t * SR); n = min(len(x), N - i)
         if n > 0 and i >= 0: bus[i:i + n] += x[:n]
     for t in punch_times: place(FX.noise_sweep(0.55, 500, 4500, FX.db(-27)), t - 0.32)        # soft whoosh into a punch-in
-    for t, space in keys: place(key_click(rng, FX.db(-20), space), t)                          # labels type on
+    for t, space in keys: place(key_sample(rng, FX.db(-17)), t)                                 # labels type on: real key clicks
+    for t in claps: place(clap_snd(FX.db(-16)), t)
+    for t in twinkles: place(FX.bells([2093, 2637, 3136], FX.db(-27), 0.06), t)
     for k, (t, dur) in enumerate(pencils): place(pencil_noise(dur, 40 + k, FX.db(-22)), t)    # pencil on the screen
     for t in hits:                                                                              # low soft hit on the heavy words
         n = int(0.9 * SR); tt = np.arange(n) / SR; y = np.sin(2 * np.pi * (52 + 30 * np.exp(-tt * 9)) * tt) * np.exp(-tt * 4.5)
@@ -286,13 +313,25 @@ def render(src, work, out, mic=None):
     card_h = script_patch("Продолжение", 260); card_tr = ink_track(card_h); card_lab = "В СЛЕДУЮЩЕЙ ЧАСТИ"
     card_ls = [label_patch(card_lab[:i], 58) for i in range(1, len(card_lab) + 1)]
     keys += [(total + 1.55 + i * TYPE_STEP, c == " ") for i, c in enumerate(card_lab)]; pencils += [(total + 0.35, 1.0)]
+    dds = []
+    for k, a_, b_, name in DOODLES:
+        t0 = starts[k] + a_ - SEGS[k][0]; t1 = starts[k] + b_ - SEGS[k][0]; dd = min(0.9, (t1 - t0) * 0.45)
+        dds.append(dict(t0=t0, t1=t1, dd=dd, name=name, seed=len(dds) + 1)); pencils.append((t0, dd))
+    claps = [d_["t0"] + d_["dd"] + 0.3 for d_ in dds if d_["name"] == "clapper"]      # the bar shuts 0.3 s after drawing
+    twinkles = [d_["t0"] + d_["dd"] + 0.1 for d_ in dds if d_["name"] == "wand"]
+    # the square insert gets little flames under «мой личный ад»
+    for d_ in ins:
+        if d_["mode"] == "square":
+            tf = d_["tw"] + d_["wd"] + 0.65; dds.append(dict(t0=tf, t1=d_["t1"], dd=0.6, name="flames", seed=99, sq=True)); pencils.append((tf, 0.6))
+    hx = (W - card_h.shape[1]) // 2 + card_h.shape[1] + 30
+    dds.append(dict(t0=total + 1.4, t1=total + END_CARD + 1, dd=0.5, name="heart", seed=7, card=True)); pencils.append((total + 1.4, 0.5))
     # audio: voice + effects
     punch = [starts[k] for k, s_ in enumerate(SEGS) if s_[2] >= 1.18 and k > 0]
     punch += [starts[k] + st[0] - SEGS[k][0] for k, sts in STEPS.items() for st in sts[1:]]
     punch += [t for d_ in ins if d_["mode"] == "square" for t in (d_["t0"] + 0.3, d_["t1"] + 0.3)]
     hits = [starts[k] + ts - SEGS[k][0] for k, ts in HITS_SRC]
     ticks = [a_ for w, a_, b_ in cs if any(k in w for k in KEY)]
-    mix = sfx(v, keys, pencils, punch, hits, ticks, total)
+    mix = sfx(v, keys, pencils, punch, hits, ticks, total, claps, twinkles)
     mix *= min(1, FX.db(-1) / (np.abs(mix).max() + 1e-9))
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", str(SR), "-ac", "2", "-i", "-", f"{work}/mix.wav"],
                    input=mix.astype(np.float32).tobytes(), check=True)
@@ -315,6 +354,18 @@ def render(src, work, out, mic=None):
         return (0.0, 0.0)
     def put_pen(fr, x, y, bob=0.0):
         blend(fr, pen, int(x - pen_tip[0]), int(y - pen_tip[1] + bob))
+    def doodle(fr, d_, t):
+        if not (d_["t0"] <= t < d_["t1"] + 0.3): return
+        prog = (t - d_["t0"]) / d_["dd"]
+        if t > d_["t1"]: prog = 1 - (t - d_["t1"]) / 0.3                    # undraw quickly at the end
+        if d_.get("sq"):
+            left = int(SQUARE[1] * W + SQUARE[0] / 2 + 90); size = 300; x = (left + W - 110) // 2 - size // 2; y = int(0.46 * H) + 170; col, th = CREAM, 7
+        elif d_.get("card"):
+            size = 190; x = hx; y = int(H * 0.44) - size // 2 - 20; col, th = INK, 7
+        else:
+            size = int(DOODLE_BOX[2] * H); x = int(DOODLE_BOX[0] * W); y = int(DOODLE_BOX[1] * H); col, th = INK, 9
+        tip = doodles.draw_icon(fr, d_["name"], x, y, size, prog, t, col, th, motion=max(0.0, t - d_["t0"] - d_["dd"]), seed=d_["seed"])
+        if tip is not None and 0 < prog < 1 and t <= d_["t1"]: put_pen(fr, *tip, bob=4 * np.sin(t * 40))
     def insert(fr, d_, t):
         fade = 1 - ease((t - d_["t1"]) / 0.3)
         if d_["mode"] == "square":
@@ -355,6 +406,8 @@ def render(src, work, out, mic=None):
         sq = square_k(t)
         for d_ in ins:
             if d_["t0"] <= t < d_["t1"] + 0.45: insert(fr, d_, t)
+        for d_ in dds:
+            if not d_.get("card"): doodle(fr, d_, t)
         for a_, b_, ps in subs:
             if a_ <= t < b_:
                 f = int((t - a_) * FPS); p = ps[min(f, len(ps) - 1)]; sx = W / 2 + (SQUARE[1] * W - W / 2) * sq
@@ -392,6 +445,8 @@ def render(src, work, out, mic=None):
         nch = int((t - total - 1.55) / TYPE_STEP) + 1
         if nch > 0:
             lp = card_ls[min(nch, len(card_ls)) - 1]; blend(fr, lp, (W - card_ls[-1].shape[1]) // 2, int(H * 0.60 - lp.shape[0] / 2))
+        for d_ in dds:
+            if d_.get("card"): doodle(fr, d_, t)
         pw = int(W * min(t / full, 1)); fr[0:10, :pw] = (fr[0:10, :pw] * 0.3 + np.array(INK) * 0.7).astype(np.uint8)
         wr.stdin.write(fr.tobytes()); fi += 1
     wr.stdin.close(); wr.wait()
