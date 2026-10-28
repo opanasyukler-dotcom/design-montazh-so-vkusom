@@ -24,7 +24,7 @@ SLIDES = [
     # headline band (top of the reel) stacked over the footage band (bottom of the reel): full 4:5, no side bars
     ("05_volume", 23.07, 29.20, "stack", (0.07, 0.36), (0.585, 1.0)),
     ("06_not_a_lift", 29.20, 36.60, "stack", (0.06, 0.335), (0.378, 1.0)),
-    ("07_this_task", 36.60, None, "stack", (0.05, 0.34), (0.585, 1.0)),
+    ("07_this_task", 36.60, None, "text"),  # footage cropped low, headline redrawn on top of it
 ]
 
 
@@ -76,8 +76,39 @@ def stack(name, a, b, top, bot):
     os.remove(tmp)
 
 
+def headline_overlay(path):
+    """the reel's last headline, redrawn over the footage (check mark, title, navy pill)"""
+    from PIL import Image, ImageDraw
+    S = 3
+    ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ov.alpha_composite(ct.vgrad(170, 380, 1.0, 0))  # the top of the crop is already dark: hides the reel's word pill
+    hi = Image.new("RGBA", (W * S, H * S), (0, 0, 0, 0)); d = ImageDraw.Draw(hi)
+    cx, cy, r = W // 2 * S, 92 * S, 40 * S
+    d.ellipse((cx - r, cy - r, cx + r, cy + r), outline=ct.WHITE + (255,), width=5 * S)
+    d.line([(cx - 18 * S, cy + 1 * S), (cx - 5 * S, cy + 14 * S), (cx + 20 * S, cy - 13 * S)], fill=ct.WHITE + (255,), width=6 * S, joint="curve")
+    ov.alpha_composite(hi.resize((W, H), Image.LANCZOS))
+    ct.Block(W - 2 * ct.MARGIN, "center").head("Именно эту задачу\nи решали", 92, 0).draw(ov, ct.MARGIN, 152)
+    f = ct.mont(27, 500); t = "Подробнее в актуальном «Липофилинг»"; tw = f.getlength(t)
+    d = ImageDraw.Draw(ov); y = 352
+    d.rounded_rectangle(((W - tw) / 2 - 22, y, (W + tw) / 2 + 22, y + 50), radius=25, fill=(16, 46, 70, 235))
+    d.text((W / 2, y + 25), t, font=f, fill=ct.WHITE, anchor="mm")
+    ov.save(path)
+
+
 def cut(name, a, b, mode="crop", top=None, bot=None):
     if mode == "stack": return stack(name, a, b, top, bot)
+    if mode == "text":
+        ovp = f"{OUT}/_{name}_ov.png"; headline_overlay(ovp)
+        dur = (b or float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", REEL],
+                                         capture_output=True, text=True).stdout)) - a
+        fo = max(dur - 0.12, 0)
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{a:.3f}", "-t", f"{dur:.3f}", "-i", REEL, "-loop", "1", "-i", ovp,
+                        "-filter_complex", f"[0:v]crop={W}:{H}:0:1920-{H},setsar=1[v];[v][1:v]overlay=0:0:shortest=1,format=yuv420p[o]",
+                        "-map", "[o]", "-map", "0:a", "-t", f"{dur:.3f}",
+                        "-af", f"afade=t=in:d=0.06,afade=t=out:st={fo:.3f}:d=0.12",
+                        "-c:v", "libx264", "-preset", "medium", "-crf", "17",
+                        "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", f"{OUT}/{name}.mp4"], check=True)
+        os.remove(ovp); return
     dur = (b or float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", REEL],
                                      capture_output=True, text=True).stdout)) - a
     fo = max(dur - 0.12, 0)
