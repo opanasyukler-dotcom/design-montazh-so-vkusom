@@ -121,7 +121,7 @@ def cut(name, a, b, mode="crop", top=None, bot=None):
 
 
 ASSETS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "carousel_lipofilling", "src")
-LILAC_D = (196, 120, 214)  # lilac dark enough to read on white and on the dark screenshots
+LILAC_D = (240, 178, 196)  # soft pastel pink: bullets, highlight frames, step badges
 
 
 def before_badge(path, cx, cy, r=165):
@@ -161,9 +161,12 @@ def cta():
     """surgeon on top, what the consultation covers, then how to book: the profile header and its links, annotated"""
     from PIL import Image, ImageDraw
     import numpy as np
-    PH = 540
-    im = ct.load_photo("DSC00888.JPG"); sc = W / im.width; sh = im.height * sc; off = 0.19 * sh
-    ph = im.resize((W, round(sh)), Image.LANCZOS).crop((0, int(off), W, int(off) + PH)).convert("RGBA")
+    PH = 600
+    ct.LILAC = LILAC_D  # the rule under the heading follows the same pink
+    # surgeon looking into the camera, taken from the reel below its captions: whole face stays clear of the fade
+    fr = os.path.join(OUT, "_frame.png")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "12.4", "-i", REEL, "-frames:v", "1", fr], check=True)
+    ph = Image.open(fr).convert("RGBA").crop((0, 640, W, 640 + PH)); os.remove(fr)
     c = Image.new("RGBA", (W, H), ct.WHITE + (255,)); c.alpha_composite(ph, (0, 0))
     ct.put_logo(c, y=56, alpha=0.95)
     arr = np.zeros((H, W, 4), np.uint8); arr[..., :3] = 255
@@ -199,7 +202,7 @@ def cta():
         c.alpha_composite(card, (x0, y))
         # number badge on the card's top-left corner
         d.ellipse((x0 - 16, y - 16, x0 + 36, y + 36), fill=LILAC_D, outline=ct.WHITE, width=4)
-        d.text((x0 + 10, y + 11), num, font=ct.bebas(40), fill=ct.WHITE, anchor="mm")
+        d.text((x0 + 10, y + 11), num, font=ct.bebas(40), fill=ct.INK, anchor="mm")
         fc = ct.mont(25, 500)
         for li, ln in enumerate(cap.split("\n")):
             d.text((x0 + w_ / 2, y + hgt + 20 + li * 33), ln, font=fc, fill=ct.INK, anchor="ma")
