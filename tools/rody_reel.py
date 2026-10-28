@@ -3,7 +3,7 @@ Source C0973 (№5, 3:21), 3840x2160 @ 25.  Minimal look: brown-moody grade (lut
 punch-ins / slow push-ins and pull-outs on the face, thin Montserrat for labels and word-by-word subtitles, Gogol
 handwriting for the inserts (written on with a wipe), a blurred end card «продолжение в следующей части».
 Cuts sit in the pauses (energy-checked); each join gets a 25 ms raised-cosine fade so nothing clicks.
-  python3 rody_reel.py SRC.mov WORK_DIR            → WORK_DIR/rody_4k.mp4 (+ voice.wav, sfx inside)
+  python3 rody_reel.py SRC.mov WORK_DIR [--mic REC.m4a]  → WORK_DIR/rody_4k.mp4 (voice from the mic recording, sfx inside)
   python3 rody_reel.py SRC.mov WORK_DIR --cover    → WORK_DIR/cover_4k.jpg
 """
 import difflib, json, os, re, subprocess, sys
@@ -97,11 +97,19 @@ def cues(words, x):
     for p, q in zip(merged, merged[1:]): p[2] = q[1] if q[1] - p[2] < 0.5 else p[2] + 0.25
     return [(w, s - 0.05, e - 0.05) for w, s, e in merged]
 
-def voice(src, work):
-    x = FX.read(src, af="highpass=f=80,afftdn=nf=-45")
+MIC_SYNC = ((35.0, 0.01492), (192.0, 0.01340))      # mic time = camera time + offset (cross-correlated, ~1 ms drift)
+
+def mic_off(t):
+    (t0, o0), (t1, o1) = MIC_SYNC; return o0 + (o1 - o0) * (t - t0) / (t1 - t0)
+
+def voice(src, work, mic=None):
+    """the separately recorded mic voice (camera sound dropped), cut on the camera timeline"""
+    x = FX.read(mic or src, af="highpass=f=80,afftdn=nf=-45")
     parts = []
     for a, b, *_ in SEGS:
-        y = x[int(a * SR):int(b * SR)].copy(); f = int(0.025 * SR); r = 0.5 - 0.5 * np.cos(np.linspace(0, np.pi, f))
+        n = int(round((b - a) * SR))
+        if mic: a = a + mic_off(a)
+        y = x[int(round(a * SR)):int(round(a * SR)) + n].copy(); f = int(0.025 * SR); r = 0.5 - 0.5 * np.cos(np.linspace(0, np.pi, f))
         y[:f] *= r[:, None]; y[-f:] *= r[::-1, None]; parts.append(y)
     v = np.concatenate(parts + [np.zeros((int(END_CARD * SR), 2), np.float32)])
     raw = f"{work}/voice_raw.wav"
@@ -148,9 +156,9 @@ def tracked(text, f, track):
 def label_patch(text, size=62):
     return tracked(text, font("second", size, 300), size * 0.28)
 
-def render(src, work, out):
+def render(src, work, out, mic=None):
     words = json.load(open(f"{work}/words.json"))
-    v = voice(src, work); x = FX.read(src)[:, 0].copy()
+    v = voice(src, work, mic); x = FX.read(src)[:, 0].copy()
     starts, total = timeline(); full = total + END_CARD; n = round(full * FPS)
     cs = cues(words, x)
     fs = font("second", 124, 300)
@@ -236,5 +244,6 @@ def cover(src, work, at=60.0):
 
 if __name__ == "__main__":
     src, work = sys.argv[1:3]
+    mic = sys.argv[sys.argv.index("--mic") + 1] if "--mic" in sys.argv else None
     if "--cover" in sys.argv: cover(src, work)
-    else: render(src, work, f"{work}/rody_4k.mp4")
+    else: render(src, work, f"{work}/rody_4k.mp4", mic)
