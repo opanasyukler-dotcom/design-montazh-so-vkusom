@@ -72,6 +72,16 @@ DOODLES = [(1, 34.05, 36.80, "qmark"), (2, 42.95, 45.92, "hospital"), (5, 58.70,
 DOODLE_BOX = (0.085, 0.17, 0.25)                   # x, y (fractions of the frame), size (fraction of the height)
 HITS_SRC = [(7, 68.00), (8, 73.12), (10, 173.72), (11, 183.50)]   # micro shake + low hit: «ужасный», «хапнула», «Юдина», «платно»
 
+# multi-source projects (--project NAME → tools/NAME.py overrides the UPPER_CASE settings above)
+SEG_SRC = None                                     # per segment: key into SOURCES (None → every segment from "main")
+SOURCES = None                                     # key → dict(video, mic, sync=((t0, off0), (t1, off1)), words)
+PUNCH_SEGS = {8}                                   # segments whose zoom snaps in over 0.3 s instead of drifting
+CARD_SCRIPT, CARD_LABEL = "Продолжение", "В СЛЕДУЮЩЕЙ ЧАСТИ"
+COVER_LINES, COVER_SCRIPT, COVER_AT = ("САМОЕ СТРАШНОЕ", "НАЧАЛОСЬ"), "после родов", ("main", 60.0)
+OUT_NAME = "rody_4k.mp4"
+
+def seg_src(k): return SEG_SRC[k] if SEG_SRC else "main"
+
 def timeline():
     t, out = 0.0, []
     for s in SEGS: out.append(t); t += s[1] - s[0]
@@ -94,11 +104,11 @@ def onset_fix(x, ws, a):
         prev = w[2]
     return ws
 
-def cues(words, x):
+def cues(srcd):
     """display words (lower case) on whisper timings via a diff alignment; one word per cue, 1–2 letter words ride along"""
     starts, _ = timeline(); out = []
     for k, (a, b, _, _, text) in enumerate(SEGS):
-        ws = onset_fix(x, snap_words(words, a, b), a)
+        sd = srcd[seg_src(k)]; ws = onset_fix(sd["x"], snap_words(sd["wl"], a, b), a)
         src = [re.sub(r"[^\w-]", "", w[0].lower()) for w in ws]; dst = text.split()
         sm = difflib.SequenceMatcher(a=src, b=dst, autojunk=False); tm = []
         for op, i1, i2, j1, j2 in sm.get_opcodes():
@@ -122,16 +132,16 @@ def cues(words, x):
 
 MIC_SYNC = ((35.0, 0.01492), (192.0, 0.01340))      # mic time = camera time + offset (cross-correlated, ~1 ms drift)
 
-def mic_off(t):
-    (t0, o0), (t1, o1) = MIC_SYNC; return o0 + (o1 - o0) * (t - t0) / (t1 - t0)
+def mic_off(t, sync=None):
+    (t0, o0), (t1, o1) = sync or MIC_SYNC; return o0 + (o1 - o0) * (t - t0) / (t1 - t0)
 
-def voice(src, work, mic=None):
+def voice(srcd, work):
     """the separately recorded mic voice (camera sound dropped), cut on the camera timeline"""
-    x = FX.read(mic or src, af="highpass=f=80,afftdn=nf=-45")
+    xs = {k: FX.read(d["mic"] or d["video"], af="highpass=f=80,afftdn=nf=-45") for k, d in srcd.items()}
     parts = []
-    for a, b, *_ in SEGS:
-        n = int(round((b - a) * SR))
-        if mic: a = a + mic_off(a)
+    for k, (a, b, *_) in enumerate(SEGS):
+        n = int(round((b - a) * SR)); d = srcd[seg_src(k)]; x = xs[seg_src(k)]
+        if d["mic"]: a = a + mic_off(a, d.get("sync"))
         y = x[int(round(a * SR)):int(round(a * SR)) + n].copy(); f = int(0.025 * SR); r = 0.5 - 0.5 * np.cos(np.linspace(0, np.pi, f))
         y[:f] *= r[:, None]; y[-f:] *= r[::-1, None]; parts.append(y)
     v = np.concatenate(parts + [np.zeros((int(END_CARD * SR), 2), np.float32)])
@@ -291,11 +301,11 @@ def wobble_line(x0, x1, y0, y1, seed, amp=9, n=40):
 def sparkle(cx, cy, r):
     return [[(cx - r, cy), (cx + r, cy)], [(cx, cy - r), (cx, cy + r)], [(cx - r * .6, cy - r * .6), (cx + r * .6, cy + r * .6)]]
 
-def render(src, work, out, mic=None, retouch=None):
-    words = json.load(open(f"{work}/words.json"))
-    v = voice(src, work, mic); x = FX.read(src)[:, 0].copy()
+def render(srcd, work, out, retouch=None):
+    for d in srcd.values(): d["wl"] = json.load(open(d["words"])); d["x"] = FX.read(d["video"])[:, 0].copy()
+    v = voice(srcd, work)
     starts, total = timeline(); full = total + END_CARD; n = round(full * FPS)
-    cs = cues(words, x)
+    cs = cues(srcd)
     fs = font("second", 124, 300)
     subs = []
     for w, a, b in cs:                                                    # key words bounce in on a pill, the rest pop
@@ -305,17 +315,18 @@ def render(src, work, out, mic=None, retouch=None):
         subs.append((a, b, [cv2.resize(p, None, fx=q, fy=q, interpolation=cv2.INTER_AREA) for q in sc]))
     pen, pen_tip = pencil_sprite()
     keys, pencils, ins = [], [], []
-    for s0, o0, s1, o1, lab, hand, mode, doodle in INSERTS:
+    for s0, o0, s1, o1, lab, hand, mode, doodle, *sizes in INSERTS:                # optional (label px, handwriting px)
         t0 = starts[s0] + o0; t1 = (starts[s1] + (SEGS[s1][1] - SEGS[s1][0]) + o1) if o1 <= 0 else starts[s1] + o1
         col = CREAM if mode == "square" else INK
-        labs = [label_patch(lab[:i], 60, col) for i in range(1, len(lab) + 1)] if lab else []
-        hp = script_patch(hand, (165 if mode == "square" else 150) if len(hand) > 12 else (230 if mode == "square" else 180), col)
+        lsz, hsz = sizes if sizes else (60, (165 if mode == "square" else 150) if len(hand) > 12 else (230 if mode == "square" else 180))
+        labs = [label_patch(lab[:i], lsz, col) for i in range(1, len(lab) + 1)] if lab else []
+        hp = script_patch(hand, hsz, col)
         tw = t0 + (0.35 if mode == "square" else 0.0) + (len(lab) * TYPE_STEP + 0.15 if lab else 0.1); wd = 0.07 * len(hand) + 0.35
         keys += [(t0 + (0.35 if mode == "square" else 0.0) + i * TYPE_STEP, c == " ") for i, c in enumerate(lab)]
         pencils += [(tw, wd), (tw + wd + 0.05, 0.55)]
         ins.append(dict(t0=t0, t1=t1, mode=mode, doodle=doodle, col=col, labs=labs, hp=hp, track=ink_track(hp), tw=tw, wd=wd,
                         tl=t0 + (0.35 if mode == "square" else 0.0)))
-    card_h = script_patch("Продолжение", 260); card_tr = ink_track(card_h); card_lab = "В СЛЕДУЮЩЕЙ ЧАСТИ"
+    card_h = script_patch(CARD_SCRIPT, 260); card_tr = ink_track(card_h); card_lab = CARD_LABEL
     card_ls = [label_patch(card_lab[:i], 58) for i in range(1, len(card_lab) + 1)]
     keys += [(total + 1.55 + i * TYPE_STEP, c == " ") for i, c in enumerate(card_lab)]; pencils += [(total + 0.35, 1.0)]
     dds = []
@@ -421,7 +432,7 @@ def render(src, work, out, mic=None, retouch=None):
         pw = int(W * min(t / full, 1)); fr[0:10, :pw] = (fr[0:10, :pw] * 0.3 + np.array(CREAM) * 0.7).astype(np.uint8)   # progress line
     for k, (a, b, z0, z1, _) in enumerate(SEGS):
         m = round((starts[k] + b - a) * FPS) - round(starts[k] * FPS)
-        rd = subprocess.Popen(["ffmpeg", "-v", "error", "-ss", f"{a:.3f}", "-i", src, "-frames:v", str(m),
+        rd = subprocess.Popen(["ffmpeg", "-v", "error", "-ss", f"{a:.3f}", "-i", srcd[seg_src(k)]["video"], "-frames:v", str(m),
                                "-vf", YUV2RGB + (f",lut3d=file={LUT}:interp=tetrahedral,{CINEMA_IN}" if GRADE else ""), "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
                               stdout=subprocess.PIPE, bufsize=sz * 2)
         for j in range(m):
@@ -433,7 +444,7 @@ def render(src, work, out, mic=None, retouch=None):
             if k in STEPS:                                                                   # punch-in steps + slow drift
                 st = [p for p in STEPS[k] if p[0] <= ts + 1e-6][-1]; nx = [p[0] for p in STEPS[k] if p[0] > ts] + [b]
                 z = st[1] * (1 + 0.03 * ease((ts - st[0]) / max(nx[0] - st[0], 0.1)))
-            elif z0 != z1 and k == 8: z = z0 + (z1 - z0) * ease(j / (0.3 * FPS))           # «хапнула»: a quick punch
+            elif z0 != z1 and k in PUNCH_SEGS: z = z0 + (z1 - z0) * ease(j / (0.3 * FPS))  # a quick punch («хапнула»)
             else: z = z0 + (z1 - z0) * ease(u)
             t = fi / FPS; fr = square_frame(zoom_frame(fr, z, shake=shake(t)), square_k(t)); overlays(fr, t)
             wr.stdin.write(fr.tobytes()); fi += 1
@@ -458,25 +469,33 @@ def render(src, work, out, mic=None, retouch=None):
         wr.stdin.write(fr.tobytes()); fi += 1
     wr.stdin.close(); wr.wait()
 
-def cover(src, work, at=60.0, retouch=None):
-    raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(at), "-i", src, "-frames:v", "1",
+def cover(srcd, work, retouch=None):
+    key, at = COVER_AT
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(at), "-i", srcd[key]["video"], "-frames:v", "1",
                           "-vf", YUV2RGB + (f",lut3d=file={LUT},{CINEMA_IN},vignette=angle=PI/5" if GRADE else ""),
                           "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, check=True).stdout
     fr = np.frombuffer(raw, np.uint8).reshape(H, W, 3).copy()
     if retouch is not None: fr = retouch.apply(fr)
     fr = zoom_frame(fr, 1.08, 0.47, 0.45)
     cx = int(0.80 * W); y = int(0.30 * H)
-    for line in ("САМОЕ СТРАШНОЕ", "НАЧАЛОСЬ"):
+    for line in COVER_LINES:
         p = label_patch(line, 92); blend(fr, p, cx - p.shape[1] // 2, y - p.shape[0] // 2); y += 150
-    p = script_patch("после родов", 250); blend(fr, p, min(cx - p.shape[1] // 2, W - 110 - p.shape[1]), y + 90 - p.shape[0] // 2)
+    p = script_patch(COVER_SCRIPT, 250); blend(fr, p, min(cx - p.shape[1] // 2, W - 110 - p.shape[1]), y + 90 - p.shape[0] // 2)
     Image.fromarray(fr).save(f"{work}/cover_4k.jpg", quality=95, subsampling=0)
 
 if __name__ == "__main__":
     src, work = sys.argv[1:3]
     mic = sys.argv[sys.argv.index("--mic") + 1] if "--mic" in sys.argv else None
+    if "--project" in sys.argv:                                            # src is then the folder with the project's files
+        import importlib; cfg = importlib.import_module(sys.argv[sys.argv.index("--project") + 1])
+        globals().update({k: getattr(cfg, k) for k in dir(cfg) if k.isupper()})
+        srcd = {k: dict(d, video=os.path.join(src, d["video"]), mic=os.path.join(src, d["mic"]) if d.get("mic") else None,
+                        words=os.path.join(src, d["words"])) for k, d in SOURCES.items()}
+    else:
+        srcd = {"main": dict(video=src, mic=mic, sync=MIC_SYNC, words=f"{work}/words.json")}
     rt = None
     if "--no-grade" in sys.argv: GRADE = False
     if "--retouch" in sys.argv:                                            # needs the mediapipe venv
         import face_retouch; rt = face_retouch.Retoucher(sys.argv[sys.argv.index("--retouch") + 1])
-    if "--cover" in sys.argv: cover(src, work, retouch=rt)
-    else: render(src, work, f"{work}/rody_4k.mp4", mic, rt)
+    if "--cover" in sys.argv: cover(srcd, work, retouch=rt)
+    else: render(srcd, work, f"{work}/{OUT_NAME}", rt)
