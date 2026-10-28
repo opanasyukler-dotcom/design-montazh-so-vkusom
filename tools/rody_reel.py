@@ -76,6 +76,7 @@ HITS_SRC = [(7, 68.00), (8, 73.12), (10, 173.72), (11, 183.50)]   # micro shake 
 SEG_SRC = None                                     # per segment: key into SOURCES (None → every segment from "main")
 SOURCES = None                                     # key → dict(video, mic, sync=((t0, off0), (t1, off1)), words)
 PUNCH_SEGS = {8}                                   # segments whose zoom snaps in over 0.3 s instead of drifting
+SQUARE_ICON = "flames"                             # doodle drawn under the square-mode insert
 CARD_SCRIPT, CARD_LABEL = "Продолжение", "В СЛЕДУЮЩЕЙ ЧАСТИ"
 COVER_LINES, COVER_SCRIPT, COVER_AT = ("САМОЕ СТРАШНОЕ", "НАЧАЛОСЬ"), "после родов", ("main", 60.0)
 OUT_NAME = "rody_4k.mp4"
@@ -338,7 +339,7 @@ def render(srcd, work, out, retouch=None):
     # the square insert gets little flames under «мой личный ад»
     for d_ in ins:
         if d_["mode"] == "square":
-            tf = d_["tw"] + d_["wd"] + 0.65; dds.append(dict(t0=tf, t1=d_["t1"], dd=0.6, name="flames", seed=99, sq=True)); pencils.append((tf, 0.6))
+            tf = d_["tw"] + d_["wd"] + 0.65; dds.append(dict(t0=tf, t1=d_["t1"], dd=0.6, name=SQUARE_ICON, seed=99, sq=True)); pencils.append((tf, 0.6))
     hx = (W - card_h.shape[1]) // 2 + card_h.shape[1] + 30
     dds.append(dict(t0=total + 1.4, t1=total + END_CARD + 1, dd=0.5, name="heart", seed=7, card=True)); pencils.append((total + 1.4, 0.5))
     # audio: voice + effects
