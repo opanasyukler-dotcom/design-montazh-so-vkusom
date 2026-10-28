@@ -145,7 +145,7 @@ def tracked(text, f, track):
     for c, a in zip(text, adv): d.text((x, h / 2), c, font=f, fill=INK + (255,), anchor="lm"); x += a
     return np.asarray(im, np.float32)
 
-def label_patch(text, size=50):
+def label_patch(text, size=62):
     return tracked(text, font("second", size, 300), size * 0.28)
 
 def render(src, work, out):
@@ -183,7 +183,8 @@ def render(src, work, out):
             if not (t0 <= t < t1 + 0.35): continue
             k_out = 1 - ease((t - t1) / 0.35); cx = int(0.81 * W); y0 = int(0.30 * H)
             if lp is not None:
-                k = ease((t - t0) / 0.35) * k_out; blend(fr, lp, cx - lp.shape[1] // 2, int(y0 - lp.shape[0] / 2 + 30 * (1 - k)), k)
+                k = ease((t - t0) / 0.35) * k_out; lx = min(cx - lp.shape[1] // 2, W - 150 - lp.shape[1])   # never off the edge
+                blend(fr, lp, lx, int(y0 - lp.shape[0] / 2 + 30 * (1 - k)), k)
             tw = t0 + (0.45 if lp is not None else 0.0); k = (t - tw) / 0.8                 # handwriting: wipe on
             if k > 0:
                 w = hp.shape[1]; cut = int(w * min(1, ease(k)) * 1.1); p = hp.copy()
