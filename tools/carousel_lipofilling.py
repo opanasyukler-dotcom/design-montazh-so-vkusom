@@ -120,30 +120,90 @@ def cut(name, a, b, mode="crop", top=None, bot=None):
                     "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", f"{OUT}/{name}.mp4"], check=True)
 
 
+ASSETS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "carousel_lipofilling", "src")
+LILAC_D = (196, 120, 214)  # lilac dark enough to read on white and on the dark screenshots
+
+
+def before_badge(path, cx, cy, r=165):
+    """round inset with the patient's "before" photo and a navy НАШЕ ДО tag"""
+    from PIL import Image, ImageDraw
+    S = 3
+    im = Image.open(os.path.join(ASSETS, "before_front.jpg")).convert("RGB")
+    sq = im.crop((245, 190, 1225, 1170)).resize((2 * r * S, 2 * r * S), Image.LANCZOS)
+    m = Image.new("L", sq.size, 0); ImageDraw.Draw(m).ellipse((0, 0, sq.width - 1, sq.height - 1), fill=255)
+    hi = Image.new("RGBA", (W * S, H * S), (0, 0, 0, 0)); d = ImageDraw.Draw(hi)
+    ring = 7 * S
+    d.ellipse(((cx - r) * S - ring, (cy - r) * S - ring, (cx + r) * S + ring, (cy + r) * S + ring), fill=ct.WHITE + (255,))
+    hi.paste(sq, ((cx - r) * S, (cy - r) * S), m)
+    ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    # soft shadow under the badge
+    sh = Image.new("L", (W, H), 0); ImageDraw.Draw(sh).ellipse((cx - r - 4, cy - r + 6, cx + r + 4, cy + r + 14), fill=150)
+    from PIL import ImageFilter
+    sh = sh.filter(ImageFilter.GaussianBlur(14)); shadow = Image.new("RGBA", (W, H), ct.GRAPHITE + (0,)); shadow.putalpha(sh)
+    ov.alpha_composite(shadow); ov.alpha_composite(hi.resize((W, H), Image.LANCZOS))
+    d = ImageDraw.Draw(ov); f = ct.bebas(44); t = "НАШЕ ДО"; tw = f.getlength(t)
+    y = cy + r - 26
+    d.rounded_rectangle((cx - tw / 2 - 22, y, cx + tw / 2 + 22, y + 54), radius=14, fill=(16, 46, 70, 255))
+    d.text((cx, y + 29), t, font=f, fill=ct.WHITE, anchor="mm")
+    ov.save(path)
+
+
+def add_badge(name, cx, cy, r=165):
+    src = f"{OUT}/{name}.mp4"; tmp = f"{OUT}/_{name}_b.mp4"; png = f"{OUT}/_{name}_badge.png"
+    before_badge(png, cx, cy, r)
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-loop", "1", "-i", png,
+                    "-filter_complex", "[0:v][1:v]overlay=0:0:shortest=1,format=yuv420p[o]", "-map", "[o]", "-map", "0:a",
+                    "-c:v", "libx264", "-preset", "medium", "-crf", "17", "-c:a", "copy", "-movflags", "+faststart", tmp], check=True)
+    os.replace(tmp, src); os.remove(png)
+
+
 def cta():
-    """surgeon from the reel on top, consultation card below (same layout as the lift carousel)"""
+    """surgeon on top, what the consultation covers, then how to book: the profile header and its links, annotated"""
     from PIL import Image, ImageDraw
     import numpy as np
-    PH = 800
-    im = ct.load_photo("DSC00888.JPG"); sc = W / im.width; sh = im.height * sc; off = 0.17 * sh
+    PH = 540
+    im = ct.load_photo("DSC00888.JPG"); sc = W / im.width; sh = im.height * sc; off = 0.19 * sh
     ph = im.resize((W, round(sh)), Image.LANCZOS).crop((0, int(off), W, int(off) + PH)).convert("RGBA")
     c = Image.new("RGBA", (W, H), ct.WHITE + (255,)); c.alpha_composite(ph, (0, 0))
-    ct.put_logo(c, y=64, alpha=0.95)
+    ct.put_logo(c, y=56, alpha=0.95)
     arr = np.zeros((H, W, 4), np.uint8); arr[..., :3] = 255
-    p = np.clip((np.arange(H)[:, None] - (PH - 150)) / 150, 0, 1); p = np.broadcast_to(p, (H, W))
+    p = np.clip((np.arange(H)[:, None] - (PH - 140)) / 140, 0, 1); p = np.broadcast_to(p, (H, W))
     arr[..., 3] = (p * p * (3 - 2 * p) * 255).astype(np.uint8)
     c.alpha_composite(Image.fromarray(arr, "RGBA"))
-    bw = 840; x = (W - bw) // 2
-    b = ct.Block(bw, "center").head("На консультации разберём", 60, 10, color=ct.INK).rule(0.14, 22)
-    y = b.draw(c, x, PH - 50)
+    bw = 900; x = (W - bw) // 2
+    y = ct.Block(bw, "center").head("На консультации разберём", 54, 8, color=ct.INK).rule(0.12, 16).draw(c, x, PH - 70)
     items = ["подойдёт ли вам липофилинг", "есть ли донорские зоны", "какой объём можно добавить",
              "нужна ли подтяжка или импланты"]
-    f = ct.mont(28, 500); d = ImageDraw.Draw(c)
+    f = ct.mont(26, 500); d = ImageDraw.Draw(c)
     for it in items:
         tw = f.getlength(it); x0 = (W - tw) / 2
-        d.ellipse((x0 - 24, y + 12, x0 - 14, y + 22), fill=(214, 160, 222)); d.text((x0, y), it, font=f, fill=ct.INK); y += 42
-    y += 22
-    ct.Block(bw, "center").ital("Для записи напишите в Direct «КОНСУЛЬТАЦИЯ» или свяжитесь с нами по телефону +7 926 636 30 00 в WhatsApp, Telegram или MAX.", 27, 0, color=ct.MIST).draw(c, x, y)
+        d.ellipse((x0 - 22, y + 11, x0 - 13, y + 20), fill=LILAC_D); d.text((x0, y), it, font=f, fill=ct.INK); y += 37
+    y += 14
+    fh = ct.bebas(42); t = "КАК ЗАПИСАТЬСЯ"; d.text(((W - fh.getlength(t)) / 2, y), t, font=fh, fill=ct.INK); y += 56
+    # screenshots: profile header (step 1) and the links sheet (step 2)
+    shots = [("profile_header.jpg", [(30, 805, 760, 890)], "1", "Нажмите на ссылку\nв шапке профиля"),
+             ("profile_links.jpg", [(30, 180, 1000, 310), (30, 660, 1000, 790)], "2", "Выберите WhatsApp\nили Telegram")]
+    hgt = 392; gap = 26
+    ims = [Image.open(os.path.join(ASSETS, fn)).convert("RGB") for fn, *_ in shots]
+    ws = [int(i.width * hgt / i.height) for i in ims]
+    x0 = (W - sum(ws) - gap) // 2
+    S = 3
+    for (fn, boxes, num, cap), im_, w_ in zip(shots, ims, ws):
+        k = hgt / im_.height
+        card = im_.resize((w_ * S, hgt * S), Image.LANCZOS).convert("RGBA")
+        hd = ImageDraw.Draw(card)
+        for bx0, by0, bx1, by1 in boxes:
+            hd.rounded_rectangle((bx0 * k * S, by0 * k * S, bx1 * k * S, by1 * k * S), radius=16 * S, outline=LILAC_D + (255,), width=4 * S)
+        m = Image.new("L", card.size, 0); ImageDraw.Draw(m).rounded_rectangle((0, 0, card.width - 1, card.height - 1), radius=22 * S, fill=255)
+        card.putalpha(m); card = card.resize((w_, hgt), Image.LANCZOS)
+        c.alpha_composite(card, (x0, y))
+        # number badge on the card's top-left corner
+        d.ellipse((x0 - 16, y - 16, x0 + 36, y + 36), fill=LILAC_D, outline=ct.WHITE, width=4)
+        d.text((x0 + 10, y + 11), num, font=ct.bebas(40), fill=ct.WHITE, anchor="mm")
+        fc = ct.mont(25, 500)
+        for li, ln in enumerate(cap.split("\n")):
+            d.text((x0 + w_ / 2, y + hgt + 20 + li * 33), ln, font=fc, fill=ct.INK, anchor="ma")
+        x0 += w_ + gap
     ct.save_jpg(c, f"{OUT}/08_cta.jpg")
 
 
@@ -151,4 +211,5 @@ if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     for n, a, b, *m in SLIDES:
         cut(n, a, b, *m); print("done", n, flush=True)
+    add_badge("05_volume", 870, 1080); add_badge("07_this_task", 870, 1110)
     cta(); print("done cta")
