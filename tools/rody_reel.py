@@ -1,6 +1,6 @@
 """@mcg.va — Reels 1 «Я думала, самое страшное — это роды. Но нет» (intro to the maternity-ward story), 16:9 like the source.
-Source C0973 (№5, 3:21), 3840x2160 @ 25.  Minimal look: soft warm grade (luts/mcgva_warm_cream_soft.cube),
-punch-ins / slow push-ins and pull-outs on the face, thin Montserrat for labels and word-by-word subtitles, Great Vibes
+Source C0973 (№5, 3:21), 3840x2160 @ 25.  Minimal look: brown-moody grade (luts/mcgva_brown_moody.cube),
+punch-ins / slow push-ins and pull-outs on the face, thin Montserrat for labels and word-by-word subtitles, Gogol
 handwriting for the inserts (written on with a wipe), a blurred end card «продолжение в следующей части».
 Cuts sit in the pauses (energy-checked); each join gets a 25 ms raised-cosine fade so nothing clicks.
   python3 rody_reel.py SRC.mov WORK_DIR            → WORK_DIR/rody_4k.mp4 (+ voice.wav, sfx inside)
@@ -17,10 +17,10 @@ import posuda_sfx as FX
 
 W, H, FPS, SR = 3840, 2160, 25, 48000
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-LUT = os.path.join(ROOT, "luts", "mcgva_warm_cream_soft.cube")
-SCRIPT_FONT = os.path.join(ROOT, "fonts", "commercial-safe", "Great Vibes", "GreatVibes-Regular.ttf")
-INK = (47, 6, 0)                                   # brand ink #2F0600
-BLUSH = (247, 223, 221)
+LUT = os.path.join(ROOT, "luts", "mcgva_brown_moody.cube")                                     # make_brown_lut.py
+SCRIPT_FONT = os.path.join(ROOT, "skills", "montage-svg-typography", "Шрифты", "Коллекция шрифтов", "Gogol-Regular.otf")
+INK = (43, 31, 26)                                 # #2B1F1A from the brown palette
+BLUSH = (220, 225, 231)                            # #DCE1E7 — the palette's pale cool grey, for highlighted words
 FACE = (0.485, 0.42)                               # zoom centre (fraction of the frame): her face sits in the upper third
 END_CARD = 3.0
 
@@ -160,8 +160,8 @@ def render(src, work, out):
     ins = []
     for s0, o0, s1, o1, lab, hand in INSERTS:
         t0 = starts[s0] + o0; t1 = (starts[s1] + (SEGS[s1][1] - SEGS[s1][0]) + o1) if o1 <= 0 else starts[s1] + o1
-        ins.append((t0, t1, label_patch(lab) if lab else None, script_patch(hand, 210)))
-    card_l, card_h = label_patch("В СЛЕДУЮЩЕЙ ЧАСТИ", 58), script_patch("Продолжение", 300)
+        ins.append((t0, t1, label_patch(lab) if lab else None, script_patch(hand, 180)))         # Gogol runs wide
+    card_l, card_h = label_patch("В СЛЕДУЮЩЕЙ ЧАСТИ", 58), script_patch("Продолжение", 260)
     # audio: voice + effects
     punch = [starts[k] for k, s in enumerate(SEGS) if s[2] >= 1.18 and k > 0]
     hits = [starts[7] + (68.00 - SEGS[7][0]), starts[10] + (173.72 - SEGS[10][0])]
@@ -190,7 +190,7 @@ def render(src, work, out):
                 w = hp.shape[1]; cut = int(w * min(1, ease(k)) * 1.1); p = hp.copy()
                 if cut < w:
                     ramp = np.clip((cut - np.arange(w)) / 60, 0, 1)[None, :, None]; p[..., 3:4] *= ramp
-                blend(fr, p, cx - w // 2, int(y0 + 150 - hp.shape[0] / 2), k_out)
+                blend(fr, p, min(cx - w // 2, W - 110 - w), int(y0 + 150 - hp.shape[0] / 2), k_out)
         for a, b, ps in subs:
             if a <= t < b:
                 f = int((t - a) * FPS); p = ps[min(f, 2)]; blend(fr, p, (W - p.shape[1]) // 2, H - 300 - p.shape[0] // 2, min(1, (f + 1) / 2))
@@ -231,7 +231,7 @@ def cover(src, work, at=60.0):
     cx = int(0.80 * W); y = int(0.30 * H)
     for line in ("САМОЕ СТРАШНОЕ", "НАЧАЛОСЬ"):
         p = label_patch(line, 92); blend(fr, p, cx - p.shape[1] // 2, y - p.shape[0] // 2); y += 150
-    p = script_patch("после родов", 300); blend(fr, p, cx - p.shape[1] // 2, y + 90 - p.shape[0] // 2)
+    p = script_patch("после родов", 250); blend(fr, p, min(cx - p.shape[1] // 2, W - 110 - p.shape[1]), y + 90 - p.shape[0] // 2)
     Image.fromarray(fr).save(f"{work}/cover_4k.jpg", quality=95, subsampling=0)
 
 if __name__ == "__main__":
