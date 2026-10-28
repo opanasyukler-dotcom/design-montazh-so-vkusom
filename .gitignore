@@ -1,1 +1,4 @@
 .DS_Store
+tools/__pycache__/
+# videos sent directly: the repo LFS budget is full
+carousel_lipofilling/*.mp4
