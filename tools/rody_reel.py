@@ -6,7 +6,8 @@ insert where the picture eases into a square card on a dark blurred backdrop, mi
 progress line, key-word subtitles that bounce in, hand-drawn animated doodles (?!, hospital, clapper that claps, dream
 cloud, pin, ₽ coin, magic wand, flames, heart) drawn by the pencil on the free wall, real CC0 key clicks for typing, extra punch-ins inside long takes, a deeper «cinema» finish (S-curve, vignette, fine grain), a blurred end card.
 Cuts sit in the pauses (energy-checked); each join gets a 25 ms raised-cosine fade so nothing clicks.
-  python3 rody_reel.py SRC.mov WORK_DIR [--mic REC.m4a]  → WORK_DIR/rody_4k.mp4 (voice from the mic recording, sfx inside)
+  python3 rody_reel.py SRC.mov WORK_DIR [--mic REC.m4a] [--retouch MP_MODELS_DIR]  → WORK_DIR/rody_4k.mp4
+  (voice from the mic recording, sfx inside; --retouch: natural skin + soft makeup via face_retouch.py, mediapipe venv)
   python3 rody_reel.py SRC.mov WORK_DIR --cover    → WORK_DIR/cover_4k.jpg
 """
 import difflib, json, os, re, subprocess, sys
@@ -286,7 +287,7 @@ def wobble_line(x0, x1, y0, y1, seed, amp=9, n=40):
 def sparkle(cx, cy, r):
     return [[(cx - r, cy), (cx + r, cy)], [(cx, cy - r), (cx, cy + r)], [(cx - r * .6, cy - r * .6), (cx + r * .6, cy + r * .6)]]
 
-def render(src, work, out, mic=None):
+def render(src, work, out, mic=None, retouch=None):
     words = json.load(open(f"{work}/words.json"))
     v = voice(src, work, mic); x = FX.read(src)[:, 0].copy()
     starts, total = timeline(); full = total + END_CARD; n = round(full * FPS)
@@ -421,6 +422,7 @@ def render(src, work, out, mic=None):
         for j in range(m):
             buf = rd.stdout.read(sz)
             fr = np.frombuffer(buf, np.uint8).reshape(H, W, 3).copy() if len(buf) == sz else last.copy()
+            if retouch is not None and len(buf) == sz: fr = retouch.apply(fr)             # natural skin + soft makeup
             last = fr; u = j / max(m - 1, 1)
             ts = a + j / FPS
             if k in STEPS:                                                                   # punch-in steps + slow drift
@@ -451,10 +453,12 @@ def render(src, work, out, mic=None):
         wr.stdin.write(fr.tobytes()); fi += 1
     wr.stdin.close(); wr.wait()
 
-def cover(src, work, at=60.0):
+def cover(src, work, at=60.0, retouch=None):
     raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(at), "-i", src, "-frames:v", "1", "-vf", f"lut3d=file={LUT},{CINEMA_IN},vignette=angle=PI/5",
                           "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, check=True).stdout
-    fr = np.frombuffer(raw, np.uint8).reshape(H, W, 3).copy(); fr = zoom_frame(fr, 1.08, 0.47, 0.45)
+    fr = np.frombuffer(raw, np.uint8).reshape(H, W, 3).copy()
+    if retouch is not None: fr = retouch.apply(fr)
+    fr = zoom_frame(fr, 1.08, 0.47, 0.45)
     cx = int(0.80 * W); y = int(0.30 * H)
     for line in ("САМОЕ СТРАШНОЕ", "НАЧАЛОСЬ"):
         p = label_patch(line, 92); blend(fr, p, cx - p.shape[1] // 2, y - p.shape[0] // 2); y += 150
@@ -464,5 +468,8 @@ def cover(src, work, at=60.0):
 if __name__ == "__main__":
     src, work = sys.argv[1:3]
     mic = sys.argv[sys.argv.index("--mic") + 1] if "--mic" in sys.argv else None
-    if "--cover" in sys.argv: cover(src, work)
-    else: render(src, work, f"{work}/rody_4k.mp4", mic)
+    rt = None
+    if "--retouch" in sys.argv:                                            # needs the mediapipe venv
+        import face_retouch; rt = face_retouch.Retoucher(sys.argv[sys.argv.index("--retouch") + 1])
+    if "--cover" in sys.argv: cover(src, work, retouch=rt)
+    else: render(src, work, f"{work}/rody_4k.mp4", mic, rt)
