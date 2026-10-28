@@ -62,8 +62,8 @@ INSERTS = [
 TYPE_STEP = 0.05                                   # one typed letter of a label
 KEYS_DIR = os.path.join(ROOT, "sfx", "keyboard")   # real key presses, CC0 (sfx/keyboard/LICENSE.txt)
 # hand-drawn animated doodles on the free wall left of her: (segment, source from, source to, icon, colour key)
-DOODLES = [(1, 34.05, 36.80, "qmark"), (2, 42.95, 45.92, "hospital"), (5, 58.70, 61.55, "clapper"), (6, 61.60, 63.28, "cloud"),
-           (10, 172.95, 174.86, "pin"), (11, 182.70, 184.20, "ruble"), (12, 189.60, 190.90, "ruble"), (12, 190.95, 193.55, "wand")]
+DOODLES = [(1, 34.05, 36.80, "qmark"), (2, 42.95, 45.92, "hospital"), (5, 58.70, 61.30, "clapper"), (6, 61.75, 63.28, "cloud"),
+           (10, 172.95, 174.86, "pin"), (11, 182.70, 184.20, "ruble"), (12, 189.60, 190.60, "ruble"), (12, 191.00, 193.55, "wand")]
 DOODLE_BOX = (0.085, 0.17, 0.25)                   # x, y (fractions of the frame), size (fraction of the height)
 HITS_SRC = [(7, 68.00), (8, 73.12), (10, 173.72), (11, 183.50)]   # micro shake + low hit: «ужасный», «хапнула», «Юдина», «платно»
 
