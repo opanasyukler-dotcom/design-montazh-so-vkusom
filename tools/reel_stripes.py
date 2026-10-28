@@ -45,7 +45,7 @@ VO = [("A", "1635", [(2.14, 5.22)]),                                   # сег�
       ("Q", "1635", [(38.70, 39.52)]),                                 # вам всё нравится?
       ("R", "1635", [(39.50, 40.68)]),                                 # мы очень довольны (the patient, quieter — levelled on its own)
       ("S", "1635", [(40.70, 41.72)])]                                 # и мы довольны
-GAP = {"B": 0.3, "C": 2.0, "D": 0.35, "E": 0.45, "F": 1.1, "G": 0.35, "Q": 3.2, "R": 0.0, "S": 0.12}
+GAP = {"B": 1.5, "C": 2.0, "D": 0.35, "E": 0.45, "F": 1.1, "G": 0.35, "Q": 3.2, "R": 0.0, "S": 0.12}
 SEG = []; _t = 0.04                                                    # the reel starts on the first word
 for _b, _s, _parts in VO:
     if SEG: _t += GAP[_b]
@@ -380,7 +380,8 @@ def pulse_dot(fr, x, y, t, t0, r=16):
     path_draw(fr, [(x + rr * np.cos(a), y + rr * np.sin(a)) for a in np.linspace(0, 2 * np.pi, 40)], 1, PINK, 3, op=1 - u)
 def mapM(M, x, y): return M[0, 0] * x + M[0, 2], M[1, 1] * y + M[1, 2]
 
-# A — ДО turns into ПОСЛЕ: both photos aligned neck → fingertips, a pink slider sweeps across, then ПОСЛЕ holds
+# A — opens on the surgeon's phone with the ДО photo held in front of the body ПОСЛЕ (another part of the same take as B),
+#     then ДО turns into ПОСЛЕ: both photos aligned neck → fingertips, a pink slider sweeps across, then ПОСЛЕ holds
 HA = lift(Drop(["ДЕЛАЕМ ГРУДЬ", "И ЖИВОТ", "*ЗА ОДНУ ОПЕРАЦИЮ:*"], 120, 70, 0, maxw=840), 1300)
 def aligned(im, n, top=250, body=1450):
     """the whole photo scaled DOWN so neck→fingertips spans `body` px from y=`top`, body centred; the face above is blurred"""
@@ -389,8 +390,11 @@ def aligned(im, n, top=250, body=1450):
     r = cv2.copyMakeBorder(r, P, P, P, P, cv2.BORDER_REPLICATE)[P + oy:P + oy + H, P + ox:P + ox + W]
     return anon(np.ascontiguousarray(r), top - 10)
 A_BEF, A_AFT = aligned(PH["0305"], "0305"), aligned(PH["1637"], "1637")
-T_SWEEP = (0.95, 1.85)
-def s_a(t):
+T_PH = 1.6; T_SWEEP = (T_PH + 0.6, T_PH + 1.5)                         # phone shot, then the slider
+def s_phone(t):
+    fr = full(V["1635"].at(11.7 + t), 0.5, 0.45, lerp(1.0, 1.04, eio(t / T_PH))); shade(fr, VIG); shade(fr, GBOT)
+    chip(fr, "ДО", 40, 280); return fr
+def s_slider(t):
     z = lerp(1.06, 1.0, eio(t / 3.3)); b = full(A_BEF, 0.5, 0.45, z); a = full(A_AFT, 0.5, 0.45, z)
     xd = int(W * (1 - eio((t - T_SWEEP[0]) / (T_SWEEP[1] - T_SWEEP[0]))))            # slider runs right → left, ПОСЛЕ follows it
     fr = b.copy(); fr[:, xd:] = a[:, xd:]; shade(fr, GBOT)
@@ -398,9 +402,14 @@ def s_a(t):
         fr[:, max(0, xd - 3):xd + 3] = PINK
         m = np.zeros((H, W), np.uint8); cv2.circle(m, (xd, 760), 34, 255, -1, cv2.LINE_AA); blend(fr, m.astype(np.float32) / 255, 0, 0, PINK)
         ar = alpha_img("‹ ›", mont(36, 600)); blend(fr, ar, xd - ar.shape[1] / 2, 760 - ar.shape[0] / 2 - 2, NAVY)
-    chip(fr, "ДО", 40, 280, cl((xd - 200) / 120)); chip(fr, "ПОСЛЕ", 40, 280, cl((W - 300 - xd) / 200))
-    HA.draw(fr, t, 0.15)
+    chip(fr, "ДО", 40, 280, cl((xd - 220) / 100)); chip(fr, "ПОСЛЕ", 40, 280, cl((180 - xd) / 100))
     return fr
+def s_a(t):
+    """phone → slider; the headline sits on top of both and does not take part in the cut"""
+    if t < T_PH: fr = s_phone(t)
+    elif t < T_PH + 0.3: fr = zoom_through(s_phone(t), s_slider(t), (t - T_PH) / 0.3)
+    else: fr = s_slider(t)
+    HA.draw(fr, t, 0.15); return fr
 
 # B — ДО: first on the surgeon's phone, then in the studio with the three problem zones pinned
 HB = lift(Drop(["НАШЕ *ДО*"], 170, 70, 0, maxw=840), 1230)
