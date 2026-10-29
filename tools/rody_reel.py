@@ -79,6 +79,7 @@ PUNCH_SEGS = {8}                                   # segments whose zoom snaps i
 SQUARE_ICON = "flames"                             # doodle drawn under the square-mode insert
 CARD_SCRIPT, CARD_LABEL = "Продолжение", "В СЛЕДУЮЩЕЙ ЧАСТИ"
 COVER_LINES, COVER_SCRIPT, COVER_AT = ("САМОЕ СТРАШНОЕ", "НАЧАЛОСЬ"), "после родов", ("main", 60.0)
+COVER_TAIL = ()
 OUT_NAME = "rody_4k.mp4"
 COVER_SCRIPT_PX = 250
 
@@ -489,8 +490,11 @@ def cover(srcd, work, retouch=None):
     fr = zoom_frame(fr, 1.08, 0.47, 0.45)
     cx = int(0.80 * W); y = int(0.30 * H)
     for line in COVER_LINES:
-        p = label_patch(line, 92); blend(fr, p, cx - p.shape[1] // 2, y - p.shape[0] // 2); y += 150
+        p = label_patch(line, 92); blend(fr, p, min(cx - p.shape[1] // 2, W - 110 - p.shape[1]), y - p.shape[0] // 2); y += 150
     p = script_patch(COVER_SCRIPT, COVER_SCRIPT_PX); blend(fr, p, min(cx - p.shape[1] // 2, W - 110 - p.shape[1]), y + 90 - p.shape[0] // 2)
+    y += 90 + p.shape[0] // 2 + 70
+    for line in COVER_TAIL:                                                # typed lines under the handwriting
+        p = label_patch(line, 78); blend(fr, p, min(cx - p.shape[1] // 2, W - 110 - p.shape[1]), y - p.shape[0] // 2); y += 150
     Image.fromarray(fr).save(f"{work}/cover_4k.jpg", quality=95, subsampling=0)
 
 if __name__ == "__main__":
