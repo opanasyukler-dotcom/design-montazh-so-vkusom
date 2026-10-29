@@ -140,13 +140,16 @@ def mic_off(t, sync=None):
 
 def voice(srcd, work):
     """the separately recorded mic voice (camera sound dropped), cut on the camera timeline"""
-    xs = {k: FX.read(d["mic"] or d["video"], af="highpass=f=80,afftdn=nf=-45") for k, d in srcd.items()}
+    xs = {k: FX.read(d["mic"], af="highpass=f=80") if d["mic"] else FX.read(d["video"], af="highpass=f=80,afftdn=nf=-45")
+          for k, d in srcd.items()}                                       # the mic is already clean: a denoiser there eats word endings
     parts = []
     for k, (a, b, *_) in enumerate(SEGS):
         n = int(round((b - a) * SR)); d = srcd[seg_src(k)]; x = xs[seg_src(k)]
         if d["mic"]: a = a + mic_off(a, d.get("sync"))
-        y = x[int(round(a * SR)):int(round(a * SR)) + n].copy(); f = int(0.025 * SR); r = 0.5 - 0.5 * np.cos(np.linspace(0, np.pi, f))
-        y[:f] *= r[:, None]; y[-f:] *= r[::-1, None]; parts.append(y)
+        y = x[int(round(a * SR)):int(round(a * SR)) + n].copy()
+        fi_, fo_ = int(0.03 * SR), int(0.06 * SR)                         # raised-cosine edges: 30 ms in, 60 ms out
+        y[:fi_] *= (0.5 - 0.5 * np.cos(np.linspace(0, np.pi, fi_)))[:, None]; y[-fo_:] *= (0.5 + 0.5 * np.cos(np.linspace(0, np.pi, fo_)))[:, None]
+        parts.append(y)
     v = np.concatenate(parts + [np.zeros((int(END_CARD * SR), 2), np.float32)])
     raw = f"{work}/voice_raw.wav"
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", str(SR), "-ac", "2", "-i", "-", raw], input=v.tobytes(), check=True)
@@ -216,8 +219,9 @@ def sfx(v, keys, pencils, punch_times, hits, ticks, card_t, claps=(), twinkles=(
         n = int(0.9 * SR); tt = np.arange(n) / SR; y = np.sin(2 * np.pi * (52 + 30 * np.exp(-tt * 9)) * tt) * np.exp(-tt * 4.5)
         y = (y * FX.db(-18)).astype(np.float32); place(np.stack([y, y], 1), t)
     for t in ticks: place(FX.pop(FX.db(-30)), t)                                                # tiny tick on highlighted words
-    place(FX.noise_sweep(0.9, 300, 3000, FX.db(-24)), card_t - 0.45)
-    place(FX.bells([1046.5, 1318.5, 1568, 2093], FX.db(-24), 0.09), card_t + 2.2)
+    if card_t is not None:
+        place(FX.noise_sweep(0.9, 300, 3000, FX.db(-24)), card_t - 0.45)
+        place(FX.bells([1046.5, 1318.5, 1568, 2093], FX.db(-24), 0.09), card_t + 2.2)
     lv = np.convolve(np.abs(v).mean(1), np.ones(960) / 960, "same"); g = np.where(lv > FX.db(-40), FX.db(-4), 1.0)
     return v + bus * g[:, None].astype(np.float32)
 
@@ -287,6 +291,23 @@ def ink_track(p):
     ys = np.interp(np.arange(a.shape[1]), idx, ys[idx]); ys = np.convolve(ys, np.ones(31) / 31, "same")
     return ys, idx[0], idx[-1]
 
+def script_lines(text, size, col=INK):
+    """handwriting with "\n" line breaks → (stacked patch, [(line patch, track, dx, dy)]), lines centred, written in turn"""
+    ps = [script_patch(t, size, col) for t in text.split("\n")]; step = int(size * 1.08); wm = max(p.shape[1] for p in ps)
+    comp = np.zeros((step * (len(ps) - 1) + ps[-1].shape[0], wm, 4), ps[0].dtype); lines = []
+    for i, p in enumerate(ps):
+        dx, dy = (wm - p.shape[1]) // 2, i * step; r = comp[dy:dy + p.shape[0], dx:dx + p.shape[1]]
+        m = p[..., 3:4] > r[..., 3:4]; r[...] = np.where(m, p, r); lines.append((p, ink_track(p), dx, dy))
+    return comp, lines
+
+def draw_lines(fr, lines, prog, x, y, alpha=1.0):
+    """draw_on over several lines in turn; returns the pencil tip on the line being written"""
+    ws = [tr[2] - tr[1] + 18 for _, tr, _, _ in lines]; d = sum(ws) * min(max(prog, 0), 1); tip = None
+    for (p, tr, dx, dy), w in zip(lines, ws):
+        if d <= 0: break
+        tip = draw_on(fr, p, tr, min(d / w, 1.0), x + dx, y + dy, alpha); d -= w
+    return tip
+
 def draw_on(fr, p, track, prog, x, y, alpha=1.0):
     """reveal a handwriting patch left→right up to prog (0..1 of the inked width); returns the pencil tip position"""
     ys, i0, i1 = track; cut = i0 + (i1 + 18 - i0) * min(max(prog, 0), 1)   # +18: the soft edge clears the last letter
@@ -330,15 +351,16 @@ def render(srcd, work, out, retouch=None):
         col = CREAM if mode == "square" else INK
         lsz, hsz = sizes if sizes else (60, (165 if mode == "square" else 150) if len(hand) > 12 else (230 if mode == "square" else 180))
         labs = [label_patch(lab[:i], lsz, col) for i in range(1, len(lab) + 1)] if lab else []
-        hp = script_patch(hand, hsz, col)
-        tw = t0 + (0.35 if mode == "square" else 0.0) + (len(lab) * TYPE_STEP + 0.15 if lab else 0.1); wd = 0.07 * len(hand) + 0.35
+        hp, hl = script_lines(hand, hsz, col)
+        tw = t0 + (0.35 if mode == "square" else 0.0) + (len(lab) * TYPE_STEP + 0.15 if lab else 0.1); wd = 0.07 * len(hand.replace("\n", "")) + 0.35
         keys += [(t0 + (0.35 if mode == "square" else 0.0) + i * TYPE_STEP, c == " ") for i, c in enumerate(lab)]
         pencils += [(tw, wd), (tw + wd + 0.05, 0.55)]
-        ins.append(dict(t0=t0, t1=t1, mode=mode, doodle=doodle, col=col, labs=labs, hp=hp, track=ink_track(hp), tw=tw, wd=wd,
+        ins.append(dict(t0=t0, t1=t1, mode=mode, doodle=doodle, col=col, labs=labs, hp=hp, hl=hl, track=ink_track(hp), tw=tw, wd=wd,
                         tl=t0 + (0.35 if mode == "square" else 0.0)))
-    card_h = script_patch(CARD_SCRIPT, 260); card_tr = ink_track(card_h); card_lab = CARD_LABEL
-    card_ls = [label_patch(card_lab[:i], 58) for i in range(1, len(card_lab) + 1)]
-    keys += [(total + 1.55 + i * TYPE_STEP, c == " ") for i, c in enumerate(card_lab)]; pencils += [(total + 0.35, 1.0)]
+    if CARD_SCRIPT:                                                          # None: the final part, no «Продолжение»
+        card_h = script_patch(CARD_SCRIPT, 260); card_tr = ink_track(card_h); card_lab = CARD_LABEL
+        card_ls = [label_patch(card_lab[:i], 58) for i in range(1, len(card_lab) + 1)]
+        keys += [(total + 1.55 + i * TYPE_STEP, c == " ") for i, c in enumerate(card_lab)]; pencils += [(total + 0.35, 1.0)]
     dds = []
     for k, a_, b_, name in DOODLES:
         t0 = starts[k] + a_ - SEGS[k][0]; t1 = starts[k] + b_ - SEGS[k][0]; dd = min(0.9, (t1 - t0) * 0.45)
@@ -349,15 +371,15 @@ def render(srcd, work, out, retouch=None):
     for d_ in ins:
         if d_["mode"] == "square":
             tf = d_["tw"] + d_["wd"] + 0.65; dds.append(dict(t0=tf, t1=d_["t1"], dd=0.6, name=SQUARE_ICON, seed=99, sq=True)); pencils.append((tf, 0.6))
-    hx = (W - card_h.shape[1]) // 2 + card_h.shape[1] + 30
-    dds.append(dict(t0=total + 1.4, t1=total + END_CARD + 1, dd=0.5, name="heart", seed=7, card=True)); pencils.append((total + 1.4, 0.5))
+    if CARD_SCRIPT:
+        dds.append(dict(t0=total + 1.4, t1=total + END_CARD + 1, dd=0.5, name="heart", seed=7, card=True)); pencils.append((total + 1.4, 0.5))
     # audio: voice + effects
     punch = [starts[k] for k, s_ in enumerate(SEGS) if s_[2] >= 1.18 and k > 0]
     punch += [starts[k] + st[0] - SEGS[k][0] for k, sts in STEPS.items() for st in sts[1:]]
     punch += [t for d_ in ins if d_["mode"] == "square" for t in (d_["t0"] + 0.3, d_["t1"] + 0.3)]
     hits = [starts[k] + ts - SEGS[k][0] for k, ts in HITS_SRC]
     ticks = [a_ for w, a_, b_ in cs if any(k in w for k in KEY)]
-    mix = sfx(v, keys, pencils, punch, hits, ticks, total, claps, twinkles)
+    mix = sfx(v, keys, pencils, punch, hits, ticks, total if CARD_SCRIPT else None, claps, twinkles)
     mix *= min(1, FX.db(-1) / (np.abs(mix).max() + 1e-9))
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", str(SR), "-ac", "2", "-i", "-", f"{work}/mix.wav"],
                    input=mix.astype(np.float32).tobytes(), check=True)
@@ -405,10 +427,10 @@ def render(srcd, work, out, retouch=None):
             if nch > 0:
                 lp = d_["labs"][min(nch, len(d_["labs"])) - 1]; full_w = d_["labs"][-1].shape[1]
                 lx = max(left - 40, min(cx - full_w // 2, W - 150 - full_w)); blend(fr, lp, lx, int(yl - lp.shape[0] / 2), fade)
-        hp = d_["hp"]; w = hp.shape[1]; hx = max(left - 40, min(cx - w // 2, W - 110 - w)); hy = int(yh - hp.shape[0] / 2)
+        hp = d_["hp"]; w = hp.shape[1]; hx = max(left - 40, min(cx - w // 2, W - 110 - w)); hy = int(yh - d_["hl"][0][0].shape[0] / 2)
         k = (t - d_["tw"]) / d_["wd"]
         if k > 0:
-            tip = draw_on(fr, hp, d_["track"], k, hx, hy, fade)
+            tip = draw_lines(fr, d_["hl"], k, hx, hy, fade)
             if k < 1: pen_at = tip
         ys_, i0, i1 = d_["track"]; x0, x1 = hx + i0, hx + i1
         a_ = hp[..., 3]; rows = np.where(a_.sum(1) > 1)[0]; yt, yb = hy + rows[0], hy + rows[-1]
@@ -467,11 +489,11 @@ def render(srcd, work, out, retouch=None):
         sm = cv2.GaussianBlur(cv2.resize(still, (480, 270), interpolation=cv2.INTER_AREA), (0, 0), 6)
         bl = cv2.resize(sm, (W, H)); fr = cv2.addWeighted(still, 1 - k, bl, k, 0)
         fr = cv2.addWeighted(fr, 1 - 0.45 * k, np.full_like(fr, 252), 0.45 * k, 0)
-        kt = (t - total - 0.35) / 1.0
+        kt = (t - total - 0.35) / 1.0 if CARD_SCRIPT else -1
         if kt > 0:
             tip = draw_on(fr, card_h, card_tr, kt, (W - card_h.shape[1]) // 2, int(H * 0.44 - card_h.shape[0] / 2))
             if kt < 1: put_pen(fr, *tip, bob=4 * np.sin(t * 40))
-        nch = int((t - total - 1.55) / TYPE_STEP) + 1
+        nch = int((t - total - 1.55) / TYPE_STEP) + 1 if CARD_SCRIPT else 0
         if nch > 0:
             lp = card_ls[min(nch, len(card_ls)) - 1]; blend(fr, lp, (W - card_ls[-1].shape[1]) // 2, int(H * 0.60 - lp.shape[0] / 2))
         for d_ in dds:
