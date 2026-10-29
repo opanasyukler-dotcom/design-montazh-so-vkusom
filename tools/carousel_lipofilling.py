@@ -19,7 +19,7 @@ CROP_Y = 60  # keeps the reel's headline band and the body below it
 SLIDES = [
     ("01_implants_no", 0.00, 4.93),
     ("02_lift_no", 4.93, 10.67),
-    ("03_chose_lipofilling", 10.67, 19.20),
+    ("03_chose_lipofilling", 10.67, 19.20, "stack", (0.08, 0.225), (0.365, 0.985)),  # keep the patient at the bottom in frame
     ("04_donor_zones", 19.20, 23.07),
     # headline band (top of the reel) stacked over the footage band (bottom of the reel): full 4:5, no side bars
     ("05_volume", 23.07, 29.20, "stack", (0.07, 0.36), (0.585, 1.0)),
