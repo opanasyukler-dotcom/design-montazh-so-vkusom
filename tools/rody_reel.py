@@ -370,7 +370,10 @@ def render(srcd, work, out, retouch=None):
     # the square insert gets little flames under «мой личный ад»
     for d_ in ins:
         if d_["mode"] == "square":
-            tf = d_["tw"] + d_["wd"] + 0.65; dds.append(dict(t0=tf, t1=d_["t1"], dd=0.6, name=SQUARE_ICON, seed=99, sq=True)); pencils.append((tf, 0.6))
+            tf = d_["tw"] + d_["wd"] + 0.65; pencils.append((tf, 0.6))
+            hb = int(0.46 * H) + 30 - d_["hl"][0][0].shape[0] // 2 + d_["hp"].shape[0]      # bottom of the handwriting block
+            sy = max(int(0.46 * H) + 170, hb + 60); ssz = min(300, int(0.80 * H) - sy)            # the icon sits under it, above the subtitles
+            dds.append(dict(t0=tf, t1=d_["t1"], dd=0.6, name=SQUARE_ICON, seed=99, sq=True, sy=sy, ssz=ssz))
     if CARD_SCRIPT:
         dds.append(dict(t0=total + 1.4, t1=total + END_CARD + 1, dd=0.5, name="heart", seed=7, card=True)); pencils.append((total + 1.4, 0.5))
     # audio: voice + effects
@@ -408,7 +411,7 @@ def render(srcd, work, out, retouch=None):
         prog = (t - d_["t0"]) / d_["dd"]
         if t > d_["t1"]: prog = 1 - (t - d_["t1"]) / 0.3                    # undraw quickly at the end
         if d_.get("sq"):
-            left = int(SQUARE[1] * W + SQUARE[0] / 2 + 90); size = 300; x = (left + W - 110) // 2 - size // 2; y = int(0.46 * H) + 170; col, th = CREAM, 7
+            left = int(SQUARE[1] * W + SQUARE[0] / 2 + 90); size = d_["ssz"]; x = (left + W - 110) // 2 - size // 2; y = d_["sy"]; col, th = CREAM, 7
         elif d_.get("card"):
             size = 190; x = hx; y = int(H * 0.44) - size // 2 - 20; col, th = INK, 7
         else:
