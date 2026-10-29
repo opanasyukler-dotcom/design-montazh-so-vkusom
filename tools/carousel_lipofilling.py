@@ -229,9 +229,55 @@ def cta():
     ct.save_jpg(c, f"{OUT}/08_cta.jpg")
 
 
+def booking_steps(c, y, hgt=340, gap=26, text=None):
+    """the two annotated profile screenshots (step 1: link in the header, step 2: pick a messenger); returns the y below"""
+    from PIL import Image, ImageDraw
+    text = text or ct.WHITE
+    d = ImageDraw.Draw(c)
+    shots = [("profile_header.jpg", [(30, 805, 760, 890)], "1", "Нажмите на ссылку\nв шапке профиля"),
+             ("profile_links.jpg", [(30, 180, 1000, 310), (30, 660, 1000, 790)], "2", "Выберите WhatsApp\nили Telegram")]
+    ims = [Image.open(os.path.join(ASSETS, fn)).convert("RGB") for fn, *_ in shots]
+    ws = [int(i.width * hgt / i.height) for i in ims]
+    x0 = (W - sum(ws) - gap) // 2; S = 3
+    for (fn, boxes, num, cap), im_, w_ in zip(shots, ims, ws):
+        k = hgt / im_.height
+        card = im_.resize((w_ * S, hgt * S), Image.LANCZOS).convert("RGBA"); hd = ImageDraw.Draw(card)
+        for bx0, by0, bx1, by1 in boxes:
+            hd.rounded_rectangle((bx0 * k * S, by0 * k * S, bx1 * k * S, by1 * k * S), radius=16 * S, outline=LILAC_D + (255,), width=4 * S)
+        m = Image.new("L", card.size, 0); ImageDraw.Draw(m).rounded_rectangle((0, 0, card.width - 1, card.height - 1), radius=22 * S, fill=255)
+        card.putalpha(m); card = card.resize((w_, hgt), Image.LANCZOS)
+        c.alpha_composite(card, (x0, y))
+        d.rounded_rectangle((x0 - 1, y - 1, x0 + w_, y + hgt), radius=22, outline=LILAC_D + (140,), width=2)
+        d.ellipse((x0 - 18, y - 18, x0 + 36, y + 36), fill=LILAC_D, outline=ct.GRAPHITE, width=4)
+        d.text((x0 + 9, y + 10), num, font=ct.bebas(40), fill=ct.INK, anchor="mm")
+        for li, ln in enumerate(cap.split("\n")):
+            ct.shadow_text(c, (x0 + w_ / 2 - ct.mont(26, 500).getlength(ln) / 2, y + hgt + 22 + li * 34), ln, ct.mont(26, 500), text)
+        x0 += w_ + gap
+    return y + hgt + 22 + 2 * 34
+
+
+def important():
+    """blurred surgeon in the OR, ВАЖНО accent: no answers in Direct, write to a messenger; profile navigation; room left for a link"""
+    from PIL import Image, ImageDraw, ImageFilter
+    ct.LILAC = LILAC_D
+    im = Image.open(os.path.join(ASSETS, "surgeon_or.jpg")).convert("RGB")
+    bg = ct.fit_cover(im, W, H, cy=0.35).filter(ImageFilter.GaussianBlur(26)).convert("RGBA")
+    bg.alpha_composite(Image.new("RGBA", (W, H), ct.GRAPHITE + (150,)))  # dim the light wall so white type reads
+    c = bg; d = ImageDraw.Draw(c)
+    ct.put_logo(c, y=96, alpha=0.95)
+    f = ct.bebas(46); t = "ВАЖНО"; tw = f.getlength(t); y = 168
+    d.rounded_rectangle(((W - tw) / 2 - 26, y, (W + tw) / 2 + 26, y + 60), radius=30, fill=LILAC_D + (255,))
+    d.text((W / 2, y + 33), t, font=f, fill=ct.INK, anchor="mm")
+    y = ct.Block(W - 2 * ct.MARGIN, "center").head("Я не могу отвечать\nвам в директе", 86, 18).rule(0.14, 24) \
+        .body("Пишите сразу в удобном для вас мессенджере", 33, 0).draw(c, ct.MARGIN, y + 92)
+    y = booking_steps(c, y + 60)
+    ct.save_jpg(c, f"{OUT}/09_important.jpg")  # free space below the steps is left for the link
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     for n, a, b, *m in SLIDES:
         cut(n, a, b, *m); print("done", n, flush=True)
     add_badge("05_volume", 870, 1080); add_badge("07_this_task", 870, 1110)
     cta(); print("done cta")
+    important(); print("done important")
