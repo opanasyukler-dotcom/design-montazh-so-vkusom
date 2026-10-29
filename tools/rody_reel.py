@@ -149,7 +149,14 @@ def voice(srcd, work):
     v = np.concatenate(parts + [np.zeros((int(END_CARD * SR), 2), np.float32)])
     raw = f"{work}/voice_raw.wav"
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", str(SR), "-ac", "2", "-i", "-", raw], input=v.tobytes(), check=True)
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", raw, "-af", "loudnorm=I=-15:TP=-1.5:LRA=9", "-ar", str(SR), f"{work}/voice.wav"], check=True)
+    # two-pass, linear loudness: one constant gain for the whole voice (single-pass loudnorm pumps the first seconds and clips)
+    meas = subprocess.run(["ffmpeg", "-hide_banner", "-i", raw, "-af", "loudnorm=I=-15:TP=-1.5:LRA=11:print_format=json", "-f", "null", "-"],
+                          capture_output=True, text=True).stderr
+    mj = json.loads(meas[meas.rindex("{"):meas.rindex("}") + 1])
+    ln = (f"loudnorm=I=-15:TP=-1.5:LRA=11:linear=true:measured_I={mj['input_i']}:measured_TP={mj['input_tp']}:"
+          f"measured_LRA={mj['input_lra']}:measured_thresh={mj['input_thresh']}:offset={mj['target_offset']}")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", raw, "-af", ln + ",alimiter=limit=0.89:level=false", "-ar", str(SR),
+                    "-c:a", "pcm_s16le", f"{work}/voice.wav"], check=True)
     return FX.read(f"{work}/voice.wav")
 
 def pencil_noise(dur, seed, gain):
