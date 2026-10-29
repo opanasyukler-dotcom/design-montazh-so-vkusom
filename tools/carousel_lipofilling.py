@@ -105,7 +105,9 @@ def chose_overlay(path):
     tw = fb.getlength("ЛИПОФИЛИНГ")
     d.rectangle((x, y + 6, x + tw + 28, y + 104), fill=(16, 46, 70, 255))
     d.text((x + 14, y), "ЛИПОФИЛИНГ", font=fb, fill=ct.WHITE); y += 124
-    ct.shadow_text(ov, (x + 14, y), "собственная жировая ткань", ct.mont(30, 500), ct.WHITE, blur=6, a=200)
+    fs = ct.mont(30, 500)
+    for ln in ["собственная жировая ткань", "будет получена из области", "галифе, внутренних бёдер", "и коленей"]:
+        ct.shadow_text(ov, (x + 14, y), ln, fs, ct.WHITE, blur=6, a=210); y += 40
     ov.save(path)
 
 
