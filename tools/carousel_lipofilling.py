@@ -19,7 +19,7 @@ CROP_Y = 60  # keeps the reel's headline band and the body below it
 SLIDES = [
     ("01_implants_no", 0.00, 4.93),
     ("02_lift_no", 4.93, 10.67),
-    ("03_chose_lipofilling", 10.67, 19.20, "stack", (0.08, 0.225), (0.365, 0.985)),  # keep the patient at the bottom in frame
+    ("03_chose_lipofilling", 10.67, 19.20, "text3"),  # footage cropped low (patient in frame), headline on the wall top-left
     ("04_donor_zones", 19.20, 23.07),
     # headline band (top of the reel) stacked over the footage band (bottom of the reel): full 4:5, no side bars
     ("05_volume", 23.07, 29.20, "stack", (0.07, 0.36), (0.585, 1.0)),
@@ -95,7 +95,33 @@ def headline_overlay(path):
     ov.save(path)
 
 
+def chose_overlay(path):
+    """ВЫБРАЛИ / ЛИПОФИЛИНГ on the wall, top-left (surgeon stays clear): no shade, only the text's own soft shadow"""
+    from PIL import Image, ImageDraw
+    ov = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(ov)
+    x, y = 44, 70
+    fb = ct.bebas(100)
+    ct.shadow_text(ov, (x + 14, y), "ВЫБРАЛИ", fb, ct.WHITE, blur=8, a=170); y += 100
+    tw = fb.getlength("ЛИПОФИЛИНГ")
+    d.rectangle((x, y + 6, x + tw + 28, y + 104), fill=(16, 46, 70, 255))
+    d.text((x + 14, y), "ЛИПОФИЛИНГ", font=fb, fill=ct.WHITE); y += 124
+    ct.shadow_text(ov, (x + 14, y), "собственная жировая ткань", ct.mont(30, 500), ct.WHITE, blur=6, a=200)
+    ov.save(path)
+
+
 def cut(name, a, b, mode="crop", top=None, bot=None):
+    if mode == "text3":
+        ovp = f"{OUT}/_{name}_ov.png"; chose_overlay(ovp)
+        dur = b - a; fo = max(dur - 0.12, 0)
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{a:.3f}", "-t", f"{dur:.3f}", "-i", REEL, "-loop", "1", "-i", ovp,
+                        # 6% push-in: the reel's word pill above the surgeon falls outside the frame, patient stays in
+                        "-filter_complex", f"[0:v]scale=1146:-2:flags=lanczos,crop={W}:{H}:33:ih-{H},setsar=1[v];"
+                                           "[v][1:v]overlay=0:0:shortest=1,format=yuv420p[o]",
+                        "-map", "[o]", "-map", "0:a", "-t", f"{dur:.3f}",
+                        "-af", f"afade=t=in:d=0.06,afade=t=out:st={fo:.3f}:d=0.12",
+                        "-c:v", "libx264", "-preset", "medium", "-crf", "17",
+                        "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", f"{OUT}/{name}.mp4"], check=True)
+        os.remove(ovp); return
     if mode == "stack": return stack(name, a, b, top, bot)
     if mode == "text":
         ovp = f"{OUT}/_{name}_ov.png"; headline_overlay(ovp)
