@@ -289,7 +289,7 @@ def ink_track(p):
 
 def draw_on(fr, p, track, prog, x, y, alpha=1.0):
     """reveal a handwriting patch left→right up to prog (0..1 of the inked width); returns the pencil tip position"""
-    ys, i0, i1 = track; cut = i0 + (i1 - i0) * min(max(prog, 0), 1)
+    ys, i0, i1 = track; cut = i0 + (i1 + 18 - i0) * min(max(prog, 0), 1)   # +18: the soft edge clears the last letter
     q = p.copy(); q[..., 3:4] *= np.clip((cut - np.arange(p.shape[1])) / 18, 0, 1)[None, :, None]
     blend(fr, q, x, y, alpha); ci = int(min(cut, p.shape[1] - 1))
     return x + cut, y + ys[ci]
