@@ -268,9 +268,11 @@ def important():
     f = ct.bebas(46); t = "ВАЖНО"; tw = f.getlength(t); y = 168
     d.rounded_rectangle(((W - tw) / 2 - 26, y, (W + tw) / 2 + 26, y + 60), radius=30, fill=LILAC_D + (255,))
     d.text((W / 2, y + 33), t, font=f, fill=ct.INK, anchor="mm")
-    y = ct.Block(W - 2 * ct.MARGIN, "center").head("Я не могу отвечать\nвам в директе", 86, 18).rule(0.14, 24) \
-        .body("Пишите сразу в удобном для вас мессенджере", 33, 0).draw(c, ct.MARGIN, y + 92)
-    y = booking_steps(c, y + 60)
+    y = ct.Block(W - 2 * ct.MARGIN + 40, "center").head("Чтобы ваше сообщение\nне осталось без ответа", 74, 16).rule(0.14, 22) \
+        .body("Сейчас я получаю большое количество обращений, а возможность отвечать в Direct временно ограничена.", 29, 14) \
+        .body("Пожалуйста, пишите сразу в WhatsApp или Telegram по ссылке в шапке профиля", 29, 0, wght=700) \
+        .draw(c, ct.MARGIN - 20, y + 90)
+    y = booking_steps(c, y + 50, hgt=320)
     ct.save_jpg(c, f"{OUT}/09_important.jpg")  # free space below the steps is left for the link
 
 
