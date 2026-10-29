@@ -149,7 +149,7 @@ def cut(name, a, b, mode="crop", top=None, bot=None):
 
 
 ASSETS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "carousel_lipofilling", "src")
-LILAC_D = (240, 178, 196)  # soft pastel pink: bullets, highlight frames, step badges
+LILAC_D = (247, 207, 217)  # soft pastel pink: bullets, highlight frames, step badges
 
 
 def before_badge(path, cx, cy, r=165):
