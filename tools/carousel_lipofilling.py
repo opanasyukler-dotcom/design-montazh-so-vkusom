@@ -256,24 +256,28 @@ def booking_steps(c, y, hgt=340, gap=26, text=None):
     return y + hgt + 22 + 2 * 34
 
 
-def important():
-    """blurred surgeon in the OR, ВАЖНО accent: no answers in Direct, write to a messenger; profile navigation; room left for a link"""
+def important(hh=1920, name="09_important.jpg"):
+    """blurred surgeon in the OR, ВАЖНО accent: write to a messenger, profile navigation; 9:16 like a story,
+    the lower part is left free for a link sticker"""
     from PIL import Image, ImageDraw, ImageFilter
     ct.LILAC = LILAC_D
+    tall = hh > H
     im = Image.open(os.path.join(ASSETS, "surgeon_or.jpg")).convert("RGB")
-    bg = ct.fit_cover(im, W, H, cy=0.35).filter(ImageFilter.GaussianBlur(26)).convert("RGBA")
-    bg.alpha_composite(Image.new("RGBA", (W, H), ct.GRAPHITE + (150,)))  # dim the light wall so white type reads
+    bg = ct.fit_cover(im, W, hh, cy=0.35).filter(ImageFilter.GaussianBlur(26)).convert("RGBA")
+    bg.alpha_composite(Image.new("RGBA", (W, hh), ct.GRAPHITE + (150,)))  # dim the light wall so white type reads
     c = bg; d = ImageDraw.Draw(c)
-    ct.put_logo(c, y=96, alpha=0.95)
-    f = ct.bebas(46); t = "ВАЖНО"; tw = f.getlength(t); y = 168
-    d.rounded_rectangle(((W - tw) / 2 - 26, y, (W + tw) / 2 + 26, y + 60), radius=30, fill=LILAC_D + (255,))
-    d.text((W / 2, y + 33), t, font=f, fill=ct.INK, anchor="mm")
-    y = ct.Block(W - 2 * ct.MARGIN + 40, "center").head("Чтобы ваше сообщение\nне осталось без ответа", 74, 16).rule(0.14, 22) \
-        .body("Сейчас я получаю большое количество обращений, а возможность отвечать в Direct временно ограничена.", 29, 14) \
-        .body("Пожалуйста, пишите сразу в WhatsApp или Telegram по ссылке в шапке профиля", 29, 0, wght=700) \
-        .draw(c, ct.MARGIN - 20, y + 90)
-    y = booking_steps(c, y + 50, hgt=320)
-    ct.save_jpg(c, f"{OUT}/09_important.jpg")  # free space below the steps is left for the link
+    y0 = 230 if tall else 96  # stories: keep clear of the profile bar at the top
+    ct.put_logo(c, y=y0, alpha=0.95)
+    f = ct.bebas(50 if tall else 46); t = "ВАЖНО"; tw = f.getlength(t); y = y0 + 76
+    d.rounded_rectangle(((W - tw) / 2 - 28, y, (W + tw) / 2 + 28, y + 64), radius=32, fill=LILAC_D + (255,))
+    d.text((W / 2, y + 35), t, font=f, fill=ct.INK, anchor="mm")
+    hs, bs = (82, 31) if tall else (74, 29)
+    y = ct.Block(W - 2 * ct.MARGIN + 40, "center").head("Чтобы ваше сообщение\nне осталось без ответа", hs, 18).rule(0.14, 24) \
+        .body("Сейчас я получаю большое количество обращений, а возможность отвечать в Direct временно ограничена.", bs, 16) \
+        .body("Пожалуйста, пишите сразу в WhatsApp или Telegram по ссылке в шапке профиля", bs, 0, wght=700) \
+        .draw(c, ct.MARGIN - 20, y + 96)
+    booking_steps(c, y + 60, hgt=350 if tall else 320)
+    ct.save_jpg(c, f"{OUT}/{name}")  # free space below the steps is left for the link
 
 
 if __name__ == "__main__":
