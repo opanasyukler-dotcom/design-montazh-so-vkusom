@@ -235,68 +235,16 @@ def video_story(src, blocks, out, ss=0.0, dur=None, fx=0.5, fy=0.5, zoom=1.0, av
                         "-movflags", "+faststart", out], check=True)
     return bs
 
-def card_story(src, blocks, out, icon="heart", ss=0.0, fx=0.5, fy=0.5, at=None):
-    """no repeated frame: the picture only as a soft blurred ground, the text, and a pencil that writes the handwriting
-    and draws a small line picture (doodles.py) that then keeps moving"""
-    import pillow_heif, doodles; pillow_heif.register_heif_opener()
-    from rody_reel import pencil_sprite
+def card_story(src, blocks, out, icon=None, ss=0.0, fx=0.5, fy=0.5, at=None):
+    """no repeated frame: the picture only as a soft blurred ground under the text (a still JPG, no animation)"""
+    import pillow_heif; pillow_heif.register_heif_opener()
     if src.lower().endswith((".mov", ".mp4")): im = frame_at(src, ss, "null")
     else: im = ImageOps.exif_transpose(Image.open(src)).convert("RGB")
     bg = cover(im, fx, fy).resize((W // 10, H // 10), Image.BILINEAR).filter(ImageFilter.GaussianBlur(4)).resize((W, H), Image.BICUBIC)
     bg = Image.fromarray((np.asarray(bg, np.float32) * 0.62).astype(np.uint8))           # calm and darker: white type reads
     bs = [Block(k, t) for k, t in blocks]; place(bs, ([], np.zeros((H // 20, W // 20), np.float32)), at)
     for b in bs: b.light, b.haze = False, False
-    words = sum(len(t.split()) for _, t in blocks); dur = float(np.clip(words / 2.5 + 3.5, 6, 11))
-    plain = draw([b for b in bs if b.kind != "script"]); scr = [b for b in bs if b.kind == "script"]
-    # the picture box: the largest free square left of / right of / between the text pieces
-    used = [(b.x, b.y, b.x + b.w, b.y + b.h) for b in bs]; spot = None
-    for size in (300, 240, 190):                                           # biggest that fits; may sit a bit outside the text zone
-        for y in range(160, H - 300 - size, 20):
-            for x in (W - MARGIN - size, (W - size) // 2, MARGIN):
-                if not hits((x, y, x + size, y + size), used, 50):
-                    c = abs(y + size / 2 - (SAFE_TOP + SAFE_BOTTOM) / 2) * 0.3
-                    if spot is None or c < spot[0]: spot = (c, x, y)
-        if spot: break
-    pen, tip = pencil_sprite(0.42)
-    t_scr0, per = 0.7, 0.055
-    t_ico0 = t_scr0 + sum(len(b.text) for b in scr) * per + 0.2
-    with tempfile.TemporaryDirectory() as td:
-        lay = [(b, draw([b])) for b in scr]
-        cmd = ["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", "30", "-i", "-",
-               "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart", out]
-        wr = subprocess.Popen(cmd, stdin=subprocess.PIPE); base = np.asarray(bg.convert("RGBA"), np.float32)
-        pl = np.asarray(plain, np.float32); lays = [(b, np.asarray(l, np.float32)) for b, l in lay]
-        for fi in range(int(dur * 30)):
-            t = fi / 30; fr = base.copy(); k = min(max((t - 0.2) / 0.5, 0), 1)
-            fr = fr * (1 - pl[..., 3:] / 255 * k) + pl * (pl[..., 3:] / 255 * k)
-            pen_at = None; t0 = t_scr0
-            for b, l in lays:                                              # the handwriting is written on, left → right, line by line
-                d_ = (t - t0) / per; tot = len(b.text); t0 += tot * per
-                if d_ <= 0: continue
-                q = min(d_ / tot, 1.0); widths = [b.f.getlength(x) for x in b.lines]; cut = q * sum(widths); xm = np.zeros(W, np.float32)
-                for j, wl in enumerate(widths):
-                    lx = b.x if b.side == "left" else b.x + b.w - wl; yb = b.y + j * b.step + b.f.size * 0.85
-                    c = min(max(cut, 0), wl); cut -= wl
-                    if c > 0:
-                        y0, y1 = int(yb - b.f.size * 1.1), int(yb + b.f.size * 0.5)
-                        m = np.clip((lx + c - np.arange(W)) / 14, 0, 1)
-                        fr[y0:y1] = fr[y0:y1] * (1 - l[y0:y1, :, 3:] / 255 * m[None, :, None]) + l[y0:y1] * (l[y0:y1, :, 3:] / 255 * m[None, :, None])
-                        if c < wl: pen_at = (lx + c, yb - b.f.size * 0.3)
-                if q >= 1: continue
-            img = fr[..., :3].astype(np.uint8).copy()
-            if spot:                                                       # the line picture, drawn on, then alive
-                prog = (t - t_ico0) / 1.3
-                if prog > 0:
-                    tp = doodles.draw_icon(img, icon, spot[1], spot[2], size, prog, t, (245, 240, 234), 7, motion=max(0.0, t - t_ico0 - 1.3), seed=3)
-                    if 0 < prog < 1 and tp: pen_at = tp
-            if pen_at:
-                x0, y0 = int(pen_at[0] - tip[0]), int(pen_at[1] - tip[1] + 3 * np.sin(t * 40)); h_, w_ = pen.shape[:2]
-                xa, ya, xb, yb_ = max(x0, 0), max(y0, 0), min(x0 + w_, W), min(y0 + h_, H)
-                if xb > xa and yb_ > ya:
-                    p_ = pen[ya - y0:yb_ - y0, xa - x0:xb - x0]; a_ = p_[..., 3:] / 255
-                    img[ya:yb_, xa:xb] = (img[ya:yb_, xa:xb] * (1 - a_) + p_[..., :3] * a_).astype(np.uint8)
-            wr.stdin.write(img.tobytes())
-        wr.stdin.close(); wr.wait()
+    img = bg.convert("RGBA"); img.alpha_composite(draw(bs)); img.convert("RGB").save(out, quality=95, subsampling=0)
 
 V8208 = ("IMG_8208_m.json", (("прадо", "Prada"),), ())
 V8214 = ("IMG_8214_m.json", (("прадо", "Prada"),), ((17.3, 19.5),))
@@ -389,7 +337,7 @@ if __name__ == "__main__":
         for old in (name + ".jpg", name + ".mp4"):
             if os.path.exists(old): os.remove(old)
         if kind == "photo": photo_story(os.path.join(src, f), blocks, name + ".jpg", **kw)
-        elif kind == "card": card_story(os.path.join(src, f), blocks, name + ".mp4", **kw)
+        elif kind == "card": card_story(os.path.join(src, f), blocks, name + ".jpg", **kw)
         else:
             if kw.get("voice"): kw = dict(kw, voice=(os.path.join(src, "..", "asr", kw["voice"][0]),) + kw["voice"][1:])
             video_story(os.path.join(src, f), blocks, name + ".mp4", **kw)
