@@ -15,15 +15,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPT = os.path.join(HERE, "..", "skills", "montage-svg-typography", "Шрифты", "Коллекция шрифтов", "Gogol-Regular.otf")
 MONT = os.path.join(FONT_DIR, "Montserrat-VariableFont_wght.ttf")
 EMOJI = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"
-MARGIN, GAP, FACE_PAD = 72, 56, 60
+MARGIN, GAP, FACE_PAD = 70, 44, 50
 WHITE, INK, SHADE = (255, 255, 255), (24, 20, 18), (22, 15, 12)
 
 def mont(size, wght):
     f = ImageFont.truetype(MONT, size); f.set_variation_by_axes([wght]); return f
 
-STYLE = {"main": (lambda: mont(58, 800), 1.12, 640),          # font, line lead (× size), column width
-         "second": (lambda: mont(32, 300), 1.42, 600),
-         "script": (lambda: ImageFont.truetype(SCRIPT, 72), 1.0, 680)}
+STYLE = {"main": (lambda: mont(52, 700), 1.15, 760),          # font, line lead (× size), column width — sizes as in the blog's stories
+         "second": (lambda: mont(40, 400), 1.32, 720),
+         "script": (lambda: ImageFont.truetype(SCRIPT, 84), 1.0, 760)}
 
 def emoji_img(ch, h):
     f = ImageFont.truetype(EMOJI, 109); im = Image.new("RGBA", (160, 160), (0, 0, 0, 0))
@@ -47,7 +47,7 @@ def person_share(r, person):
     g = person[max(r[1] // 20, 0):r[3] // 20 + 1, max(r[0] // 20, 0):r[2] // 20 + 1]
     return float(g.mean()) if g.size else 0.0
 
-def place(blocks, people, at=None):
+def place(blocks, people, at=None, one_side=False):
     """reading order top → bottom; each piece goes to a free spot near its share of the height, sides alternating;
     never over a face, and over the body only if there is no other room; at = wished heights (0..1 of the safe zone) per piece"""
     faces, person = people
@@ -70,7 +70,7 @@ def place(blocks, people, at=None):
             x = MARGIN if side == "left" else W - MARGIN - b.w; y = int(min(max(prev + GAP, SAFE_TOP), SAFE_BOTTOM - b.h)); s = side
         else: _, x, y, s = best
         b.x, b.y, b.side = x, y, s; used.append((x, y, x + b.w, y + b.h)); prev = y + b.h
-        side = "right" if s == "left" else "left"
+        side = s if one_side else ("right" if s == "left" else "left")
 
 def colour(blocks, frame):
     """ink on light ground, white on dark (mean luminance under the piece)"""
@@ -115,11 +115,11 @@ def faces_of(frames, avoid=()):
     j = json.loads(r.stdout.strip().splitlines()[-1])
     return j["faces"] + [list(a) for a in avoid], np.array(j["person"], np.float32)
 
-def photo_story(src, blocks, out, fx=0.5, fy=0.5, zoom=1.0, avoid=(), at=None):
+def photo_story(src, blocks, out, fx=0.5, fy=0.5, zoom=1.0, avoid=(), at=None, one_side=False):
     import pillow_heif; pillow_heif.register_heif_opener()
     bg = cover(ImageOps.exif_transpose(Image.open(src)).convert("RGB"), fx, fy, zoom)
     if cover.card: avoid = tuple(avoid) + (cover.card,)
-    bs = [Block(k, t) for k, t in blocks]; place(bs, faces_of([bg], avoid), at); colour(bs, bg)
+    bs = [Block(k, t) for k, t in blocks]; place(bs, faces_of([bg], avoid), at, one_side); colour(bs, bg)
     img = bg.convert("RGBA"); img.alpha_composite(draw(bs)); img.convert("RGB").save(out, quality=95, subsampling=0)
     return bs
 
@@ -162,7 +162,7 @@ def sub_patch(text):
     s = Image.new("RGBA", (w, h), SHADE + (0,)); s.putalpha(sh.filter(ImageFilter.GaussianBlur(6))); s.alpha_composite(lay)
     return s
 
-def video_story(src, blocks, out, ss=0.0, dur=None, fx=0.5, fy=0.5, zoom=1.0, avoid=(), voice=None, at=None):
+def video_story(src, blocks, out, ss=0.0, dur=None, fx=0.5, fy=0.5, zoom=1.0, avoid=(), voice=None, at=None, one_side=False):
     """the clip full-bleed; the text pieces fade in; voice=(words.json, fixes, drops) keeps the sound and adds phrase subtitles"""
     probe = frame_at(src, ss, "null"); sw, sh_ = probe.size
     s = max(W / sw, H / sh_) * zoom; pw, ph = round(sw * s / 2) * 2, round(sh_ * s / 2) * 2
@@ -172,7 +172,7 @@ def video_story(src, blocks, out, ss=0.0, dur=None, fx=0.5, fy=0.5, zoom=1.0, av
     if dur is None: dur = float(np.clip(words / 2.5 + 2.0, 5, 10))
     dur = min(dur, probe_dur(src) - ss)
     frames = [frame_at(src, ss + dur * k / 5, crop) for k in range(6)]
-    bs = [Block(k, t) for k, t in blocks]; people = faces_of(frames, avoid); place(bs, people, at); faces = people[0]
+    bs = [Block(k, t) for k, t in blocks]; people = faces_of(frames, avoid); place(bs, people, at, one_side); faces = people[0]
     colour(bs, Image.fromarray(np.median(np.stack([np.asarray(f) for f in frames]), 0).astype(np.uint8)))
     with tempfile.TemporaryDirectory() as td:
         lay = os.path.join(td, "text.png"); draw(bs).save(lay)
@@ -201,7 +201,7 @@ V8214 = ("IMG_8214_m.json", (("прадо", "Prada"),), ((17.3, 19.5),))
 V8207 = ("IMG_8207_m.json", (), ())
 
 S = [  # (photo|video, file, options, [(kind, text), ...]) — one short thought per story, in reading order
-    ("photo", "IMG_9141.JPG", dict(fy=0.45, at=(0.05, 0.22)), [("main", "Я тут наконец-то решилась рассказать"), ("script", "про свои роды")]),
+    ("photo", "IMG_9141.JPG", dict(fy=0.45, at=(0.04, 0.16), one_side=True), [("main", "Я тут наконец-то решилась рассказать"), ("script", "про свои роды")]),
     ("photo", "IMG_0764.JPG", dict(fy=0.5), [("second", "Если честно, очень долго откладывала эту тему,"),
                                              ("second", "потому что вообще не понимала, хочу ли вообще рассказывать.")]),
     ("video", "IMG_0751.MOV", dict(ss=5.0), [("second", "Всю беременность я думала, что самое страшное, что меня ждёт, —"),
