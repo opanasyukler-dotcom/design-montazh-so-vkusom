@@ -51,18 +51,26 @@ def person_share(r, person):
     return float(g.mean()) if g.size else 0.0
 
 def place(blocks, people, at=None, one_side=False):
+    """try the wished / evenly spread heights first; if a piece found no room below the previous one, pack them higher"""
+    n = len(blocks)
+    for tg in ([at] if at else []) + [None, [i * 0.22 for i in range(n)], [0.0] * n]:
+        if _place(blocks, people, tg, one_side): return
+    _place(blocks, people, at, one_side)
+
+def _place(blocks, people, at=None, one_side=False):
     """reading order top → bottom; each piece goes to a free spot near its share of the height, sides alternating;
     never over a face, and over the body only if there is no other room; at = wished heights (0..1 of the safe zone) per piece"""
     faces, person = people
     fx = np.mean([(b[0] + b[2]) / 2 for b in faces]) if faces else W / 2
-    side = "left" if fx >= W / 2 else "right"; n = len(blocks); span = SAFE_BOTTOM - SAFE_TOP; prev = SAFE_TOP - GAP; used = []
+    side = "left" if fx >= W / 2 else "right"; n = len(blocks); span = SAFE_BOTTOM - SAFE_TOP; prev = SAFE_TOP - GAP; used = []; ok = True
     for i, b in enumerate(blocks):
         tgt = SAFE_TOP + span * (at[i] if at else (i + 0.5) / n) - b.h / 2; best = None
+        reserve = sum(c.h + GAP for c in blocks[i + 1:])                   # leave room below for the pieces still to come
         for lim, cw in [(l, c) for l in (0.04, 0.12, 0.3, 1.01) for c in (b.cw, int(b.cw * 0.72), int(b.cw * 0.52))]:
             b.rewrap(cw)                                                   # first a narrower column, only then over the body
             for s in (side, "right" if side == "left" else "left"):
                 x = MARGIN if s == "left" else W - MARGIN - b.w
-                for y in range(int(max(prev + GAP, SAFE_TOP)), SAFE_BOTTOM - b.h + 1, 8):
+                for y in range(int(max(prev + GAP, SAFE_TOP)), SAFE_BOTTOM - b.h - reserve + 1, 8):
                     r = (x, y, x + b.w, y + b.h)
                     if hits(r, faces, FACE_PAD) or hits(r, used, GAP // 2): continue
                     ps = person_share(r, person)
@@ -70,11 +78,23 @@ def place(blocks, people, at=None, one_side=False):
                     sc = abs(y - tgt) + (0 if s == side else 260) + 900 * ps
                     if best is None or sc < best[0]: best = (sc, x, y, s, cw)
             if best: break
-        if best is None:                                                   # nowhere free: the spot that covers the least face
+        if best is None: ok = False                                        # no room below the last piece: any free spot, still off faces
+        if best is None:
+            for cw in (b.cw, int(b.cw * 0.72), int(b.cw * 0.52)):
+                b.rewrap(cw)
+                for s in ("left", "right"):
+                    x = MARGIN if s == "left" else W - MARGIN - b.w
+                    for y in range(SAFE_TOP, SAFE_BOTTOM - b.h + 1, 8):
+                        r = (x, y, x + b.w, y + b.h)
+                        if hits(r, faces, FACE_PAD) or hits(r, used, GAP // 2): continue
+                        sc = abs(y - tgt) + 900 * person_share(r, person)
+                        if best is None or sc < best[0]: best = (sc, x, y, s, cw)
+        if best is None:
             b.rewrap(b.cw); x = MARGIN if side == "left" else W - MARGIN - b.w; y = int(min(max(prev + GAP, SAFE_TOP), SAFE_BOTTOM - b.h)); s = side
         else: _, x, y, s, cw = best; b.rewrap(cw)
-        b.x, b.y, b.side = x, y, s; used.append((x, y, x + b.w, y + b.h)); prev = y + b.h
+        b.x, b.y, b.side = x, y, s; used.append((x, y, x + b.w, y + b.h)); prev = max(prev, y + b.h)
         side = s if one_side else ("right" if s == "left" else "left")
+    return ok
 
 def colour(blocks, frame):
     """ink on light ground, white on dark (mean luminance under the piece)"""
@@ -181,7 +201,11 @@ def video_story(src, blocks, out, ss=0.0, dur=None, fx=0.5, fy=0.5, zoom=1.0, av
     if dur is None: dur = float(np.clip(words / 2.5 + 2.0, 5, 10))
     dur = min(dur, probe_dur(src) - ss)
     frames = [frame_at(src, ss + dur * 0.9 * k / 5, crop) for k in range(6)]
-    bs = [Block(k, t) for k, t in blocks]; people = faces_of(frames, avoid); place(bs, people, at, one_side); faces = people[0]
+    people = faces_of(frames, avoid); faces = people[0]; sy = None
+    if voice:                                                              # subtitles low, unless a face is there; the text keeps off them
+        sy = 1420 if not hits((90, 1380, W - 90, 1560), faces, 0) else 300
+        people = (faces + [(60, sy - 40, W - 60, sy + 150)], people[1])
+    bs = [Block(k, t) for k, t in blocks]; place(bs, people, at, one_side)
     colour(bs, Image.fromarray(np.median(np.stack([np.asarray(f) for f in frames]), 0).astype(np.uint8)))
     with tempfile.TemporaryDirectory() as td:
         lay = os.path.join(td, "text.png"); draw(bs).save(lay)
@@ -190,7 +214,6 @@ def video_story(src, blocks, out, ss=0.0, dur=None, fx=0.5, fy=0.5, zoom=1.0, av
         last = "v1"
         if voice:
             cues = subs_cues(*voice[:1], ss, ss + dur, *voice[1:])
-            sy = 1420 if not hits((90, 1380, W - 90, 1560), faces, 0) else 300   # subtitles low, unless a face is there
             for i, (a, b, t) in enumerate(cues):
                 p = os.path.join(td, f"s{i}.png"); sub_patch(t).save(p); ins += ["-i", p]
             n0 = 2
@@ -263,12 +286,12 @@ S = [  # (photo|video, file, options, [(kind, text), ...]) — one short thought
                                                                  ("main", "«Привыкай, дальше будет хуже»"),
                                                                  ("script", "Я до сих пор помню эту фразу.")]),
     ("photo", "DSC00516.JPG", dict(fy=0.4), [("main", "И это была только первая ночь.")]),
-    ("photo", "IMG_2194.HEIC", dict(fy=0.5), [("second", "Дальше были оскорбления из-за моего отказа от грудного вскармливания,"),
+    ("photo", "IMG_2194.HEIC", dict(fx=0.22, fy=0.5, at=(0.25, 0.5, 0.72), one_side=True), [("second", "Дальше были оскорбления из-за моего отказа от грудного вскармливания,"),
                                               ("second", "противоречивые замечания врачей"),
                                               ("second", "и постоянное ощущение, что я всё делаю неправильно.")]),
     ("photo", "IMG_6190.heic", dict(fx=0.5, fy=0.4, zoom=1.3), [("second", "Хотя я только что родила первого ребёнка"),
                                                                 ("script", "и просто пыталась разобраться")]),
-    ("photo", "DSC00770.JPG", dict(fy=0.5), [("second", "Самое обидное, что я ведь не ждала какого-то особенного отношения."),
+    ("photo", "DSC00770.JPG", dict(fy=0.5, at=(0.0, 0.14), one_side=True, avoid=((760, 1010, 1080, 1920),)), [("second", "Самое обидное, что я ведь не ждала какого-то особенного отношения."),
                                              ("second", "Мне просто хотелось, чтобы мне объяснили, помогли, дали немного "
                                                         "восстановиться после родов.")]),
     ("photo", "DSC00516.JPG", dict(fx=0.45, fy=0.35, zoom=1.35), [("main", "Хотелось просто человеческого отношения,"),

@@ -11,7 +11,7 @@ from mediapipe.tasks.python import vision, BaseOptions
 def main(models, frames):
     lm = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(
         base_options=BaseOptions(model_asset_path=os.path.join(models, "face_landmarker.task")),
-        running_mode=vision.RunningMode.IMAGE, num_faces=4, min_face_detection_confidence=0.3, min_face_presence_confidence=0.3))
+        running_mode=vision.RunningMode.IMAGE, num_faces=4, min_face_detection_confidence=0.5, min_face_presence_confidence=0.5))
     seg = vision.ImageSegmenter.create_from_options(vision.ImageSegmenterOptions(
         base_options=BaseOptions(model_asset_path=os.path.join(models, "selfie_segmenter.tflite")), output_confidence_masks=True))
     boxes, person = [], None
@@ -29,7 +29,8 @@ def main(models, frames):
             if tw == w and r.face_landmarks: break
         for p in found:
             x0, y0 = p.min(0); x1, y1 = p.max(0)
-            b = [float(x0), float(y0 - 0.25 * (y1 - y0)), float(x1), float(y1)]       # + the forehead / hair line
+            if g[int(y0) // 20:int(y1) // 20 + 1, int(x0) // 20:int(x1) // 20 + 1].mean() < 0.25: continue   # not on a person: a toy, a print
+            b =[float(x0), float(y0 - 0.25 * (y1 - y0)), float(x1), float(y1)]       # + the forehead / hair line
             for u in boxes:                                                # same face in another frame → grow its box
                 if not (b[2] < u[0] or b[0] > u[2] or b[3] < u[1] or b[1] > u[3]):
                     u[:] = [min(u[0], b[0]), min(u[1], b[1]), max(u[2], b[2]), max(u[3], b[3])]; break
