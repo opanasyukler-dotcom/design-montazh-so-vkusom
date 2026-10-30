@@ -1,5 +1,5 @@
 """@mcg.va — stories «про мои роды» (1080x1920), one short thought per story: photo stories → JPG, video stories → MP4.
-Type: main = Montserrat ExtraBold, second = thin Montserrat 300, accents = Gogol handwriting; all small.
+Type: main = Montserrat ExtraBold, second = thin Montserrat 300, accents = thin Montserrat Italic; all small.
 The picture stays full-bleed and sharp: small text pieces sit in different parts of the frame, away from faces (MediaPipe,
 face_boxes.py in the mpenv) — white with a soft shadow on dark areas, ink on light ones. Voice videos keep their sound and get
 phrase subtitles.
@@ -12,18 +12,20 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from stories_kit import W, H, SAFE_TOP, SAFE_BOTTOM, FONT_DIR, wrap
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCRIPT = os.path.join(HERE, "..", "skills", "montage-svg-typography", "Шрифты", "Коллекция шрифтов", "Gogol-Regular.otf")
 MONT = os.path.join(FONT_DIR, "Montserrat-VariableFont_wght.ttf")
 EMOJI = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"
 MARGIN, GAP, FACE_PAD = 70, 44, 50
 WHITE, INK, SHADE = (255, 255, 255), (24, 20, 18), (22, 15, 12)
+
+def mont_it(size, wght):
+    f = ImageFont.truetype(os.path.join(FONT_DIR, "Montserrat-Italic-VariableFont_wght.ttf"), size); f.set_variation_by_axes([wght]); return f
 
 def mont(size, wght):
     f = ImageFont.truetype(MONT, size); f.set_variation_by_axes([wght]); return f
 
 STYLE = {"main": (lambda: mont(52, 700), 1.15, 760),          # font, line lead (× size), column width — sizes as in the blog's stories
          "second": (lambda: mont(40, 400), 1.32, 720),
-         "script": (lambda: ImageFont.truetype(SCRIPT, 84), 1.0, 760)}
+         "script": (lambda: mont_it(44, 300), 1.3, 720)}                 # accent: thin Montserrat Italic
 
 def emoji_img(ch, h):
     f = ImageFont.truetype(EMOJI, 109); im = Image.new("RGBA", (160, 160), (0, 0, 0, 0))
