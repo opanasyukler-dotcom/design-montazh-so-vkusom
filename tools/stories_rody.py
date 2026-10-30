@@ -288,7 +288,7 @@ S = [  # (photo|video, file, options, [(kind, text), ...]) — one short thought
     ("video", "IMG_8217.mov", dict(ss=0.5, dur=7.0, chest=True), [("script", "Помыть полы и высушить голову после душа 😂")]),
     ("card", "IMG_8217.mov", dict(ss=17.0, icon="mop"), [("main", "Не спрашивайте, зачем."),
                                                        ("second", "У человека активные роды, а она уборку затеяла.")]),
-    ("video", "IMG_8217.mov", dict(ss=34.0, dur=8.0, chest=True), [("second", "Я расстраивалась и думала, что у меня максимум 5 см раскрытие"),
+    ("video", "IMG_8217.mov", dict(ss=34.0, dur=8.0), [("second", "Я расстраивалась и думала, что у меня максимум 5 см раскрытие"),
                                                        ("main", "(но на самом деле уже было 10 см)")]),
     ("video", "IMG_8217.mov", dict(ss=58.0, dur=6.0, chest=True), [("script", "Кстати, голову до конца я так и не высушила.")]),
     ("video", "IMG_6146.mov", dict(ss=2.0, dur=6.0, blur=True), [("main", "В итоге в роддом мы буквально летели."),
