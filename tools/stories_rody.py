@@ -1,208 +1,291 @@
-"""@mcg.va — 10 stories «про мои роды» (1080x1920): photo stories → JPG, video stories → MP4 with the text over the clip.
-Type: main = Montserrat ExtraBold, huge; second = thin Montserrat 300; script accents = Gogol handwriting.
-White type with a soft glyph shadow over a gentle gradient spray from the text side (no boxes, no cards).
-  python3 -I stories_rody.py MATERIALS_DIR OUT_DIR [N ...]
+"""@mcg.va — stories «про мои роды» (1080x1920), one short thought per story: photo stories → JPG, video stories → MP4.
+Type: main = Montserrat ExtraBold, second = thin Montserrat 300, accents = Gogol handwriting; all small.
+The picture stays full-bleed and sharp: small text pieces sit in different parts of the frame, away from faces (MediaPipe,
+face_boxes.py in the mpenv) — white with a soft shadow on dark areas, ink on light ones. Voice videos keep their sound and get
+phrase subtitles.
+  python3 -I stories_rody.py MATERIALS_DIR OUT_DIR MPENV_PYTHON MODELS_DIR [N ...]
 """
-import os, sys, subprocess
+import io, json, os, re, subprocess, sys, tempfile
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from stories_kit import W, H, SAFE_TOP, SAFE_BOTTOM, FONT_DIR, wrap
 
-ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-SCRIPT = os.path.join(ROOT, "skills", "montage-svg-typography", "Шрифты", "Коллекция шрифтов", "Gogol-Regular.otf")
+HERE = os.path.dirname(os.path.abspath(__file__))
+SCRIPT = os.path.join(HERE, "..", "skills", "montage-svg-typography", "Шрифты", "Коллекция шрифтов", "Gogol-Regular.otf")
 MONT = os.path.join(FONT_DIR, "Montserrat-VariableFont_wght.ttf")
 EMOJI = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"
-X0, MAXW = 84, W - 2 * 84
-SPRAY = (22, 15, 12)
+MARGIN, GAP, FACE_PAD = 72, 56, 60
+WHITE, INK, SHADE = (255, 255, 255), (24, 20, 18), (22, 15, 12)
 
 def mont(size, wght):
     f = ImageFont.truetype(MONT, size); f.set_variation_by_axes([wght]); return f
 
-STYLE = {"main": (lambda s: mont(s, 800), 92, 1.08, 30),            # font, size, line lead (× size), gap after the block
-         "second": (lambda s: mont(s, 300), 40, 1.38, 26),
-         "script": (lambda s: ImageFont.truetype(SCRIPT, s), 108, 0.98, 48)}
+STYLE = {"main": (lambda: mont(58, 800), 1.12, 640),          # font, line lead (× size), column width
+         "second": (lambda: mont(32, 300), 1.42, 600),
+         "script": (lambda: ImageFont.truetype(SCRIPT, 72), 1.0, 680)}
 
 def emoji_img(ch, h):
     f = ImageFont.truetype(EMOJI, 109); im = Image.new("RGBA", (160, 160), (0, 0, 0, 0))
     ImageDraw.Draw(im).text((80, 80), ch, font=f, embedded_color=True, anchor="mm"); im = im.crop(im.getbbox())
     return im.resize((round(im.width * h / im.height), h), Image.LANCZOS)
 
-def split_emoji(t):
-    """«text 😂» → ("text", "😂"): emoji only at the end of a block"""
-    if t and ord(t[-1]) > 0x2600: return t[:-1].rstrip(), t[-1]
-    return t, None
+class Block:
+    """one text piece: wrapped lines, its size, later its place and colour"""
+    def __init__(self, kind, text):
+        mk, lead, self.cw = STYLE[kind]; self.kind, self.f = kind, mk()
+        self.emo = text[-1] if ord(text[-1]) > 0x2600 else None; text = text[:-1].rstrip() if self.emo else text
+        self.lines = wrap(text, self.f, self.cw - (80 if self.emo else 0)); self.step = self.f.size * lead
+        self.w = int(max(self.f.getlength(l) for l in self.lines) + (80 if self.emo else 0))
+        self.h = int(self.step * (len(self.lines) - 1) + self.f.size * 1.15)
 
-def layout(blocks, scale=1.0):
-    """→ list of (kind, font, line, y-offset, lead), total height"""
-    ops, y = [], 0
-    for i, (kind, text) in enumerate(blocks):
-        mk, size, lead, gap = STYLE[kind]; f = mk(round(size * scale)); text, emo = split_emoji(text)
-        for j, l in enumerate(wrap(text, f, MAXW - (90 if emo else 0))):
-            ops.append((kind, f, l, y, emo if emo and j == len(wrap(text, f, MAXW - 90)) - 1 else None)); y += f.size * lead
-        if i < len(blocks) - 1: y += gap * scale
-    return ops, y
+def hits(r, boxes, pad):
+    return any(not (r[2] + pad <= b[0] or r[0] - pad >= b[2] or r[3] + pad <= b[1] or r[1] - pad >= b[3]) for b in boxes)
 
-def fit_text(blocks):
-    for sc in np.arange(1.0, 0.6, -0.03):                                 # shrink only if the text would leave the safe zone
-        ops, h = layout(blocks, sc)
-        if h <= SAFE_BOTTOM - SAFE_TOP - 40: return ops, h
+def person_share(r, person):
+    """share of the rectangle covered by the person mask (20 px cells)"""
+    g = person[max(r[1] // 20, 0):r[3] // 20 + 1, max(r[0] // 20, 0):r[2] // 20 + 1]
+    return float(g.mean()) if g.size else 0.0
 
-def geometry(blocks, pos):
-    """text block top y0 and height h; the sharp picture zone (z0, z1) is the rest of the frame, overlapping the text by FEATHER"""
-    ops, h = fit_text(blocks); h = int(round(h))
-    y0 = SAFE_TOP + 30 if pos == "top" else SAFE_BOTTOM - 20 - h
-    z = (y0 + h + 40 - FEATHER // 2, H) if pos == "top" else (0, y0 - 40 + FEATHER // 2)
-    return ops, y0, h, (int(z[0]), int(z[1]))
+def place(blocks, people, at=None):
+    """reading order top → bottom; each piece goes to a free spot near its share of the height, sides alternating;
+    never over a face, and over the body only if there is no other room; at = wished heights (0..1 of the safe zone) per piece"""
+    faces, person = people
+    fx = np.mean([(b[0] + b[2]) / 2 for b in faces]) if faces else W / 2
+    side = "left" if fx >= W / 2 else "right"; n = len(blocks); span = SAFE_BOTTOM - SAFE_TOP; prev = SAFE_TOP - GAP; used = []
+    for i, b in enumerate(blocks):
+        tgt = SAFE_TOP + span * (at[i] if at else (i + 0.5) / n) - b.h / 2; best = None
+        for lim in (0.04, 0.12, 0.3, 1.01):                                # how much body the piece may cover, relaxed step by step
+            for s in (side, "right" if side == "left" else "left"):
+                x = MARGIN if s == "left" else W - MARGIN - b.w
+                for y in range(int(max(prev + GAP, SAFE_TOP)), SAFE_BOTTOM - b.h + 1, 8):
+                    r = (x, y, x + b.w, y + b.h)
+                    if hits(r, faces, FACE_PAD) or hits(r, used, GAP // 2): continue
+                    ps = person_share(r, person)
+                    if ps > lim: continue
+                    sc = abs(y - tgt) + (0 if s == side else 260) + 900 * ps
+                    if best is None or sc < best[0]: best = (sc, x, y, s)
+            if best: break
+        if best is None:                                                   # nowhere free: the spot that covers the least face
+            x = MARGIN if side == "left" else W - MARGIN - b.w; y = int(min(max(prev + GAP, SAFE_TOP), SAFE_BOTTOM - b.h)); s = side
+        else: _, x, y, s = best
+        b.x, b.y, b.side = x, y, s; used.append((x, y, x + b.w, y + b.h)); prev = y + b.h
+        side = "right" if s == "left" else "left"
 
-FEATHER = 300
+def colour(blocks, frame):
+    """ink on light ground, white on dark (mean luminance under the piece)"""
+    a = np.asarray(frame.convert("L"), np.float32)
+    for b in blocks: b.light = a[b.y:b.y + b.h, b.x:b.x + b.w].mean() > 150
 
-def zone_mask(pos, zh):
-    """alpha of the sharp picture: 1 inside, fading out over FEATHER towards the text"""
-    m = np.ones(zh, np.float32); r = np.linspace(0, 1, FEATHER) ** 1.6
-    if pos == "top": m[:FEATHER] = r
-    else: m[-FEATHER:] = r[::-1]
-    return Image.fromarray((np.repeat(m[:, None], W, 1) * 255).astype(np.uint8))
+def draw(blocks, size=(W, H)):
+    """RGBA layer with the text pieces (soft glyph shadow under white, faint glow under ink)"""
+    txt = Image.new("RGBA", size, (0, 0, 0, 0)); sh = Image.new("L", size, 0); gl = Image.new("L", size, 0)
+    d, ds, dg = ImageDraw.Draw(txt), ImageDraw.Draw(sh), ImageDraw.Draw(gl)
+    for b in blocks:
+        col = INK if b.light else WHITE; under = dg if b.light else ds
+        for j, l in enumerate(b.lines):
+            yb = b.y + j * b.step + b.f.size * 0.85; lw = b.f.getlength(l) + (80 if b.emo and j == len(b.lines) - 1 else 0)
+            x = b.x if b.side == "left" else b.x + b.w - lw
+            d.text((x, yb), l, font=b.f, fill=col + (255,), anchor="ls"); under.text((x, yb + 2), l, font=b.f, fill=150, anchor="ls")
+            if b.emo and j == len(b.lines) - 1:
+                e = emoji_img(b.emo, int(b.f.size * 0.8)); txt.alpha_composite(e, (int(x + b.f.getlength(l) + 16), int(yb - e.height * 0.9)))
+    out = Image.new("RGBA", size, (0, 0, 0, 0))
+    s1 = Image.new("RGBA", size, SHADE + (0,)); s1.putalpha(sh.filter(ImageFilter.GaussianBlur(7))); out.alpha_composite(s1)
+    s2 = Image.new("RGBA", size, (255, 255, 255, 0)); s2.putalpha(gl.filter(ImageFilter.GaussianBlur(9)).point(lambda v: v * 0.6))
+    out.alpha_composite(s2); out.alpha_composite(txt)
+    return out
 
-def text_layer(ops, y0, h, pos):
-    """RGBA layer: a light spray on the text side + white type with a soft shadow"""
-    a = np.zeros(H, np.float32); yy = np.arange(H)
-    if pos == "top": e0, e1 = y0 + h + 200, y0 + 100; a = np.clip((e0 - yy) / (e0 - e1), 0, 1)
-    else: e0, e1 = y0 - 200, y0 + 100; a = np.clip((yy - e0) / (e1 - e0), 0, 1)
-    a = (a ** 1.3) * 0.30
-    lay = Image.new("RGBA", (W, H), SPRAY + (0,)); lay.putalpha(Image.fromarray((np.repeat(a[:, None], W, 1) * 255).astype(np.uint8)))
-    txt = Image.new("RGBA", (W, H), (0, 0, 0, 0)); sh = Image.new("L", (W, H), 0)
-    d, ds = ImageDraw.Draw(txt), ImageDraw.Draw(sh)
-    for kind, f, l, y, emo in ops:
-        yb = y0 + y + f.size * 0.8                                         # baseline
-        d.text((X0, yb), l, font=f, fill=(255, 255, 255, 255), anchor="ls")
-        ds.text((X0, yb + 3), l, font=f, fill=150 if kind != "main" else 120, anchor="ls")
-        if emo:
-            e = emoji_img(emo, int(f.size * (0.8 if kind == "script" else 0.95)))
-            txt.alpha_composite(e, (int(X0 + f.getlength(l) + 18), int(yb - e.height * 0.92)))
-    shadow = Image.new("RGBA", (W, H), SPRAY + (0,)); shadow.putalpha(sh.filter(ImageFilter.GaussianBlur(8)))
-    lay.alpha_composite(shadow); lay.alpha_composite(txt)
-    return lay
+def cover(im, fx=0.5, fy=0.5, zoom=1.0):
+    if zoom < 1:                                                           # contained, smaller, on the picture's own corner colour
+        s = min(W / im.width, H / im.height) * zoom; p = im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
+        bg = Image.new("RGB", (W, H), im.getpixel((2, im.height // 2))); x, y = (W - p.width) // 2, int((H - p.height) * fy)
+        bg.paste(p, (x, y)); cover.card = (x, y, x + p.width, y + p.height)         # the text keeps off the picture itself
+        return bg
+    cover.card = None
+    s = max(W / im.width, H / im.height) * zoom; im = im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
+    x = int(min(max(fx * im.width - W / 2, 0), im.width - W)); y = int(min(max(fy * im.height - H / 2, 0), im.height - H))
+    return im.crop((x, y, x + W, y + H))
 
-def place(sw, sh, zh, fx, fy, zoom=1.0):
-    """scale (k) and crop offset of a sw×sh picture so it covers a W×zh zone with the focus (fx, fy) near the zone centre"""
-    k = max(W / sw, zh / sh) * zoom; pw, ph = sw * k, sh * k
-    x = int(min(max(fx * pw - W / 2, 0), pw - W)); y = int(min(max(fy * ph - zh / 2, 0), ph - zh))
-    return k, round(pw), round(ph), x, y
+def faces_of(frames, avoid=()):
+    """face boxes over the given 1080x1920 frames (mpenv), plus any boxes the story lists by hand"""
+    with tempfile.TemporaryDirectory() as td:
+        ps = []
+        for i, f in enumerate(frames): p = os.path.join(td, f"{i}.png"); f.save(p); ps.append(p)
+        r = subprocess.run([MPPY, os.path.join(HERE, "face_boxes.py"), MODELS] + ps, capture_output=True, text=True, check=True)
+    j = json.loads(r.stdout.strip().splitlines()[-1])
+    return j["faces"] + [list(a) for a in avoid], np.array(j["person"], np.float32)
 
-def backdrop(im):
-    """the same picture, cover-filled, heavily blurred and a little darker: the calm ground for the type"""
-    s = max(W / im.width, H / im.height); b = im.resize((round(im.width * s / 8), round(im.height * s / 8)), Image.BILINEAR)
-    b = b.filter(ImageFilter.GaussianBlur(5)).resize((round(im.width * s), round(im.height * s)), Image.BICUBIC)
-    b = b.crop(((b.width - W) // 2, (b.height - H) // 2, (b.width - W) // 2 + W, (b.height - H) // 2 + H))
-    return Image.fromarray((np.asarray(b, np.float32) * 0.72).astype(np.uint8))
-
-def photo_story(src, blocks, pos, out, fx=0.5, fy=0.4, zoom=1.0):
+def photo_story(src, blocks, out, fx=0.5, fy=0.5, zoom=1.0, avoid=(), at=None):
     import pillow_heif; pillow_heif.register_heif_opener()
-    im = ImageOps.exif_transpose(Image.open(src)).convert("RGB")
-    ops, y0, h, (z0, z1) = geometry(blocks, pos); zh = z1 - z0
-    k, pw, ph, x, y = place(im.width, im.height, zh, fx, fy, zoom)
-    sharp = im.resize((pw, ph), Image.LANCZOS).crop((x, y, x + W, y + zh))
-    img = backdrop(im); img.paste(sharp, (0, z0), zone_mask(pos, zh)); img = img.convert("RGBA")
-    img.alpha_composite(text_layer(ops, y0, h, pos)); img.convert("RGB").save(out, quality=95, subsampling=0)
+    bg = cover(ImageOps.exif_transpose(Image.open(src)).convert("RGB"), fx, fy, zoom)
+    if cover.card: avoid = tuple(avoid) + (cover.card,)
+    bs = [Block(k, t) for k, t in blocks]; place(bs, faces_of([bg], avoid), at); colour(bs, bg)
+    img = bg.convert("RGBA"); img.alpha_composite(draw(bs)); img.convert("RGB").save(out, quality=95, subsampling=0)
+    return bs
 
-def video_story(src, blocks, pos, out, ss=0.0, fx=0.5, fy=0.4, zoom=1.0):
-    """the clip (muted) sharp in its zone over its own blurred copy; the static type fades in; length = time to read it"""
-    words = sum(len(t.split()) for _, t in blocks); dur = float(np.clip(words / 2.6 + 2.5, 7, 22))
-    pr = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", src], capture_output=True, text=True)
-    clip = float(pr.stdout) - ss
-    fr = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(ss), "-i", src, "-frames:v", "1", "-f", "image2pipe", "-vcodec", "png", "-"],
-                        capture_output=True, check=True).stdout
-    import io; sw, sh = Image.open(io.BytesIO(fr)).size                     # displayed (rotated) size
-    slow = min(max(dur / clip, 1.0), 1.6)                                   # a short clip plays a bit slower, then loops if still short
-    ops, y0, h, (z0, z1) = geometry(blocks, pos); zh = z1 - z0
-    k, pw, ph, x, y = place(sw, sh, zh, fx, fy, zoom); pw += pw % 2; ph += ph % 2
-    lay, msk = out + ".layer.png", out + ".mask.png"
-    text_layer(ops, y0, h, pos).save(lay); zone_mask(pos, zh).save(msk)
-    vf = (f"[0:v]setpts={slow:.3f}*PTS,fps=30,split[a][b];"
-          f"[b]scale={W // 8}:{H // 8}:force_original_aspect_ratio=increase,crop={W // 8}:{H // 8},gblur=sigma=5,"
-          f"scale={W}:{H}:flags=bicubic,colorchannelmixer=rr=.72:gg=.72:bb=.72[bg];"
-          f"[a]scale={pw}:{ph}:flags=lanczos,crop={W}:{zh}:{x}:{y},format=rgba[f];[2:v]format=gray[m];[f][m]alphamerge[fm];"
-          f"[bg][fm]overlay=0:{z0}[c];[1:v]format=rgba,fade=in:st=0.25:d=0.6:alpha=1[t];[c][t]overlay=0:0,format=yuv420p")
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(ss), "-stream_loop", "-1", "-i", src, "-loop", "1", "-i", lay,
-                    "-loop", "1", "-i", msk, "-filter_complex", vf, "-t", f"{dur:.2f}", "-an", "-c:v", "libx264", "-preset", "slow",
-                    "-crf", "17", "-profile:v", "high", "-movflags", "+faststart", out], check=True)
-    os.remove(lay); os.remove(msk)
+def probe_dur(src):
+    return float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", src],
+                                capture_output=True, text=True).stdout)
 
-STORIES = {
-    1: ("photo", "IMG_9141.JPG", "top", dict(fy=0.45, zoom=1.35), [
-        ("main", "Я тут наконец-то решилась рассказать"),
-        ("script", "про свои роды"),
-        ("second", "Если честно, очень долго откладывала эту тему, потому что вообще не понимала, хочу ли вообще рассказывать.")]),
-    2: ("video", "IMG_0751.MOV", "bottom", dict(ss=2.0), [
-        ("second", "Всю беременность я думала, что самое страшное, что меня ждёт, — это сами роды и тяжесть материнства, но…"),
-        ("second", "Я готовилась к боли, к тому, что всё может пойти не по плану, представляла себе миллион разных сценариев."),
-        ("main", "Но реальность оказалась"),
-        ("script", "немного другой")]),
-    3: ("video", "IMG_8216.mov", "bottom", dict(), [
-        ("main", "Мои роды начались ровно в ПДР!"),
-        ("second", "Муж в этот день уехал на выступление, а я осталась дома со схватками."),
-        ("second", "Причём весь день я лежала, смотрела кино, ела, слушала музыку и отдыхала в полной темноте."),
-        ("script", "Вот примерно о таких родах я и мечтала")]),
-    4: ("video", "IMG_8217.mov", "top", dict(), [
-        ("second", "А потом у меня отошли воды, схватки стали сильнее,"),
-        ("main", "и знаете, что я решила сделать?"),
-        ("script", "Помыть полы и высушить голову после душа 😂"),
-        ("second", "Не спрашивайте, зачем. У человека активные роды, а она уборку затеяла. Я расстраивалась и думала, что у меня "
-                   "максимум 5 см раскрытие (но на самом деле уже было 10 см)."),
-        ("second", "Кстати, голову до конца я так и не высушила.")]),
-    "5a": ("video", "IMG_6146.mov", "top", dict(fy=0.5), [
-        ("main", "В итоге в роддом мы буквально летели"),
-        ("second", "Потому что я чуть не родила дома, а затем и в такси. Просто бедный таксист. Он сидел весь зелёный от страха. "
-                   "Меня просто забрала моя акушерка из дома, и мы поехали в роддом. Мы не могли долго выехать со двора, и акушерка "
-                   "думала уже звонить в полицию, чтобы нас сопроводили. Потому что у меня уже начинались потуги.")]),
-    "5b": ("photo", "IMG_6190.heic", "bottom", dict(fy=0.40), [
-        ("second", "Меня встретили с каталкой, быстро отвезли в родовую, и уже через час после поступления я родила дочку."),
-        ("second", "И знаете что? Я считаю, что роды у меня прошли"),
-        ("script", "просто шикарно!"),
-        ("second", "После такого опыта я реально готова идти за вторым.")]),
-    6: ("video", "IMG_6145.mov", "top", dict(), [
-        ("second", "Но потом меня перевели в послеродовое отделение."),
-        ("main", "И вот здесь началось то, к чему я вообще не была готова"),
-        ("second", "Я осталась одна с новорождённым ребёнком. Уставшая, без сна, без понимания, что делать дальше."),
-        ("script", "И мне казалось, что хотя бы здесь мне помогут")]),
-    "7a": ("video", "IMG_8214.mov", "bottom", dict(fy=0.35), [
-        ("main", "Дочка всю ночь плакала,"),
-        ("second", "я буквально падала с ног. Она захлёбывалась водой. Я не понимала, что с ней происходит. Оказывается, ребёнок "
-                   "может наглотаться околоплодных вод, и это нормально, что вода потом выходит. Почему-то в роддоме мне никто "
-                   "не мог этого объяснить."),
-        ("script", "Я чуть не умерла со страха")]),
-    "7b": ("photo", "IMG_6225.heic", "top", dict(fy=0.55), [
-        ("second", "Несколько раз звала медсестру, потому что не понимала, что происходит и как ей помочь. И вместо объяснений услышала:"),
-        ("main", "«Привыкай, дальше будет хуже»"),
-        ("script", "Я до сих пор помню эту фразу")]),
-    8: ("photo", "IMG_0042.HEIC", "top", dict(fy=0.5), [
-        ("main", "И это была только первая ночь"),
-        ("second", "Дальше были оскорбления из-за моего отказа от грудного вскармливания, противоречивые замечания врачей и постоянное "
-                   "ощущение, что я всё делаю неправильно."),
-        ("second", "Хотя я только что родила первого ребёнка"),
-        ("script", "и просто пыталась разобраться")]),
-    "9a": ("photo", "DSC00516.JPG", "bottom", dict(fy=0.30), [
-        ("second", "Самое обидное, что я ведь не ждала какого-то особенного отношения. Мне просто хотелось, чтобы мне объяснили, "
-                   "помогли, дали немного восстановиться после родов."),
-        ("main", "Хотелось просто человеческого отношения,"),
-        ("second", "потому что после родов ты настолько сильно уязвима, как никогда.")]),
-    "9b": ("photo", "DSC00770.JPG", "top", dict(fy=0.55), [
-        ("second", "Да, кому-то могло быть хуже. Но я здесь не сравниваю свою историю с чужой."),
-        ("script", "Для меня этот опыт оказался травмирующим,"),
-        ("second", "и я потом ещё долго с этим разбиралась.")]),
-    10: ("photo", "100.jpg", "bottom", dict(fy=0.33), [
-        ("main", "Я решила сделать целую серию рилс,"),
-        ("second", "потому что в одно видео всё это просто невозможно уместить. Расскажу и про сами роды, и про первую ночь, и про "
-                   "отношение персонала, с которым я столкнулась в роддоме Юдина."),
-        ("second", "Возможно, кому-то моя история поможет чуть лучше подготовиться к тому, что бывает после родов."),
-        ("script", "Первую часть уже выложила")]),
-}
+def frame_at(src, t, crop):
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{t:.2f}", "-i", src, "-frames:v", "1", "-vf", crop, "-f", "image2pipe",
+                          "-vcodec", "png", "-"], capture_output=True, check=True).stdout
+    return Image.open(io.BytesIO(raw)).convert("RGB")
+
+def subs_cues(words_json, t0, t1, fix=(), drop=()):
+    """phrase cues (≤ 3 words / 24 letters, broken at punctuation) from whisper words in [t0, t1); fix = word replacements"""
+    ws = [w for w in json.load(open(words_json)) if t0 <= w[1] < t1 and not any(a <= w[1] < b for a, b in drop)]
+    toks = []
+    for w, a, b in ws:
+        if w.startswith("-") and toks: toks[-1][0] += w; toks[-1][2] = b; continue
+        toks.append([w, a, b])
+    for i, t in enumerate(toks):                                           # sentence-case: whisper capitalises after its own pauses
+        if i and not re.search(r"[.!?…»]$", toks[i - 1][0]) and t[0][:1].isupper() and t[0] not in ("Дьявол", "Prada"): t[0] = t[0].lower()
+        for a, b in fix: t[0] = t[0].replace(a, b)
+    cues, cur = [], []
+    for t in toks:
+        cur.append(t); txt = " ".join(c[0] for c in cur)
+        if len(cur) >= 3 or len(txt) >= 22 or re.search(r"[,.!?…»]$", t[0]): cues.append(cur); cur = []
+    if cur: cues.append(cur)
+    out = []
+    for i, c in enumerate(cues):
+        end = cues[i + 1][0][1] if i + 1 < len(cues) and cues[i + 1][0][1] - c[-1][2] < 0.6 else c[-1][2] + 0.35
+        out.append((c[0][1] - t0, end - t0, " ".join(x[0] for x in c).rstrip(",")))
+    return out
+
+def sub_patch(text):
+    f = mont(44, 600); lines = wrap(text, f, 900); w = int(max(f.getlength(l) for l in lines)) + 40; h = 62 * len(lines) + 30
+    lay = Image.new("RGBA", (w, h), (0, 0, 0, 0)); sh = Image.new("L", (w, h), 0); d, ds = ImageDraw.Draw(lay), ImageDraw.Draw(sh)
+    for j, l in enumerate(lines):
+        d.text((w / 2, 20 + j * 62 + 44), l, font=f, fill=WHITE + (255,), anchor="ms")
+        ds.text((w / 2, 22 + j * 62 + 44), l, font=f, fill=190, anchor="ms")
+    s = Image.new("RGBA", (w, h), SHADE + (0,)); s.putalpha(sh.filter(ImageFilter.GaussianBlur(6))); s.alpha_composite(lay)
+    return s
+
+def video_story(src, blocks, out, ss=0.0, dur=None, fx=0.5, fy=0.5, zoom=1.0, avoid=(), voice=None, at=None):
+    """the clip full-bleed; the text pieces fade in; voice=(words.json, fixes, drops) keeps the sound and adds phrase subtitles"""
+    probe = frame_at(src, ss, "null"); sw, sh_ = probe.size
+    s = max(W / sw, H / sh_) * zoom; pw, ph = round(sw * s / 2) * 2, round(sh_ * s / 2) * 2
+    x = int(min(max(fx * pw - W / 2, 0), pw - W)); y = int(min(max(fy * ph - H / 2, 0), ph - H))
+    crop = f"scale={pw}:{ph}:flags=lanczos,crop={W}:{H}:{x}:{y}"
+    words = sum(len(t.split()) for _, t in blocks)
+    if dur is None: dur = float(np.clip(words / 2.5 + 2.0, 5, 10))
+    dur = min(dur, probe_dur(src) - ss)
+    frames = [frame_at(src, ss + dur * k / 5, crop) for k in range(6)]
+    bs = [Block(k, t) for k, t in blocks]; people = faces_of(frames, avoid); place(bs, people, at); faces = people[0]
+    colour(bs, Image.fromarray(np.median(np.stack([np.asarray(f) for f in frames]), 0).astype(np.uint8)))
+    with tempfile.TemporaryDirectory() as td:
+        lay = os.path.join(td, "text.png"); draw(bs).save(lay)
+        ins = ["-ss", f"{ss:.2f}", "-t", f"{dur:.2f}", "-i", src, "-loop", "1", "-t", f"{dur:.2f}", "-i", lay]
+        fg = f"[0:v]{crop},fps=30,format=yuv420p[v0];[1:v]format=rgba,fade=in:st=0.2:d=0.5:alpha=1[t];[v0][t]overlay=0:0[v1]"
+        last = "v1"
+        if voice:
+            cues = subs_cues(*voice[:1], ss, ss + dur, *voice[1:])
+            sy = 1420 if not hits((90, 1380, W - 90, 1560), faces, 0) else 300   # subtitles low, unless a face is there
+            for i, (a, b, t) in enumerate(cues):
+                p = os.path.join(td, f"s{i}.png"); sub_patch(t).save(p); ins += ["-i", p]
+            n0 = 2
+            for i, (a, b, t) in enumerate(cues):
+                fg += f";[{last}][{n0 + i}:v]overlay=(W-w)/2:{sy}:enable='between(t,{max(a, 0):.2f},{b:.2f})'[v{i + 2}]"; last = f"v{i + 2}"
+            fg += f";[0:a]loudnorm=I=-16:TP=-1.5:LRA=11[a]"
+            amap = ["-map", "[a]", "-c:a", "aac", "-b:a", "192k"]
+        else: amap = ["-an"]
+        fg += f";[{last}]format=yuv420p[vout]"
+        subprocess.run(["ffmpeg", "-v", "error", "-y"] + ins + ["-filter_complex", fg, "-map", "[vout]"] + amap +
+                       ["-t", f"{dur:.2f}", "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-profile:v", "high", "-r", "30",
+                        "-movflags", "+faststart", out], check=True)
+    return bs
+
+V8208 = ("IMG_8208_m.json", (("прадо", "Prada"),), ())
+V8214 = ("IMG_8214_m.json", (("прадо", "Prada"),), ((17.3, 19.5),))
+V8207 = ("IMG_8207_m.json", (), ())
+
+S = [  # (photo|video, file, options, [(kind, text), ...]) — one short thought per story, in reading order
+    ("photo", "IMG_9141.JPG", dict(fy=0.45, at=(0.05, 0.22)), [("main", "Я тут наконец-то решилась рассказать"), ("script", "про свои роды")]),
+    ("photo", "IMG_0764.JPG", dict(fy=0.5), [("second", "Если честно, очень долго откладывала эту тему,"),
+                                             ("second", "потому что вообще не понимала, хочу ли вообще рассказывать.")]),
+    ("video", "IMG_0751.MOV", dict(ss=5.0), [("second", "Всю беременность я думала, что самое страшное, что меня ждёт, —"),
+                                             ("main", "это сами роды и тяжесть материнства, но…")]),
+    ("photo", "IMG_7952.JPG", dict(fy=0.5), [("second", "Я готовилась к боли, к тому, что всё может пойти не по плану,"),
+                                             ("second", "представляла себе миллион разных сценариев.")]),
+    ("video", "IMG_0755.mov", dict(ss=1.0), [("main", "Но реальность оказалась"), ("script", "немного другой")]),
+    ("video", "IMG_8207.mov", dict(voice=V8207, dur=9.0), [("main", "Мои роды начались ровно в ПДР!")]),
+    ("photo", "IMG_8219.png", dict(fy=0.12, zoom=0.62), [("second", "Муж в этот день уехал на выступление,"),
+                                             ("main", "а я осталась дома со схватками")]),
+    ("video", "IMG_8216.mov", dict(ss=6.0), [("second", "Причём весь день я лежала, смотрела кино, ела, слушала музыку"),
+                                             ("script", "и отдыхала в полной темноте")]),
+    ("video", "IMG_8208.mov", dict(voice=V8208, dur=53.5), []),
+    ("video", "IMG_8214.mov", dict(voice=V8214, ss=2.0, dur=33.0), [("script", "Вот примерно о таких родах я и мечтала")]),
+    ("video", "IMG_8218.mov", dict(ss=2.5), [("second", "А потом у меня отошли воды, схватки стали сильнее,"),
+                                             ("main", "и знаете, что я решила сделать?")]),
+    ("video", "IMG_8217.mov", dict(ss=0.5, dur=7.0), [("script", "Помыть полы и высушить голову после душа 😂")]),
+    ("video", "IMG_8217.mov", dict(ss=17.0, dur=7.0), [("main", "Не спрашивайте, зачем."),
+                                                       ("second", "У человека активные роды, а она уборку затеяла.")]),
+    ("video", "IMG_8217.mov", dict(ss=34.0, dur=8.0), [("second", "Я расстраивалась и думала, что у меня максимум 5 см раскрытие"),
+                                                       ("main", "(но на самом деле уже было 10 см)")]),
+    ("video", "IMG_8217.mov", dict(ss=58.0, dur=6.0), [("script", "Кстати, голову до конца я так и не высушила.")]),
+    ("video", "IMG_6146.mov", dict(ss=2.0, dur=6.0), [("main", "В итоге в роддом мы буквально летели."),
+                                                      ("second", "Потому что я чуть не родила дома, а затем и в такси.")]),
+    ("video", "IMG_6146.mov", dict(ss=4.5, dur=5.0), [("second", "Просто бедный таксист."),
+                                                      ("second", "Он сидел весь зелёный от страха.")]),
+    ("photo", "IMG_2463.heic", dict(fy=0.5), [("second", "Меня просто забрала моя акушерка из дома, и мы поехали в роддом.")]),
+    ("video", "IMG_6146.mov", dict(ss=7.0, dur=6.0), [("second", "Мы не могли долго выехать со двора, и акушерка думала уже звонить "
+                                                                 "в полицию, чтобы нас сопроводили."),
+                                                      ("main", "Потому что у меня уже начинались потуги.")]),
+    ("video", "IMG_6146.mov", dict(ss=10.5, dur=7.0), [("second", "Меня встретили с каталкой, быстро отвезли в родовую,"),
+                                                       ("main", "и уже через час после поступления я родила дочку")]),
+    ("photo", "IMG_6225.heic", dict(fy=0.5), [("second", "И знаете что? Я считаю, что роды у меня прошли"), ("script", "просто шикарно!")]),
+    ("photo", "102.jpg", dict(fy=0.45), [("second", "После такого опыта я реально готова идти за вторым.")]),
+    ("photo", "IMG_0042.HEIC", dict(fy=0.5), [("main", "Но потом меня перевели в послеродовое отделение.")]),
+    ("video", "IMG_6145.mov", dict(ss=1.8, dur=5.0), [("second", "И вот здесь началось то,"),
+                                                      ("main", "к чему я вообще не была готова")]),
+    ("photo", "IMG_6190.heic", dict(fy=0.45), [("second", "Я осталась одна с новорождённым ребёнком."),
+                                               ("second", "Уставшая, без сна, без понимания, что делать дальше.")]),
+    ("photo", "IMG_2460.heic", dict(fy=0.5), [("script", "И мне казалось, что хотя бы здесь мне помогут.")]),
+    ("video", "IMG_6145.mov", dict(ss=9.5, dur=3.6), [("main", "Дочка всю ночь плакала,"), ("second", "я буквально падала с ног.")]),
+    ("photo", "IMG_6190.heic", dict(fx=0.58, fy=0.42, zoom=1.9), [("second", "Она захлёбывалась водой."),
+                                                                  ("second", "Я не понимала, что с ней происходит.")]),
+    ("photo", "IMG_6225.heic", dict(fx=0.45, fy=0.45, zoom=1.5), [
+        ("second", "Оказывается, ребёнок может наглотаться околоплодных вод, и это нормально, что вода потом выходит."),
+        ("second", "Почему-то в роддоме мне никто не мог этого объяснить."), ("script", "Я чуть не умерла со страха.")]),
+    ("video", "IMG_6145.mov", dict(ss=2.6, dur=6.0), [("second", "Несколько раз звала медсестру, потому что не понимала, что происходит "
+                                                                 "и как ей помочь.")]),
+    ("photo", "IMG_0042.HEIC", dict(fx=0.6, fy=0.35, zoom=1.6), [("second", "И вместо объяснений услышала:"),
+                                                                 ("main", "«Привыкай, дальше будет хуже»"),
+                                                                 ("script", "Я до сих пор помню эту фразу.")]),
+    ("photo", "DSC00516.JPG", dict(fy=0.4), [("main", "И это была только первая ночь.")]),
+    ("photo", "IMG_2194.HEIC", dict(fy=0.5), [("second", "Дальше были оскорбления из-за моего отказа от грудного вскармливания,"),
+                                              ("second", "противоречивые замечания врачей"),
+                                              ("second", "и постоянное ощущение, что я всё делаю неправильно.")]),
+    ("photo", "IMG_6190.heic", dict(fx=0.5, fy=0.4, zoom=1.3), [("second", "Хотя я только что родила первого ребёнка"),
+                                                                ("script", "и просто пыталась разобраться")]),
+    ("photo", "DSC00770.JPG", dict(fy=0.5), [("second", "Самое обидное, что я ведь не ждала какого-то особенного отношения."),
+                                             ("second", "Мне просто хотелось, чтобы мне объяснили, помогли, дали немного "
+                                                        "восстановиться после родов.")]),
+    ("photo", "DSC00516.JPG", dict(fx=0.45, fy=0.35, zoom=1.35), [("main", "Хотелось просто человеческого отношения,"),
+                                                                  ("second", "потому что после родов ты настолько сильно уязвима, "
+                                                                             "как никогда.")]),
+    ("photo", "IMG_7929.HEIC", dict(fy=0.5), [("second", "Да, кому-то могло быть хуже."),
+                                              ("second", "Но я здесь не сравниваю свою историю с чужой.")]),
+    ("photo", "DSC00770.JPG", dict(fx=0.45, fy=0.45, zoom=1.4), [("script", "Для меня этот опыт оказался травмирующим,"),
+                                                                 ("second", "и я потом ещё долго с этим разбиралась.")]),
+    ("photo", "100.jpg", dict(fy=0.42), [("main", "Я решила сделать целую серию рилс,"),
+                                         ("second", "потому что в одно видео всё это просто невозможно уместить.")]),
+    ("photo", "102.jpg", dict(fx=0.5, fy=0.4, zoom=1.3), [("second", "Расскажу и про сами роды, и про первую ночь, и про отношение "
+                                                                      "персонала, с которым я столкнулась в роддоме Юдина.")]),
+    ("photo", "IMG_9141.JPG", dict(fx=0.5, fy=0.4, zoom=1.25), [("second", "Возможно, кому-то моя история поможет чуть лучше "
+                                                                           "подготовиться к тому, что бывает после родов."),
+                                                                ("script", "Первую часть уже выложила")]),
+]
 
 if __name__ == "__main__":
-    src, out = sys.argv[1:3]; os.makedirs(out, exist_ok=True); order = list(STORIES)
-    for key in [k for k in order if str(k) in sys.argv[3:]] or order:
-        kind, f, pos, kw, blocks = STORIES[key]; name = os.path.join(out, f"story_{order.index(key) + 1:02d}")
-        if kind == "photo": photo_story(os.path.join(src, f), blocks, pos, name + ".jpg", **kw)
-        else: video_story(os.path.join(src, f), blocks, pos, name + ".mp4", **kw)
-        print("story", key, "→", os.path.basename(name), flush=True)
+    src, out, MPPY, MODELS = sys.argv[1:5]; os.makedirs(out, exist_ok=True)
+    only = {int(a) for a in sys.argv[5:]}
+    for i, (kind, f, kw, blocks) in enumerate(S, 1):
+        if only and i not in only: continue
+        name = os.path.join(out, f"story_{i:02d}")
+        if kind == "photo": photo_story(os.path.join(src, f), blocks, name + ".jpg", **kw)
+        else:
+            if kw.get("voice"): kw = dict(kw, voice=(os.path.join(src, "..", "asr", kw["voice"][0]),) + kw["voice"][1:])
+            video_story(os.path.join(src, f), blocks, name + ".mp4", **kw)
+        print("story", i, flush=True)
