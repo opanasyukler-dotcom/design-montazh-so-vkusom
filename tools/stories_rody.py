@@ -34,8 +34,11 @@ class Block:
     """one text piece: wrapped lines, its size, later its place and colour"""
     def __init__(self, kind, text):
         mk, lead, self.cw = STYLE[kind]; self.kind, self.f = kind, mk()
-        self.emo = text[-1] if ord(text[-1]) > 0x2600 else None; text = text[:-1].rstrip() if self.emo else text
-        self.lines = wrap(text, self.f, self.cw - (80 if self.emo else 0)); self.step = self.f.size * lead
+        self.emo = text[-1] if ord(text[-1]) > 0x2600 else None; self.text = text[:-1].rstrip() if self.emo else text
+        self.step = self.f.size * lead; self.rewrap(self.cw)
+
+    def rewrap(self, cw):
+        self.lines = wrap(self.text, self.f, cw - (80 if self.emo else 0))
         self.w = int(max(self.f.getlength(l) for l in self.lines) + (80 if self.emo else 0))
         self.h = int(self.step * (len(self.lines) - 1) + self.f.size * 1.15)
 
@@ -55,7 +58,8 @@ def place(blocks, people, at=None, one_side=False):
     side = "left" if fx >= W / 2 else "right"; n = len(blocks); span = SAFE_BOTTOM - SAFE_TOP; prev = SAFE_TOP - GAP; used = []
     for i, b in enumerate(blocks):
         tgt = SAFE_TOP + span * (at[i] if at else (i + 0.5) / n) - b.h / 2; best = None
-        for lim in (0.04, 0.12, 0.3, 1.01):                                # how much body the piece may cover, relaxed step by step
+        for lim, cw in [(l, c) for l in (0.04, 0.12, 0.3, 1.01) for c in (b.cw, int(b.cw * 0.72), int(b.cw * 0.52))]:
+            b.rewrap(cw)                                                   # first a narrower column, only then over the body
             for s in (side, "right" if side == "left" else "left"):
                 x = MARGIN if s == "left" else W - MARGIN - b.w
                 for y in range(int(max(prev + GAP, SAFE_TOP)), SAFE_BOTTOM - b.h + 1, 8):
@@ -64,11 +68,11 @@ def place(blocks, people, at=None, one_side=False):
                     ps = person_share(r, person)
                     if ps > lim: continue
                     sc = abs(y - tgt) + (0 if s == side else 260) + 900 * ps
-                    if best is None or sc < best[0]: best = (sc, x, y, s)
+                    if best is None or sc < best[0]: best = (sc, x, y, s, cw)
             if best: break
         if best is None:                                                   # nowhere free: the spot that covers the least face
-            x = MARGIN if side == "left" else W - MARGIN - b.w; y = int(min(max(prev + GAP, SAFE_TOP), SAFE_BOTTOM - b.h)); s = side
-        else: _, x, y, s = best
+            b.rewrap(b.cw); x = MARGIN if side == "left" else W - MARGIN - b.w; y = int(min(max(prev + GAP, SAFE_TOP), SAFE_BOTTOM - b.h)); s = side
+        else: _, x, y, s, cw = best; b.rewrap(cw)
         b.x, b.y, b.side = x, y, s; used.append((x, y, x + b.w, y + b.h)); prev = y + b.h
         side = s if one_side else ("right" if s == "left" else "left")
 
@@ -95,13 +99,18 @@ def draw(blocks, size=(W, H)):
     out.alpha_composite(s2); out.alpha_composite(txt)
     return out
 
-def cover(im, fx=0.5, fy=0.5, zoom=1.0):
+def cover(im, fx=0.5, fy=0.5, zoom=1.0, fit="cover"):
     if zoom < 1:                                                           # contained, smaller, on the picture's own corner colour
         s = min(W / im.width, H / im.height) * zoom; p = im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
         bg = Image.new("RGB", (W, H), im.getpixel((2, im.height // 2))); x, y = (W - p.width) // 2, int((H - p.height) * fy)
         bg.paste(p, (x, y)); cover.card = (x, y, x + p.width, y + p.height)         # the text keeps off the picture itself
         return bg
     cover.card = None
+    if fit == "contain":                                                   # full width, the backdrop's own colour above, seam feathered
+        s = W / im.width; p = im.resize((W, round(im.height * s)), Image.LANCZOS); y0 = H - p.height
+        top = np.asarray(p, np.float32)[:12].mean((0, 1)); bg = Image.new("RGB", (W, H), tuple(int(v) for v in top))
+        m = Image.fromarray((np.clip(np.arange(p.height) / 160, 0, 1)[:, None].repeat(W, 1) * 255).astype(np.uint8))
+        bg.paste(p, (0, y0), m); return bg
     s = max(W / im.width, H / im.height) * zoom; im = im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
     x = int(min(max(fx * im.width - W / 2, 0), im.width - W)); y = int(min(max(fy * im.height - H / 2, 0), im.height - H))
     return im.crop((x, y, x + W, y + H))
@@ -115,9 +124,9 @@ def faces_of(frames, avoid=()):
     j = json.loads(r.stdout.strip().splitlines()[-1])
     return j["faces"] + [list(a) for a in avoid], np.array(j["person"], np.float32)
 
-def photo_story(src, blocks, out, fx=0.5, fy=0.5, zoom=1.0, avoid=(), at=None, one_side=False):
+def photo_story(src, blocks, out, fx=0.5, fy=0.5, zoom=1.0, avoid=(), at=None, one_side=False, fit="cover"):
     import pillow_heif; pillow_heif.register_heif_opener()
-    bg = cover(ImageOps.exif_transpose(Image.open(src)).convert("RGB"), fx, fy, zoom)
+    bg = cover(ImageOps.exif_transpose(Image.open(src)).convert("RGB"), fx, fy, zoom, fit)
     if cover.card: avoid = tuple(avoid) + (cover.card,)
     bs = [Block(k, t) for k, t in blocks]; place(bs, faces_of([bg], avoid), at, one_side); colour(bs, bg)
     img = bg.convert("RGBA"); img.alpha_composite(draw(bs)); img.convert("RGB").save(out, quality=95, subsampling=0)
@@ -171,7 +180,7 @@ def video_story(src, blocks, out, ss=0.0, dur=None, fx=0.5, fy=0.5, zoom=1.0, av
     words = sum(len(t.split()) for _, t in blocks)
     if dur is None: dur = float(np.clip(words / 2.5 + 2.0, 5, 10))
     dur = min(dur, probe_dur(src) - ss)
-    frames = [frame_at(src, ss + dur * k / 5, crop) for k in range(6)]
+    frames = [frame_at(src, ss + dur * 0.9 * k / 5, crop) for k in range(6)]
     bs = [Block(k, t) for k, t in blocks]; people = faces_of(frames, avoid); place(bs, people, at, one_side); faces = people[0]
     colour(bs, Image.fromarray(np.median(np.stack([np.asarray(f) for f in frames]), 0).astype(np.uint8)))
     with tempfile.TemporaryDirectory() as td:
@@ -201,14 +210,14 @@ V8214 = ("IMG_8214_m.json", (("прадо", "Prada"),), ((17.3, 19.5),))
 V8207 = ("IMG_8207_m.json", (), ())
 
 S = [  # (photo|video, file, options, [(kind, text), ...]) — one short thought per story, in reading order
-    ("photo", "IMG_9141.JPG", dict(fy=0.45, at=(0.04, 0.16), one_side=True), [("main", "Я тут наконец-то решилась рассказать"), ("script", "про свои роды")]),
+    ("photo", "IMG_9141.JPG", dict(fit="contain", at=(0.03, 0.15), one_side=True), [("main", "Я тут наконец-то решилась рассказать"), ("script", "про свои роды")]),
     ("photo", "IMG_0764.JPG", dict(fy=0.5), [("second", "Если честно, очень долго откладывала эту тему,"),
                                              ("second", "потому что вообще не понимала, хочу ли вообще рассказывать.")]),
     ("video", "IMG_0751.MOV", dict(ss=5.0), [("second", "Всю беременность я думала, что самое страшное, что меня ждёт, —"),
                                              ("main", "это сами роды и тяжесть материнства, но…")]),
     ("photo", "IMG_7952.JPG", dict(fy=0.5), [("second", "Я готовилась к боли, к тому, что всё может пойти не по плану,"),
                                              ("second", "представляла себе миллион разных сценариев.")]),
-    ("video", "IMG_0755.mov", dict(ss=1.0), [("main", "Но реальность оказалась"), ("script", "немного другой")]),
+    ("video", "IMG_0755.mov", dict(ss=1.0, avoid=((560, 300, 960, 700),)), [("main", "Но реальность оказалась"), ("script", "немного другой")]),
     ("video", "IMG_8207.mov", dict(voice=V8207, dur=9.0), [("main", "Мои роды начались ровно в ПДР!")]),
     ("photo", "IMG_8219.png", dict(fy=0.12, zoom=0.62), [("second", "Муж в этот день уехал на выступление,"),
                                              ("main", "а я осталась дома со схватками")]),
