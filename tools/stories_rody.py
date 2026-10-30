@@ -97,9 +97,11 @@ def _place(blocks, people, at=None, one_side=False):
     return ok
 
 def colour(blocks, frame):
-    """ink on light ground, white on dark (mean luminance under the piece)"""
+    """ink on calm light ground, white on calm dark ground; anything busy or mid-grey → white over a light black haze"""
     a = np.asarray(frame.convert("L"), np.float32)
-    for b in blocks: b.light = a[b.y:b.y + b.h, b.x:b.x + b.w].mean() > 150
+    for b in blocks:
+        r = a[b.y:b.y + b.h, b.x:b.x + b.w]; m, sd = r.mean(), r.std()
+        b.light = m > 172 and sd < 38; b.haze = not b.light and (m > 100 or sd > 42)
 
 def draw(blocks, size=(W, H)):
     """RGBA layer with the text pieces (soft glyph shadow under white, faint glow under ink)"""
@@ -113,7 +115,12 @@ def draw(blocks, size=(W, H)):
             d.text((x, yb), l, font=b.f, fill=col + (255,), anchor="ls"); under.text((x, yb + 2), l, font=b.f, fill=150, anchor="ls")
             if b.emo and j == len(b.lines) - 1:
                 e = emoji_img(b.emo, int(b.f.size * 0.8)); txt.alpha_composite(e, (int(x + b.f.getlength(l) + 16), int(yb - e.height * 0.9)))
-    out = Image.new("RGBA", size, (0, 0, 0, 0))
+    out = Image.new("RGBA", size, (0, 0, 0, 0)); hz = Image.new("L", size, 0); dh = ImageDraw.Draw(hz)
+    for b in blocks:                                                       # the light black haze under hard-to-read pieces
+        if getattr(b, "haze", False): dh.rounded_rectangle((b.x - 46, b.y - 34, b.x + b.w + 46, b.y + b.h + 34), 60, fill=255)
+    if hz.getbbox():
+        h_ = Image.new("RGBA", size, (8, 6, 5, 0)); h_.putalpha(hz.filter(ImageFilter.GaussianBlur(38)).point(lambda v: v * 0.42))
+        out.alpha_composite(h_)
     s1 = Image.new("RGBA", size, SHADE + (0,)); s1.putalpha(sh.filter(ImageFilter.GaussianBlur(7))); out.alpha_composite(s1)
     s2 = Image.new("RGBA", size, (255, 255, 255, 0)); s2.putalpha(gl.filter(ImageFilter.GaussianBlur(9)).point(lambda v: v * 0.6))
     out.alpha_composite(s2); out.alpha_composite(txt)
@@ -228,6 +235,69 @@ def video_story(src, blocks, out, ss=0.0, dur=None, fx=0.5, fy=0.5, zoom=1.0, av
                         "-movflags", "+faststart", out], check=True)
     return bs
 
+def card_story(src, blocks, out, icon="heart", ss=0.0, fx=0.5, fy=0.5, at=None):
+    """no repeated frame: the picture only as a soft blurred ground, the text, and a pencil that writes the handwriting
+    and draws a small line picture (doodles.py) that then keeps moving"""
+    import pillow_heif, doodles; pillow_heif.register_heif_opener()
+    from rody_reel import pencil_sprite
+    if src.lower().endswith((".mov", ".mp4")): im = frame_at(src, ss, "null")
+    else: im = ImageOps.exif_transpose(Image.open(src)).convert("RGB")
+    bg = cover(im, fx, fy).resize((W // 10, H // 10), Image.BILINEAR).filter(ImageFilter.GaussianBlur(4)).resize((W, H), Image.BICUBIC)
+    bg = Image.fromarray((np.asarray(bg, np.float32) * 0.62).astype(np.uint8))           # calm and darker: white type reads
+    bs = [Block(k, t) for k, t in blocks]; place(bs, ([], np.zeros((H // 20, W // 20), np.float32)), at)
+    for b in bs: b.light, b.haze = False, False
+    words = sum(len(t.split()) for _, t in blocks); dur = float(np.clip(words / 2.5 + 3.5, 6, 11))
+    plain = draw([b for b in bs if b.kind != "script"]); scr = [b for b in bs if b.kind == "script"]
+    # the picture box: the largest free square left of / right of / between the text pieces
+    used = [(b.x, b.y, b.x + b.w, b.y + b.h) for b in bs]; spot = None
+    for size in (300, 240, 190):                                           # biggest that fits; may sit a bit outside the text zone
+        for y in range(160, H - 300 - size, 20):
+            for x in (W - MARGIN - size, (W - size) // 2, MARGIN):
+                if not hits((x, y, x + size, y + size), used, 50):
+                    c = abs(y + size / 2 - (SAFE_TOP + SAFE_BOTTOM) / 2) * 0.3
+                    if spot is None or c < spot[0]: spot = (c, x, y)
+        if spot: break
+    pen, tip = pencil_sprite(0.42)
+    t_scr0, per = 0.7, 0.055
+    t_ico0 = t_scr0 + sum(len(b.text) for b in scr) * per + 0.2
+    with tempfile.TemporaryDirectory() as td:
+        lay = [(b, draw([b])) for b in scr]
+        cmd = ["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", "30", "-i", "-",
+               "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart", out]
+        wr = subprocess.Popen(cmd, stdin=subprocess.PIPE); base = np.asarray(bg.convert("RGBA"), np.float32)
+        pl = np.asarray(plain, np.float32); lays = [(b, np.asarray(l, np.float32)) for b, l in lay]
+        for fi in range(int(dur * 30)):
+            t = fi / 30; fr = base.copy(); k = min(max((t - 0.2) / 0.5, 0), 1)
+            fr = fr * (1 - pl[..., 3:] / 255 * k) + pl * (pl[..., 3:] / 255 * k)
+            pen_at = None; t0 = t_scr0
+            for b, l in lays:                                              # the handwriting is written on, left → right, line by line
+                d_ = (t - t0) / per; tot = len(b.text); t0 += tot * per
+                if d_ <= 0: continue
+                q = min(d_ / tot, 1.0); widths = [b.f.getlength(x) for x in b.lines]; cut = q * sum(widths); xm = np.zeros(W, np.float32)
+                for j, wl in enumerate(widths):
+                    lx = b.x if b.side == "left" else b.x + b.w - wl; yb = b.y + j * b.step + b.f.size * 0.85
+                    c = min(max(cut, 0), wl); cut -= wl
+                    if c > 0:
+                        y0, y1 = int(yb - b.f.size * 1.1), int(yb + b.f.size * 0.5)
+                        m = np.clip((lx + c - np.arange(W)) / 14, 0, 1)
+                        fr[y0:y1] = fr[y0:y1] * (1 - l[y0:y1, :, 3:] / 255 * m[None, :, None]) + l[y0:y1] * (l[y0:y1, :, 3:] / 255 * m[None, :, None])
+                        if c < wl: pen_at = (lx + c, yb - b.f.size * 0.3)
+                if q >= 1: continue
+            img = fr[..., :3].astype(np.uint8).copy()
+            if spot:                                                       # the line picture, drawn on, then alive
+                prog = (t - t_ico0) / 1.3
+                if prog > 0:
+                    tp = doodles.draw_icon(img, icon, spot[1], spot[2], size, prog, t, (245, 240, 234), 7, motion=max(0.0, t - t_ico0 - 1.3), seed=3)
+                    if 0 < prog < 1 and tp: pen_at = tp
+            if pen_at:
+                x0, y0 = int(pen_at[0] - tip[0]), int(pen_at[1] - tip[1] + 3 * np.sin(t * 40)); h_, w_ = pen.shape[:2]
+                xa, ya, xb, yb_ = max(x0, 0), max(y0, 0), min(x0 + w_, W), min(y0 + h_, H)
+                if xb > xa and yb_ > ya:
+                    p_ = pen[ya - y0:yb_ - y0, xa - x0:xb - x0]; a_ = p_[..., 3:] / 255
+                    img[ya:yb_, xa:xb] = (img[ya:yb_, xa:xb] * (1 - a_) + p_[..., :3] * a_).astype(np.uint8)
+            wr.stdin.write(img.tobytes())
+        wr.stdin.close(); wr.wait()
+
 V8208 = ("IMG_8208_m.json", (("прадо", "Prada"),), ())
 V8214 = ("IMG_8214_m.json", (("прадо", "Prada"),), ((17.3, 19.5),))
 V8207 = ("IMG_8207_m.json", (), ())
@@ -251,7 +321,7 @@ S = [  # (photo|video, file, options, [(kind, text), ...]) — one short thought
     ("video", "IMG_8218.mov", dict(ss=2.5), [("second", "А потом у меня отошли воды, схватки стали сильнее,"),
                                              ("main", "и знаете, что я решила сделать?")]),
     ("video", "IMG_8217.mov", dict(ss=0.5, dur=7.0), [("script", "Помыть полы и высушить голову после душа 😂")]),
-    ("video", "IMG_8217.mov", dict(ss=17.0, dur=7.0), [("main", "Не спрашивайте, зачем."),
+    ("card", "IMG_8217.mov", dict(ss=17.0, icon="mop"), [("main", "Не спрашивайте, зачем."),
                                                        ("second", "У человека активные роды, а она уборку затеяла.")]),
     ("video", "IMG_8217.mov", dict(ss=34.0, dur=8.0), [("second", "Я расстраивалась и думала, что у меня максимум 5 см раскрытие"),
                                                        ("main", "(но на самом деле уже было 10 см)")]),
@@ -275,37 +345,37 @@ S = [  # (photo|video, file, options, [(kind, text), ...]) — one short thought
                                                ("second", "Уставшая, без сна, без понимания, что делать дальше.")]),
     ("photo", "IMG_2460.heic", dict(fy=0.5), [("script", "И мне казалось, что хотя бы здесь мне помогут.")]),
     ("video", "IMG_6145.mov", dict(ss=9.5, dur=3.6), [("main", "Дочка всю ночь плакала,"), ("second", "я буквально падала с ног.")]),
-    ("photo", "IMG_6190.heic", dict(fx=0.58, fy=0.42, zoom=1.9), [("second", "Она захлёбывалась водой."),
+    ("card", "IMG_6190.heic", dict(icon="drops"), [("second", "Она захлёбывалась водой."),
                                                                   ("second", "Я не понимала, что с ней происходит.")]),
-    ("photo", "IMG_6225.heic", dict(fx=0.45, fy=0.45, zoom=1.5), [
+    ("card", "IMG_6225.heic", dict(icon="qmark"), [
         ("second", "Оказывается, ребёнок может наглотаться околоплодных вод, и это нормально, что вода потом выходит."),
         ("second", "Почему-то в роддоме мне никто не мог этого объяснить."), ("script", "Я чуть не умерла со страха.")]),
-    ("video", "IMG_6145.mov", dict(ss=2.6, dur=6.0), [("second", "Несколько раз звала медсестру, потому что не понимала, что происходит "
+    ("card", "IMG_6145.mov", dict(ss=2.6, icon="bell"), [("second", "Несколько раз звала медсестру, потому что не понимала, что происходит "
                                                                  "и как ей помочь.")]),
-    ("photo", "IMG_0042.HEIC", dict(fx=0.6, fy=0.35, zoom=1.6), [("second", "И вместо объяснений услышала:"),
+    ("card", "IMG_0042.HEIC", dict(icon="bolt"), [("second", "И вместо объяснений услышала:"),
                                                                  ("main", "«Привыкай, дальше будет хуже»"),
                                                                  ("script", "Я до сих пор помню эту фразу.")]),
     ("photo", "DSC00516.JPG", dict(fy=0.4), [("main", "И это была только первая ночь.")]),
     ("photo", "IMG_2194.HEIC", dict(fx=0.22, fy=0.5, at=(0.25, 0.5, 0.72), one_side=True), [("second", "Дальше были оскорбления из-за моего отказа от грудного вскармливания,"),
                                               ("second", "противоречивые замечания врачей"),
                                               ("second", "и постоянное ощущение, что я всё делаю неправильно.")]),
-    ("photo", "IMG_6190.heic", dict(fx=0.5, fy=0.4, zoom=1.3, at=(0.0, 0.1)), [("second", "Хотя я только что родила первого ребёнка"),
+    ("card", "IMG_6190.heic", dict(icon="moon"), [("second", "Хотя я только что родила первого ребёнка"),
                                                                 ("script", "и просто пыталась разобраться")]),
     ("photo", "DSC00770.JPG", dict(fy=0.5, at=(0.0, 0.14), one_side=True, avoid=((760, 1010, 1080, 1920),)), [("second", "Самое обидное, что я ведь не ждала какого-то особенного отношения."),
                                              ("second", "Мне просто хотелось, чтобы мне объяснили, помогли, дали немного "
                                                         "восстановиться после родов.")]),
-    ("photo", "DSC00516.JPG", dict(fx=0.45, fy=0.35, zoom=1.35), [("main", "Хотелось просто человеческого отношения,"),
+    ("card", "DSC00516.JPG", dict(icon="heart"), [("main", "Хотелось просто человеческого отношения,"),
                                                                   ("second", "потому что после родов ты настолько сильно уязвима, "
                                                                              "как никогда.")]),
     ("photo", "IMG_7929.HEIC", dict(fy=0.5), [("second", "Да, кому-то могло быть хуже."),
                                               ("second", "Но я здесь не сравниваю свою историю с чужой.")]),
-    ("photo", "IMG_0764.JPG", dict(fx=0.65, fy=0.5, zoom=1.15), [("script", "Для меня этот опыт оказался травмирующим,"),
+    ("card", "IMG_0764.JPG", dict(icon="cloud"), [("script", "Для меня этот опыт оказался травмирующим,"),
                                                                  ("second", "и я потом ещё долго с этим разбиралась.")]),
     ("photo", "100.jpg", dict(fy=0.42, at=(0.0, 0.1), one_side=True), [("main", "Я решила сделать целую серию рилс,"),
                                          ("second", "потому что в одно видео всё это просто невозможно уместить.")]),
-    ("photo", "102.jpg", dict(fx=0.5, fy=0.4, zoom=1.3), [("second", "Расскажу и про сами роды, и про первую ночь, и про отношение "
+    ("card", "102.jpg", dict(icon="clapper"), [("second", "Расскажу и про сами роды, и про первую ночь, и про отношение "
                                                                       "персонала, с которым я столкнулась в роддоме Юдина.")]),
-    ("photo", "IMG_9141.JPG", dict(fx=0.5, fy=0.4, zoom=1.25), [("second", "Возможно, кому-то моя история поможет чуть лучше "
+    ("card", "IMG_9141.JPG", dict(icon="wand"), [("second", "Возможно, кому-то моя история поможет чуть лучше "
                                                                            "подготовиться к тому, что бывает после родов."),
                                                                 ("script", "Первую часть уже выложила")]),
 ]
@@ -316,7 +386,10 @@ if __name__ == "__main__":
     for i, (kind, f, kw, blocks) in enumerate(S, 1):
         if only and i not in only: continue
         name = os.path.join(out, f"story_{i:02d}")
+        for old in (name + ".jpg", name + ".mp4"):
+            if os.path.exists(old): os.remove(old)
         if kind == "photo": photo_story(os.path.join(src, f), blocks, name + ".jpg", **kw)
+        elif kind == "card": card_story(os.path.join(src, f), blocks, name + ".mp4", **kw)
         else:
             if kw.get("voice"): kw = dict(kw, voice=(os.path.join(src, "..", "asr", kw["voice"][0]),) + kw["voice"][1:])
             video_story(os.path.join(src, f), blocks, name + ".mp4", **kw)
