@@ -200,8 +200,20 @@ def sub_patch(text):
     s = Image.new("RGBA", (w, h), SHADE + (0,)); s.putalpha(sh.filter(ImageFilter.GaussianBlur(6))); s.alpha_composite(lay)
     return s
 
-def video_story(src, blocks, out, ss=0.0, dur=None, fx=0.5, fy=0.5, zoom=1.0, avoid=(), voice=None, at=None, one_side=False):
-    """the clip full-bleed; the text pieces fade in; voice=(words.json, fixes, drops) keeps the sound and adds phrase subtitles"""
+def privacy_pass(src, ss, dur, crop, out):
+    """the cropped clip with the chest blurred, tracked frame by frame (chest_blur.py in the mpenv)"""
+    dec = subprocess.Popen(["ffmpeg", "-v", "error", "-ss", f"{ss:.2f}", "-t", f"{dur:.2f}", "-i", src, "-vf", crop + ",fps=30",
+                            "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE)
+    cb = subprocess.Popen([MPPY, os.path.join(HERE, "chest_blur.py"), MODELS, str(W), str(H), "30"], stdin=dec.stdout,
+                          stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", "30", "-i", "-",
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "12", "-pix_fmt", "yuv420p", out], stdin=cb.stdout, check=True)
+    dec.wait(); cb.wait()
+
+def video_story(src, blocks, out, ss=0.0, dur=None, fx=0.5, fy=0.5, zoom=1.0, avoid=(), voice=None, at=None, one_side=False,
+                chest=False, blur=False):
+    """the clip full-bleed; the text pieces fade in; voice=(words.json, fixes, drops) keeps the sound and adds phrase subtitles;
+    chest=True blurs the chest (tracked), blur=True blurs the whole picture"""
     probe = frame_at(src, ss, "null"); sw, sh_ = probe.size
     s = max(W / sw, H / sh_) * zoom; pw, ph = round(sw * s / 2) * 2, round(sh_ * s / 2) * 2
     x = int(min(max(fx * pw - W / 2, 0), pw - W)); y = int(min(max(fy * ph - H / 2, 0), ph - H))
@@ -219,13 +231,16 @@ def video_story(src, blocks, out, ss=0.0, dur=None, fx=0.5, fy=0.5, zoom=1.0, av
     with tempfile.TemporaryDirectory() as td:
         lay = os.path.join(td, "text.png"); draw(bs).save(lay)
         ins = ["-ss", f"{ss:.2f}", "-t", f"{dur:.2f}", "-i", src, "-loop", "1", "-t", f"{dur:.2f}", "-i", lay]
-        fg = f"[0:v]{crop},fps=30,format=yuv420p[v0];[1:v]format=rgba,fade=in:st=0.2:d=0.5:alpha=1[t];[v0][t]overlay=0:0[v1]"
+        vin = f"[0:v]{crop},fps=30"
+        if chest:                                                          # the blurred clip replaces the picture; sound stays from src
+            pv = os.path.join(td, "private.mp4"); privacy_pass(src, ss, dur, crop, pv); ins += ["-i", pv]; vin = f"[{ins.count('-i') - 1}:v]null"
+        if blur: vin += ",gblur=sigma=34"
+        fg = f"{vin},format=yuv420p[v0];[1:v]format=rgba,fade=in:st=0.2:d=0.5:alpha=1[t];[v0][t]overlay=0:0[v1]"
         last = "v1"
         if voice:
-            cues = subs_cues(*voice[:1], ss, ss + dur, *voice[1:])
+            cues = subs_cues(*voice[:1], ss, ss + dur, *voice[1:]); n0 = ins.count("-i")        # first subtitle input
             for i, (a, b, t) in enumerate(cues):
                 p = os.path.join(td, f"s{i}.png"); sub_patch(t).save(p); ins += ["-i", p]
-            n0 = 2
             for i, (a, b, t) in enumerate(cues):
                 fg += f";[{last}][{n0 + i}:v]overlay=(W-w)/2:{sy}:enable='between(t,{max(a, 0):.2f},{b:.2f})'[v{i + 2}]"; last = f"v{i + 2}"
             fg += f";[0:a]loudnorm=I=-16:TP=-1.5:LRA=11[a]"
@@ -266,25 +281,25 @@ S = [  # (photo|video, file, options, [(kind, text), ...]) — one short thought
                                              ("main", "а я осталась дома со схватками")]),
     ("video", "IMG_8216.mov", dict(ss=6.0), [("second", "Причём весь день я лежала, смотрела кино, ела, слушала музыку"),
                                              ("script", "и отдыхала в полной темноте")]),
-    ("video", "IMG_8208.mov", dict(voice=V8208, dur=53.5), []),
-    ("video", "IMG_8214.mov", dict(voice=V8214, ss=2.0, dur=33.0), [("script", "Вот примерно о таких родах я и мечтала")]),
+    ("video", "IMG_8208.mov", dict(voice=V8208, dur=53.5, chest=True), []),
+    ("video", "IMG_8214.mov", dict(voice=V8214, ss=2.0, dur=33.0, chest=True), [("script", "Вот примерно о таких родах я и мечтала")]),
     ("video", "IMG_8218.mov", dict(ss=2.5), [("second", "А потом у меня отошли воды, схватки стали сильнее,"),
                                              ("main", "и знаете, что я решила сделать?")]),
-    ("video", "IMG_8217.mov", dict(ss=0.5, dur=7.0), [("script", "Помыть полы и высушить голову после душа 😂")]),
+    ("video", "IMG_8217.mov", dict(ss=0.5, dur=7.0, chest=True), [("script", "Помыть полы и высушить голову после душа 😂")]),
     ("card", "IMG_8217.mov", dict(ss=17.0, icon="mop"), [("main", "Не спрашивайте, зачем."),
                                                        ("second", "У человека активные роды, а она уборку затеяла.")]),
-    ("video", "IMG_8217.mov", dict(ss=34.0, dur=8.0), [("second", "Я расстраивалась и думала, что у меня максимум 5 см раскрытие"),
+    ("video", "IMG_8217.mov", dict(ss=34.0, dur=8.0, chest=True), [("second", "Я расстраивалась и думала, что у меня максимум 5 см раскрытие"),
                                                        ("main", "(но на самом деле уже было 10 см)")]),
-    ("video", "IMG_8217.mov", dict(ss=58.0, dur=6.0), [("script", "Кстати, голову до конца я так и не высушила.")]),
-    ("video", "IMG_6146.mov", dict(ss=2.0, dur=6.0), [("main", "В итоге в роддом мы буквально летели."),
+    ("video", "IMG_8217.mov", dict(ss=58.0, dur=6.0, chest=True), [("script", "Кстати, голову до конца я так и не высушила.")]),
+    ("video", "IMG_6146.mov", dict(ss=2.0, dur=6.0, blur=True), [("main", "В итоге в роддом мы буквально летели."),
                                                       ("second", "Потому что я чуть не родила дома, а затем и в такси.")]),
-    ("video", "IMG_6146.mov", dict(ss=4.5, dur=5.0), [("second", "Просто бедный таксист."),
+    ("video", "IMG_6146.mov", dict(ss=4.5, dur=5.0, blur=True), [("second", "Просто бедный таксист."),
                                                       ("second", "Он сидел весь зелёный от страха.")]),
     ("photo", "IMG_2463.heic", dict(fy=0.5), [("second", "Меня просто забрала моя акушерка из дома, и мы поехали в роддом.")]),
-    ("video", "IMG_6146.mov", dict(ss=7.0, dur=6.0), [("second", "Мы не могли долго выехать со двора, и акушерка думала уже звонить "
+    ("video", "IMG_6146.mov", dict(ss=7.0, dur=6.0, blur=True), [("second", "Мы не могли долго выехать со двора, и акушерка думала уже звонить "
                                                                  "в полицию, чтобы нас сопроводили."),
                                                       ("main", "Потому что у меня уже начинались потуги.")]),
-    ("video", "IMG_6146.mov", dict(ss=10.5, dur=7.0), [("second", "Меня встретили с каталкой, быстро отвезли в родовую,"),
+    ("video", "IMG_6146.mov", dict(ss=10.5, dur=7.0, blur=True), [("second", "Меня встретили с каталкой, быстро отвезли в родовую,"),
                                                        ("main", "и уже через час после поступления я родила дочку")]),
     ("photo", "IMG_6225.heic", dict(fy=0.5), [("second", "И знаете что? Я считаю, что роды у меня прошли"), ("script", "просто шикарно!")]),
     ("photo", "102.jpg", dict(fy=0.45), [("second", "После такого опыта я реально готова идти за вторым.")]),
