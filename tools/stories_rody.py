@@ -113,7 +113,7 @@ def draw(blocks, size=(W, H)):
         col = INK if b.light else WHITE; under = dg if b.light else ds
         for j, l in enumerate(b.lines):
             yb = b.y + j * b.step + b.f.size * 0.85; lw = b.f.getlength(l) + (80 if b.emo and j == len(b.lines) - 1 else 0)
-            x = b.x if b.side == "left" else b.x + b.w - lw
+            x = b.x if b.side == "left" else (b.x + (b.w - lw) / 2 if b.side == "center" else b.x + b.w - lw)
             d.text((x, yb), l, font=b.f, fill=col + (255,), anchor="ls"); under.text((x, yb + 2), l, font=b.f, fill=150, anchor="ls")
             if b.emo and j == len(b.lines) - 1:
                 e = emoji_img(b.emo, int(b.f.size * 0.8)); txt.alpha_composite(e, (int(x + b.f.getlength(l) + 16), int(yb - e.height * 0.9)))
@@ -211,7 +211,7 @@ def privacy_pass(src, ss, dur, crop, out):
     dec.wait(); cb.wait()
 
 def video_story(src, blocks, out, ss=0.0, dur=None, fx=0.5, fy=0.5, zoom=1.0, avoid=(), voice=None, at=None, one_side=False,
-                chest=False, blur=False):
+                chest=False, blur=False, top_center=False):
     """the clip full-bleed; the text pieces fade in; voice=(words.json, fixes, drops) keeps the sound and adds phrase subtitles;
     chest=True blurs the chest (tracked), blur=True blurs the whole picture"""
     probe = frame_at(src, ss, "null"); sw, sh_ = probe.size
@@ -228,6 +228,9 @@ def video_story(src, blocks, out, ss=0.0, dur=None, fx=0.5, fy=0.5, zoom=1.0, av
         people = (faces + [(60, sy - 40, W - 60, sy + 150)], people[1])
     bs = [Block(k, t) for k, t in blocks]; place(bs, people, at, one_side)
     colour(bs, Image.fromarray(np.median(np.stack([np.asarray(f) for f in frames]), 0).astype(np.uint8)))
+    if top_center:                                                         # minimal: centred at the top, still, no haze
+        y = SAFE_TOP + 20
+        for b in bs: b.rewrap(b.cw); b.side, b.x, b.y, b.haze = "center", (W - b.w) // 2, y, False; y += b.h + GAP
     with tempfile.TemporaryDirectory() as td:
         lay = os.path.join(td, "text.png"); draw(bs).save(lay)
         ins = ["-ss", f"{ss:.2f}", "-t", f"{dur:.2f}", "-i", src, "-loop", "1", "-t", f"{dur:.2f}", "-i", lay]
@@ -235,14 +238,15 @@ def video_story(src, blocks, out, ss=0.0, dur=None, fx=0.5, fy=0.5, zoom=1.0, av
         if chest:                                                          # the blurred clip replaces the picture; sound stays from src
             pv = os.path.join(td, "private.mp4"); privacy_pass(src, ss, dur, crop, pv); ins += ["-i", pv]; vin = f"[{ins.count('-i') - 1}:v]null"
         if blur: vin += ",gblur=sigma=34"
-        fg = f"{vin},format=yuv420p[v0];[1:v]format=rgba,fade=in:st=0.2:d=0.5:alpha=1[t];[v0][t]overlay=0:0[v1]"
+        fade = "" if top_center else ",fade=in:st=0.2:d=0.5:alpha=1"
+        fg = f"{vin},format=yuv420p[v0];[1:v]format=rgba{fade}[t];[v0][t]overlay=0:0[v1]"
         last = "v1"
         if voice:
             cues = subs_cues(*voice[:1], ss, ss + dur, *voice[1:]); n0 = ins.count("-i")        # first subtitle input
             for i, (a, b, t) in enumerate(cues):
                 p = os.path.join(td, f"s{i}.png"); sub_patch(t).save(p); ins += ["-i", p]
             for i, (a, b, t) in enumerate(cues):
-                fg += f";[{last}][{n0 + i}:v]overlay=(W-w)/2:{sy}:enable='between(t,{max(a, 0):.2f},{b:.2f})'[v{i + 2}]"; last = f"v{i + 2}"
+                fg += f";[{last}][{n0 + i}:v]overlay=(W-w)/2:{sy}:enable='gte(t,{max(a, 0):.3f})*lt(t,{b:.3f})'[v{i + 2}]"; last = f"v{i + 2}"
             fg += f";[0:a]loudnorm=I=-16:TP=-1.5:LRA=11[a]"
             amap = ["-map", "[a]", "-c:a", "aac", "-b:a", "192k"]
         else: amap = ["-an"]
@@ -276,7 +280,7 @@ S = [  # (photo|video, file, options, [(kind, text), ...]) — one short thought
     ("photo", "IMG_7952.JPG", dict(fy=0.5), [("second", "Я готовилась к боли, к тому, что всё может пойти не по плану,"),
                                              ("second", "представляла себе миллион разных сценариев.")]),
     ("video", "IMG_0755.mov", dict(ss=1.0, avoid=((560, 300, 960, 700),)), [("main", "Но реальность оказалась"), ("script", "немного другой")]),
-    ("video", "IMG_8207.mov", dict(voice=V8207, dur=9.0), [("main", "Мои роды начались ровно в ПДР!")]),
+    ("video", "IMG_8207.mov", dict(voice=V8207, dur=9.0, top_center=True), [("main", "Мои роды начались ровно в ПДР!")]),
     ("photo", "IMG_8219.png", dict(fy=0.12, zoom=0.62), [("second", "Муж в этот день уехал на выступление,"),
                                              ("main", "а я осталась дома со схватками")]),
     ("video", "IMG_8216.mov", dict(ss=6.0), [("second", "Причём весь день я лежала, смотрела кино, ела, слушала музыку"),
