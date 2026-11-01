@@ -15,6 +15,7 @@ from toxicosis_reel import W, H, FPS, SR, CREAM, INK, BROWN, MAUVE, GREY, BLUSH,
 C = {"ink": INK, "cream": CREAM, "acc": BROWN, "mute": MAUVE, "blush": BLUSH, "grey": GREY}
 ON_INK = {"ink": CREAM, "acc": BLUSH, "mute": GREY}                        # the same roles on a dark scene
 TYPE_STEP = 0.034
+SAFE = (60, 260, 950, 1480)       # what Instagram Reels leaves visible: header on top, like/comment column on the right, caption below
 
 # ---------- the montage: per scene a background and the elements that come in on the words ----------
 # (key, kind, opts): key = a word prefix of the scene (or seconds from its start); kinds T text, R outline repeats,
@@ -31,23 +32,23 @@ MONTAGE = [
         ("токсик", "SHAKE", {})]),
     dict(bg="cream", els=[
         ("ой", "T", dict(text="ой,", st="I", size=70, x=90, y=420, al="l", col="mute", anim="type")),
-        ("токсик", "T", dict(text="токсикоз —", st="H", size=92, x=90, y=530, al="l", col="ink", anim="up")),
-        ("отдельн", "T", dict(text="ОТДЕЛЬНАЯ", st="H", size=104, x=90, y=660, al="l", col="acc", anim="pop")),
+        ("токсик", "T", dict(text="токсикоз —", st="H", size=80, x=90, y=530, al="l", col="ink", anim="up")),
+        ("отдельн", "T", dict(text="ОТДЕЛЬНАЯ", st="H", size=84, x=90, y=650, al="l", col="acc", anim="pop")),
         ("истор", "T", dict(text="история", st="L", size=84, x=90, y=780, al="l", col="ink", anim="type")),
         ("беремен", "T", dict(text="(беременности)", st="I", size=56, x=90, y=890, al="l", col="acc", anim="type")),
-        (0.0, "IMG", dict(src="vid:IMG_0755", h=1080, x=800, y=1120, anim="up")),
-        ("беремен", "LINE", dict(p=[(470, 905), (600, 980), (660, 1060)]))]),
+        (0.0, "IMG", dict(src="vid:IMG_0755", h=860, x=800, y=1040, anim="up")),
+        ("беремен", "LINE", dict(p=[(470, 905), (560, 960), (620, 1020)]))]),
     dict(bg="ink", els=[
         ("буквально", "T", dict(text="буквально", st="I", size=58, x=540, y=450, col="acc", anim="type")),
         ("тошнит", "T", dict(text="ТОШНИТ", st="H", size=150, x=540, y=630, col="ink", anim="pop")),
         ("тошнит", "R", dict(text="ТОШНИТ", size=150, x=540, y=630, n=1, step=150, delay=0.15, until="буквально")),
         ("тошнит", "GLITCH", {}), ("тошнит", "SHAKE", {}),
         ("всего", "T", dict(text="от всего", st="L", size=72, x=540, y=820, col="ink", anim="up")),
-        ("запах", "CIRCLE", dict(src="photo:0E168C5F-0AAE-4E41-96DE-CF882206C536.png", crop=0.56, d=360, x=270, y=1150, fy=0.5, anim="pop", motion="float")),
-        ("запах", "IMG", dict(src="icon:smell", h=200, x=270, y=900, anim="fade", motion="float", shadow=False)),
-        ("запах", "CARD", dict(src="IMG_2460.heic", x=730, y=1130, w=420, h=520, rot=-6, anim="slide_r")),
-        ("запах", "T", dict(text="даже запахи", st="H", size=66, x=540, y=1460, col="acc", anim="pop")),
-        ("замеча", "T", dict(text="(которые раньше не замечала)", st="I", size=40, x=540, y=1540, col="mute", anim="type"))]),
+        ("запах", "CIRCLE", dict(src="photo:0E168C5F-0AAE-4E41-96DE-CF882206C536.png", crop=0.56, d=340, x=270, y=1060, fy=0.5, anim="pop", motion="float")),
+        ("запах", "IMG", dict(src="icon:smell", h=170, x=270, y=830, anim="fade", motion="float", shadow=False)),
+        ("запах", "CARD", dict(src="IMG_2460.heic", x=720, y=1100, w=340, h=420, rot=-6, anim="slide_r")),
+        ("запах", "T", dict(text="даже запахи", st="H", size=66, x=540, y=1370, col="acc", anim="pop")),
+        ("замеча", "T", dict(text="(которые раньше не замечала)", st="I", size=40, x=540, y=1450, col="mute", anim="type"))]),
     dict(bg="split", els=[
         ("хочешь", "T", dict(text="хочешь", st="L", size=66, x=270, y=520, col="ink", anim="type", side="l")),
         ("поесть", "T", dict(text="ПОЕСТЬ", st="H", size=96, x=270, y=620, col="acc", anim="pop", side="l")),
@@ -65,18 +66,18 @@ MONTAGE = [
         *[("можно", "T", dict(text=f"{i + 1:02d}", st="I", size=36, x=150 + 195 * i, y=1110, col="acc", anim="up", delay=0.15 * i)) for i in range(5)],
         ("облегч", "LINE", dict(p=[(540, 1150), (520, 1200), (540, 1250)])),
         ("облегч", "T", dict(text="(чтобы облегчить состояние)", st="I", size=48, x=540, y=1320, col="acc", anim="type")),
-        ("поделиться", "CIRCLE", dict(src="photo:IMG_9141.JPG", d=250, x=540, y=1500, fx=0.47, fy=0.27, zoom=3.2, anim="pop", motion="float"))]),
+]),
     dict(bg="ink", num=1, els=[
-        num(1, "acc"), (0.0, "T", dict(text="ЛИМОН", st="H", size=118, x=90, y=690, al="l", col="ink", anim="up")),
-        (0.0, "IMG", dict(src="icon:lemon", h=380, x=830, y=560, anim="pop", motion="wiggle")),
+        num(1, "acc"), (0.0, "T", dict(text="ЛИМОН", st="H", size=104, x=90, y=690, al="l", col="ink", anim="up")),
+        (0.0, "IMG", dict(src="icon:lemon", h=320, x=790, y=560, anim="pop", motion="wiggle")),
         ("понюх", "T", dict(text="понюхать", st="L", size=62, x=90, y=900, al="l", col="ink", anim="type")),
-        ("понюх", "IMG", dict(src="icon:smell", h=220, x=780, y=360, anim="fade", motion="float", shadow=False)),
+        ("понюх", "IMG", dict(src="icon:smell", h=150, x=650, y=420, anim="fade", motion="float", shadow=False)),
         ("добав", "T", dict(text="или пару долек", st="L", size=62, x=90, y=990, al="l", col="ink", anim="type")),
-        ("добав", "IMG", dict(src="icon:water", h=420, x=780, y=1130, anim="pop")),
-        ("дол", "IMG", dict(src="icon:slice", h=150, x=780, y=1010, anim="drop")), ("воду", "SFX", dict(name="splash")),
-        ("кисл", "T", dict(text="КИСЛОЕ", st="H", size=112, x=90, y=1250, al="l", col="acc", anim="pop")),
-        ("тошнот", "T", dict(text="(помогает с тошнотой)", st="I", size=44, x=90, y=1350, al="l", col="mute", anim="type")),
-        ("кисл", "CIRCLE", dict(src="photo:IMG_0764.JPG", d=300, x=840, y=1430, fx=0.55, fy=0.56, zoom=2.4, anim="pop", motion="float"))]),
+        ("добав", "IMG", dict(src="icon:water", h=380, x=790, y=1010, anim="pop")),
+        ("дол", "IMG", dict(src="icon:slice", h=140, x=790, y=900, anim="drop")), ("воду", "SFX", dict(name="splash")),
+        ("кисл", "T", dict(text="КИСЛОЕ", st="H", size=96, x=90, y=1230, al="l", col="acc", anim="pop")),
+        ("тошнот", "T", dict(text="(помогает с тошнотой)", st="I", size=44, x=90, y=1330, al="l", col="mute", anim="type")),
+        ("кисл", "CIRCLE", dict(src="photo:IMG_0764.JPG", d=230, x=820, y=1340, fx=0.55, fy=0.56, zoom=2.4, anim="pop", motion="float"))]),
     dict(bg="cream", num=2, els=[
         num(2, "acc"), (0.0, "T", dict(text="БОРЖОМИ", st="H", size=110, x=90, y=690, al="l", col="ink", anim="up")),
         (0.0, "IMG", dict(src="icon:mineral", h=480, x=880, y=820, anim="pop", motion="float", until="вода")),
@@ -102,12 +103,12 @@ MONTAGE = [
         ("литрам", "T", dict(text="НЕ ЛИТРАМИ", st="H", size=92, x=540, y=1290, col="ink", anim="pop")), ("литрам", "SHAKE", {}),
         ("сахар", "BUB", dict(text="сахар", x=320, y=1440, side="l")), ("кофеин", "BUB", dict(text="кофеин", x=760, y=1440, side="r"))]),
     dict(bg="cream", num=4, els=[
-        num(4, "acc"), (0.0, "T", dict(text="ГРАНАТ", st="H", size=104, x=90, y=680, al="l", col="ink", anim="up", until="изжог")),
+        num(4, "acc"), (0.0, "T", dict(text="ГРАНАТ", st="H", size=92, x=90, y=680, al="l", col="ink", anim="up", until="изжог")),
         ("цитрус", "T", dict(text="& цитрусы", st="I", size=72, x=90, y=790, al="l", col="acc", anim="type", until="изжог")),
-        (0.0, "IMG", dict(src="icon:fruits", h=400, x=800, y=760, anim="pop", motion="float", until="изжог")),
+        (0.0, "IMG", dict(src="icon:fruits", h=320, x=770, y=760, anim="pop", motion="float", until="изжог")),
         ("кислые", "T", dict(text="кислые фрукты", st="L", size=58, x=90, y=930, al="l", col="ink", anim="type", until="изжог")),
-        ("реакц", "T", dict(text="СМОТРИ\nНА РЕАКЦИЮ", st="H", size=74, x=90, y=1110, al="l", col="acc", anim="pop", until="изжог")),
-        ("реакц", "CIRCLE", dict(src="vid:IMG_0755", d=380, x=820, y=1330, fx=0.55, fy=0.24, zoom=2.0, anim="pop", motion="float", until="изжог")),
+        ("реакц", "T", dict(text="СМОТРИ\nНА РЕАКЦИЮ", st="H", size=62, x=90, y=1110, al="l", col="acc", anim="pop", until="изжог")),
+        ("реакц", "CIRCLE", dict(src="vid:IMG_0755", d=290, x=790, y=1300, fx=0.55, fy=0.24, zoom=2.0, anim="pop", motion="float", until="изжог")),
         ("изжог", "IMG", dict(src="icon:flame", h=380, x=540, y=880, anim="pop", motion="wiggle")),
         ("изжог", "T", dict(text="ИЗЖОГА", st="H", size=130, x=540, y=1200, col="acc", anim="pop")),
         ("изжог", "T", dict(text="(у кого-то наоборот)", st="I", size=48, x=540, y=1310, col="mute", anim="type")),
@@ -141,12 +142,12 @@ MONTAGE = [
         ("тебе", "T", dict(text="ИМЕННО ТЕБЕ", st="H", size=100, x=540, y=1480, col="acc", anim="pop"))]),
     dict(bg="cream", els=[
         ("спасало", "T", dict(text="А ЧТО СПАСАЛО\nВАС?", st="H", size=96, x=540, y=520, col="ink", anim="pop")),
-        (0.0, "CIRCLE", dict(src="vid:IMG_0755", d=420, x=540, y=930, fx=0.55, fy=0.24, zoom=1.8, anim="pop", motion="float")),
-        ("кажется", "BUB", dict(text="а у меня…", x=270, y=1200, side="l")),
-        ("каждой", "BUB", dict(text="мне помогало…", x=810, y=1240, side="r")),
-        ("список", "BUB", dict(text="у меня свой список!", x=420, y=1370, side="l")),
-        ("список", "IMG", dict(src="icon:list", h=230, x=880, y=1420, anim="pop", motion="float")),
-        ("неожидан", "T", dict(text="(самые неожиданные средства)", st="I", size=46, x=540, y=1540, col="acc", anim="type"))]),
+        (0.0, "CIRCLE", dict(src="vid:IMG_0755", d=380, x=540, y=830, fx=0.55, fy=0.24, zoom=1.8, anim="pop", motion="float")),
+        ("кажется", "BUB", dict(text="а у меня…", x=260, y=1090, side="l")),
+        ("каждой", "BUB", dict(text="мне помогало…", x=790, y=1120, side="r")),
+        ("список", "BUB", dict(text="у меня свой список!", x=400, y=1240, side="l")),
+        ("список", "IMG", dict(src="icon:list", h=190, x=850, y=1270, anim="pop", motion="float")),
+        ("неожидан", "T", dict(text="(самые неожиданные средства)", st="I", size=46, x=540, y=1420, col="acc", anim="type"))]),
 ]
 
 # ---------- pictures ----------
@@ -314,6 +315,7 @@ def build(scenes, total, pics):
                     e = El("IMG", t + 0.12 * i, end, dict(src="icon:" + nm, h=o["h"], anim="pop", scene=k, orbit=(o["r"], i * 2 * math.pi / len(o["names"]), o["cy"])))
                     e.img = pics.get("icon:" + nm, o["h"]); els.append(e); events.append((t + 0.12 * i, "pop"))
                 continue
+            fit_safe(el)
             els.append(el)
     return els, events, shakes, glitches, keyt
 
@@ -332,10 +334,25 @@ def full_frame(fr, el, t, dark=False):
             a = (np.clip((np.arange(H) - H * 0.55) / (H * 0.4), 0, 1) ** 1.4 * 200).astype(np.uint8)
             g = Image.new("RGBA", (W, H), INK + (0,)); g.putalpha(Image.fromarray(np.repeat(a[:, None], W, 1))); _GRAD["g"] = g
         im.alpha_composite(_GRAD["g"])
-        if o.get("text"): paste(im, text_img(o["text"], "H", 92, CREAM), int(W / 2 - text_img(o["text"], "H", 92, CREAM).width / 2), 1330)
-        if o.get("sub"): sp = text_img(o["sub"], "I", 50, BLUSH); paste(im, sp, int(W / 2 - sp.width / 2), 1450)
+        if o.get("text"): paste(im, text_img(o["text"], "H", 92, CREAM), int(W / 2 - text_img(o["text"], "H", 92, CREAM).width / 2), 1250)
+        if o.get("sub"): sp = text_img(o["sub"], "I", 50, BLUSH); paste(im, sp, int(W / 2 - sp.width / 2), 1370)
     if al < 0.99: im.putalpha(int(255 * al))
     fr.alpha_composite(im)
+
+def fit_safe(el):
+    """move (and if it must, shrink) a piece so its resting rectangle lies inside SAFE"""
+    o = el.o
+    if el.kind in ("LINE", "FULL", "BGFULL", "R") or "orbit" in o: return
+    if el.kind == "T": im = el.img if hasattr(el, "img") else text_img(el.full + "_", o["st"], o["size"], el.col)
+    else: im = el.img[0] if isinstance(el.img, list) else el.img
+    w, h = im.size; x, y = o.get("x", 540), o.get("y", 960); al = o.get("al", "c")
+    sw, sh = SAFE[2] - SAFE[0], SAFE[3] - SAFE[1]; k = min(1.0, sw / w, sh / h)
+    if k < 1 and el.kind != "T":                                           # too big for the safe area: scale the picture down
+        sc = lambda f: f.resize((max(int(f.width * k), 1), max(int(f.height * k), 1)), Image.LANCZOS)
+        el.img = [sc(f) for f in el.img] if isinstance(el.img, list) else sc(el.img); w, h = int(w * k), int(h * k)
+    x0 = x if al == "l" else (x - w / 2 if al == "c" else x - w); top = y - h * (0.72 if el.kind == "T" else 0.5)
+    dx = max(SAFE[0] - x0, 0) - max(x0 + w - SAFE[2], 0); dy = max(SAFE[1] - top, 0) - max(top + h - SAFE[3], 0)
+    o["x"], o["y"] = x + dx, y + dy
 
 def draw_bg(fr, bg, y0=0):
     d = ImageDraw.Draw(fr)
@@ -404,6 +421,7 @@ def render(scenes, total, pics, work):
             if el.kind == "FULL" and el.o["scene"] == cur and el.t0 <= t <= el.t1 + 0.15: full_frame(fr, el, t)
         if wipe > 0: draw_bg(fr, MONTAGE[k]["bg"], int(H * (wipe / 0.22)))
         d.rounded_rectangle((60, 236, W - 60, 242), radius=3, fill=(200, 190, 180)); d.rounded_rectangle((60, 236, 60 + int((W - 120) * t / total), 242), radius=3, fill=BROWN)
+        if os.environ.get("SAFE_GUIDE"): ImageDraw.Draw(fr).rectangle(SAFE, outline=(255, 0, 0), width=3)
         img = np.asarray(fr.convert("RGB"))
         g = [s for s in glitches if 0 <= t - s < 0.35]
         if g:                                                              # colour split + torn slices
