@@ -1,7 +1,7 @@
 """Tighten a talking-head video: keep the speech, drop pauses / false starts / fillers, and put the separately recorded voice
 under the picture (the camera sound goes). Cuts sit at real silences of the voice track (energy), soft 20 ms audio edges,
 and every other cut gets a gentle punch-in so the jump reads as an edit.
-  python3 talk_cut.py VIDEO VOICE WORDS.json OUT.mp4 --sync T0:OFF0,T1:OFF1 [--drop A-B,A-B ...] [--gap 0.45] [--zoom 1.08]
+  python3 talk_cut.py VIDEO VOICE WORDS.json OUT.mp4 --sync T0:OFF0,T1:OFF1 [--drop A-B,A-B ...] [--gap 0.45] [--zoom 1.08] [--speed 1.5]
   WORDS.json: [[word, start, end], ...] on the VOICE timeline; sync: voice time = video time + offset (two points, linear).
 """
 import json, os, subprocess, sys, tempfile
@@ -20,7 +20,13 @@ def env_db(x, hop=480):
 def segments(words, drops, gap, e, floor):
     """speech runs on the voice timeline: words outside the dropped ranges, split at pauses longer than gap,
     each edge moved out to where the voice really starts / ends (energy), with a little air"""
-    ws = [w for w in words if not any(a <= (w[1] + w[2]) / 2 <= b for a, b in drops)]
+    dropped = lambda w: any(a <= (w[1] + w[2]) / 2 <= b for a, b in drops)
+    ws = [w for w in words if not dropped(w)]
+    nb = {}                                                                # fences: a kept edge never reaches into a dropped word
+    for i, w in enumerate(words):
+        if dropped(w): continue
+        if i > 0 and dropped(words[i - 1]): nb[(w[1], "lo")] = words[i - 1][2] + 0.02
+        if i + 1 < len(words) and dropped(words[i + 1]): nb[(w[2], "hi")] = words[i + 1][1] - 0.02
     runs, cur = [], [ws[0]]
     for w in ws[1:]:
         dropped_between = any(cur[-1][2] <= a and b <= w[1] + 0.05 for a, b in drops)
@@ -33,7 +39,8 @@ def segments(words, drops, gap, e, floor):
         while i > 0 and e[i - 1] > thr and a - (i - 1) / 100 < 0.35: i -= 1           # onset (whisper is often late)
         j = int(b * 100)
         while j < len(e) - 1 and e[j] > thr and j / 100 - b < 0.5: j += 1             # decay of the last word
-        out.append([max(i / 100 - 0.08, 0), j / 100 + 0.12])
+        lo, hi = nb.get((a, "lo"), 0.0), nb.get((b, "hi"), 1e9)
+        out.append([max(i / 100 - 0.08, 0, min(lo, a)), min(j / 100 + 0.12, max(hi, b))])
     split = []                                                             # silences inside a run that whisper stretched a word over
     for a, b in out:
         i0, i1 = int(a * 100), int(b * 100); quiet = e[i0:i1] < thr; start, end = a, b; k = 0
@@ -55,7 +62,7 @@ def segments(words, drops, gap, e, floor):
         else: merged.append(s)
     return merged
 
-def main(video, voice, words_json, out, sync, drops, gap=0.45, zoom=1.08):
+def main(video, voice, words_json, out, sync, drops, gap=0.45, zoom=1.08, speed=1.0):
     (t0, o0), (t1, o1) = sync; off = lambda vt: o0 + (o1 - o0) * (vt - t0) / (t1 - t0)
     v = read(voice); e = env_db(v); floor = np.percentile(e, 8)
     segs = segments(json.load(open(words_json)), drops, gap, e, floor)
@@ -86,7 +93,12 @@ def main(video, voice, words_json, out, sync, drops, gap=0.45, zoom=1.08):
                                 "-vf", vf + "format=yuv420p", "-r", str(FPS), "-c:v", "libx264", "-preset", "medium", "-crf", "18",
                                 "-video_track_timescale", "12800", p], check=True)
                 L.write(f"file '{p}'\n")
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-i", raw, "-map", "0:v", "-map", "1:a",
+        if speed != 1.0:                                                   # faster picture and voice together (pitch kept)
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-i", raw, "-filter_complex",
+                            f"[0:v]setpts=PTS/{speed},fps={FPS}[v];[1:a]atempo={speed},{ln}[a]", "-map", "[v]", "-map", "[a]",
+                            "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "256k",
+                            "-shortest", "-movflags", "+faststart", out], check=True)
+        else: subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-i", raw, "-map", "0:v", "-map", "1:a",
                         "-af", ln, "-c:v", "copy",
                         "-c:a", "aac", "-b:a", "256k", "-shortest", "-movflags", "+faststart", out], check=True)
     json.dump(plan, open(out + ".cuts.json", "w"))
@@ -95,4 +107,4 @@ if __name__ == "__main__":
     a = sys.argv; opt = lambda k, d: a[a.index(k) + 1] if k in a else d
     sync = [tuple(float(x) for x in p.split(":")) for p in opt("--sync", "").split(",")]
     drops = [tuple(float(x) for x in p.split("-")) for p in opt("--drop", "").split(",") if p]
-    main(a[1], a[2], a[3], a[4], sync, drops, float(opt("--gap", 0.45)), float(opt("--zoom", 1.08)))
+    main(a[1], a[2], a[3], a[4], sync, drops, float(opt("--gap", 0.45)), float(opt("--zoom", 1.08)), float(opt("--speed", 1.0)))
