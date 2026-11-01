@@ -3,7 +3,7 @@
 cut-out figures and objects with soft shadows, dotted connector lines, chat bubbles, huge «01.–05.» numbers, cream ↔ ink scenes
 with wipe transitions, glitch and shake on the hard words) — her fonts (Montserrat heavy / thin / thin italic) and palette.
 Reuses the voice and word timings of toxicosis_reel.py (WORK/voice.wav, WORK/timing.json).
-  python3 toxicosis_v2.py VOICE_WORK CUTOUTS_DIR MATERIALS_DIR OUT.mp4
+  python3 toxicosis_v2.py VOICE_WORK CUTOUTS_DIR MATERIALS_DIR OUT.mp4 [STICKERS_DIR]
 """
 import glob, json, math, os, subprocess, sys
 import numpy as np
@@ -60,7 +60,7 @@ MONTAGE = [
         ("поделиться", "T", dict(text="хочу поделиться", st="I", size=56, x=540, y=430, col="mute", anim="type")),
         ("попробовать", "T", dict(text="ЧТО МОЖНО\nПОПРОБОВАТЬ", st="H", size=90, x=540, y=600, col="ink", anim="pop")),
         *[("можно", "IMG", dict(src=f"icon:{n}", h=170, x=150 + 195 * i, y=980, anim="pop", motion="float", delay=0.15 * i))
-          for i, n in enumerate(("lemon", "mineral", "cola", "pom", "blister"))],
+          for i, n in enumerate(("lemon", "mineral", "cola", "fruits", "blister"))],
         *[("можно", "T", dict(text=f"{i + 1:02d}", st="I", size=36, x=150 + 195 * i, y=1110, col="acc", anim="up", delay=0.15 * i)) for i in range(5)],
         ("облегч", "LINE", dict(p=[(540, 1150), (520, 1200), (540, 1250)])),
         ("облегч", "T", dict(text="(чтобы облегчить состояние)", st="I", size=48, x=540, y=1320, col="acc", anim="type"))]),
@@ -100,8 +100,7 @@ MONTAGE = [
     dict(bg="cream", num=4, els=[
         num(4, "acc"), (0.0, "T", dict(text="ГРАНАТ", st="H", size=104, x=90, y=680, al="l", col="ink", anim="up", until="изжог")),
         ("цитрус", "T", dict(text="& цитрусы", st="I", size=72, x=90, y=790, al="l", col="acc", anim="type", until="изжог")),
-        (0.0, "IMG", dict(src="icon:pom", h=380, x=770, y=640, anim="pop", motion="float", until="изжог")),
-        ("цитрус", "IMG", dict(src="icon:orange", h=310, x=880, y=960, anim="pop", motion="float", until="изжог")),
+        (0.0, "IMG", dict(src="icon:fruits", h=400, x=800, y=760, anim="pop", motion="float", until="изжог")),
         ("кислые", "T", dict(text="кислые фрукты", st="L", size=58, x=90, y=930, al="l", col="ink", anim="type", until="изжог")),
         ("реакц", "T", dict(text="СМОТРИ\nНА РЕАКЦИЮ", st="H", size=74, x=90, y=1110, al="l", col="acc", anim="pop", until="изжог")),
         ("реакц", "IMG", dict(src="cut:IMG_7959", h=460, x=830, y=1340, anim="up", until="изжог")),
@@ -111,7 +110,7 @@ MONTAGE = [
         ("изжог", "GLITCH", {}), ("изжог", "SHAKE", {})]),
     dict(bg="ink", num=5, els=[
         num(5, "acc"), (0.0, "T", dict(text="ДУОНИКА", st="H", size=104, x=90, y=690, al="l", col="ink", anim="up")),
-        (0.0, "IMG", dict(src="icon:blister", h=330, x=880, y=520, anim="pop", motion="float")),
+        (0.0, "IMG", dict(src="icon:blister", h=250, x=790, y=480, anim="pop", motion="float")),
         ("сильн", "T", dict(text="если токсикоз сильный", st="I", size=50, x=90, y=880, al="l", col="mute", anim="type")),
         ("терпеть", "T", dict(text="НЕ ТЕРПИ", st="H", size=112, x=90, y=1000, al="l", col="acc", anim="pop")), ("терпеть", "SHAKE", {}),
         ("врач", "IMG", dict(src="icon:med", h=200, x=880, y=1050, anim="pop", motion="pulse")),
@@ -123,7 +122,7 @@ MONTAGE = [
         ("больш", "IMG", dict(src="icon:plate", h=480, x=540, y=900, anim="pop", until="перекус")),
         ("больш", "IMG", dict(src="icon:cross", h=420, x=540, y=900, anim="pop", shadow=False, until="перекус")),
         ("перекус", "T", dict(text="ПОНЕМНОГУ", st="H", size=112, x=540, y=560, col="acc", anim="pop")),
-        *[("перекус", "IMG", dict(src="icon:plate", h=230, x=x, y=880, anim="pop", motion="float", delay=0.15 * i)) for i, x in enumerate((220, 540, 860))],
+        ("перекус", "IMG", dict(src="icon:snack", h=440, x=540, y=900, anim="pop", motion="float")),
         ("дня", "IMG", dict(src="icon:clock", h=240, x=290, y=1200, anim="pop")),
         ("дня", "IMG", dict(src="icon:hands", h=240, x=290, y=1200, anim="pop", motion="spin", shadow=False)),
         ("дня", "T", dict(text="в течение дня", st="I", size=58, x=290, y=1400, col="ink", anim="type")),
@@ -131,7 +130,7 @@ MONTAGE = [
     dict(bg="ink", els=[
         ("существует", "T", dict(text="НЕТ ОДНОГО\nСРЕДСТВА", st="H", size=96, x=540, y=520, col="ink", anim="pop")),
         ("всем", "T", dict(text="(для всех)", st="I", size=58, x=540, y=700, col="acc", anim="type")),
-        (0.3, "ORBIT", dict(names=("lemon", "mineral", "cola", "pom", "orange", "blister"), r=330, h=160, cy=1060)),
+        (0.3, "ORBIT", dict(names=("lemon", "mineral", "cola", "fruits", "blister", "snack"), r=330, h=160, cy=1060)),
         ("пробова", "T", dict(text="пробуй", st="L", size=70, x=540, y=1060, col="ink", anim="type", until="тебе")),
         ("тебе", "IMG", dict(src="cut:IMG_9141", h=640, x=540, y=1080, anim="up")),
         ("тебе", "T", dict(text="ИМЕННО ТЕБЕ", st="H", size=100, x=540, y=1480, col="acc", anim="pop"))]),
@@ -153,14 +152,20 @@ def shadowed(im, k=0.35):
     sh = Image.new("RGBA", out.size, (30, 20, 15, 0)); sh.putalpha(a.filter(ImageFilter.GaussianBlur(pad / 2.2)).point(lambda v: int(v * k)))
     out.alpha_composite(sh); out.alpha_composite(im, (pad, pad)); return out
 
+STICKERS = {"lemon": "lemon", "slice": "slice", "water": "water", "mineral": "mineral", "cola": "cola", "colabottle": "cola",
+            "fruits": "fruits", "pom": "fruits", "blister": "blister", "snack": "snack"}   # her photo stickers replace the flat icons
+
 class Pics:
-    def __init__(self, cuts, mats): self.cuts, self.mats, self.c = cuts, mats, {}
+    def __init__(self, cuts, mats, stickers=None): self.cuts, self.mats, self.st, self.c = cuts, mats, stickers, {}
 
     def get(self, src, h, crop=None, shadow=True):
         key = (src, h, crop, shadow)
         if key in self.c: return self.c[key]
         kind, name = src.split(":", 1)
-        if kind == "icon": im = T.icon(name); im = im.resize((h, h), Image.LANCZOS)
+        if kind == "icon" and self.st and name in STICKERS:
+            im = Image.open(os.path.join(self.st, STICKERS[name] + "_c.png")).convert("RGBA")
+            im = im.resize((round(im.width * h / im.height), h), Image.LANCZOS)
+        elif kind == "icon": im = T.icon(name); im = im.resize((h, h), Image.LANCZOS)
         elif kind == "cut":
             im = Image.open(os.path.join(self.cuts, name + ".png")).convert("RGBA")
             if crop: im = im.crop((0, 0, im.width, int(im.height * crop)))
@@ -354,8 +359,8 @@ def mix(work, events, keyt, out):
                    input=y.astype(np.float32).tobytes(), check=True)
 
 if __name__ == "__main__":
-    work, cuts, mats, out = sys.argv[1:5]
+    work, cuts, mats, out = sys.argv[1:5]; stickers = sys.argv[5] if len(sys.argv) > 5 else None
     tm = json.load(open(os.path.join(work, "timing.json"))); scenes = [dict(t0=s["t0"], dur=s["dur"], words=s["words"]) for s in tm]
     total = T.FX.read(os.path.join(work, "voice.wav")).shape[0] / SR
-    events, keyt = render(scenes, total, Pics(cuts, mats), work)
+    events, keyt = render(scenes, total, Pics(cuts, mats, stickers), work)
     mix(work, events, keyt, out)
