@@ -1,7 +1,7 @@
 """@mcg.va — «Как справляться с токсикозом?», version 4: mostly animation on her own voice (from her edited talking video),
 she appears only now and then — her picture shrinks into a кружок at the start, small кружки later, a zoomed-out card at the end.
-Type: thin Montserrat — headings in CAPS, everything else in small letters; minimal flat icons; subtitles from her speech.
-  python3 toxicosis_v4.py BASE_VIDEO WORDS.json WORK_DIR OUT.mp4 [END_SECONDS]
+Type: thin Montserrat — headings in CAPS, everything else in small letters; her photo stickers + minimal flat icons; subtitles from her speech.
+  python3 toxicosis_v4.py BASE_VIDEO WORDS.json STICKERS_DIR WORK_DIR OUT.mp4 [END_SECONDS]
 """
 import json, os, re, subprocess, sys
 import numpy as np
@@ -36,27 +36,29 @@ STARTS = [("как", 0), ("это", 4), ("и", 7.8), ("поэтому", 10.5), (
           ("также", 41.3), ("и", 45.1), ("может", 48.8)]
 M4 = [
     dict(bg="ink", els=[
-        me(0.0, "shrink", d=380, x=540, y=1080, fx=0.5, fy=0.36, zoom=2.2),
+        me(0.0, "shrink", d=520, x=540, y=1070, fx=0.5, fy=0.44, zoom=1.35),
         ("как", "T", dict(text="как справляться\nс токсикозом?", st="H", size=78, x=540, y=430, col="ink", anim="up")),
         ("отдельная", "T", dict(text="(отдельная история беременности)", st="I", size=44, x=540, y=680, col="acc", anim="type"))]),
     dict(bg="cream", els=[
         ("буквально", "T", dict(text="буквально", st="I", size=56, x=540, y=440, col="acc", anim="type")),
         ("тошнит", "T", dict(text="тошнит", st="H", size=150, x=540, y=630, col="ink", anim="pop")), ("тошнит", "GLITCH", {}), ("тошнит", "SHAKE", {}),
         ("всего", "T", dict(text="от всего", st="L", size=64, x=540, y=780, col="ink", anim="up")),
-        ic("любого", "smell", 540, 1050, 260, anim="fade"),
-        ("запаха", "T", dict(text="(от любого запаха)", st="I", size=50, x=540, y=1290, col="acc", anim="type"))]),
+        ic("любого", "smell", 230, 900, 200, anim="fade"),
+        me("любого", "circle", d=400, x=600, y=1020, fx=0.5, fy=0.44, zoom=1.35),
+        ("запаха", "T", dict(text="(от любого запаха)", st="I", size=50, x=540, y=1320, col="acc", anim="type"))]),
     dict(bg="split", els=[
         ("хочешь", "T", dict(text="хочешь\nесть", st="H", size=74, x=270, y=520, col="ink", anim="up", side="l")),
         ic("хочешь", "plate", 270, 880, 300),
         ("не", "T", dict(text="но не\nможешь", st="H", size=74, x=810, y=520, col="ink", anim="up", side="r")),
         ic("можешь", "cross", 270, 880, 260, motion="none"),
-        ic("можешь", "sick", 810, 900, 280, motion="wiggle"), ("можешь", "SHAKE", {})]),
+        me("не", "circle", d=380, x=810, y=930, fx=0.5, fy=0.44, zoom=1.35), ("можешь", "SHAKE", {})]),
     dict(bg="cream", els=[
         ("питалась", "T", dict(text="что спасало", st="H", size=70, x=540, y=420, col="ink", anim="up")),
         ("чипсами", "BUB", dict(text="чипсы", x=280, y=700, side="l")),
         ("бармеладками", "BUB", dict(text="кислые мармеладки", x=700, y=830, side="r")),
         ("помогали", "T", dict(text="(только они и помогали)", st="I", size=48, x=540, y=1010, col="acc", anim="type")),
-        me("только", "circle", d=300, x=540, y=1260, fx=0.5, fy=0.36, zoom=2.2)]),
+        me("чипсами", "circle", d=300, x=820, y=560, fx=0.5, fy=0.68, zoom=1.6, until="помогали"),
+        me("только", "circle", d=470, x=540, y=1220, fx=0.5, fy=0.44, zoom=1.35)]),
     dict(bg="ink", num=1, els=[
         num(1), (0.0, "T", dict(text="лимон", st="H", size=110, x=90, y=690, al="l", col="ink", anim="up")),
         ic(0.0, "lemon", 780, 560, 300, motion="wiggle"),
@@ -65,42 +67,44 @@ M4 = [
         ("всем", "T", dict(text="(помогает не всем)", st="I", size=50, x=90, y=1250, al="l", col="acc", anim="type"))]),
     dict(bg="cream", num=2, els=[
         num(2), (0.0, "T", dict(text="боржоми", st="H", size=104, x=90, y=690, al="l", col="ink", anim="up")),
-        ic(0.0, "mineral", 800, 820, 420),
+        ic(0.0, "mineral", 830, 640, 340),
         ("действительно", "T", dict(text="правда помогал", st="L", size=58, x=90, y=880, al="l", col="ink", anim="type")),
+        me("помогал", "card", w=300, h=533, x=770, y=1170, until="короткий"),
         ic("короткий", "clock", 280, 1120, 220, motion="none"), ic("короткий", "hands", 280, 1120, 220, motion="spin"),
         ("короткий", "T", dict(text="(но ненадолго)", st="I", size=52, x=90, y=1320, al="l", col="acc", anim="type"))]),
     dict(bg="ink", num=3, els=[
-        num(3), (0.0, "T", dict(text="кока-кола", st="H", size=100, x=90, y=690, al="l", col="ink", anim="up")),
-        ic(0.0, "cola", 800, 800, 420, until="волшебным"), ("кока", "SFX", dict(name="fizz")),
+        num(3), (0.0, "T", dict(text="кока-кола", st="H", size=88, x=90, y=690, al="l", col="ink", anim="up")),
+        ic(0.0, "cola", 830, 820, 340, until="волшебным"), ("кока", "SFX", dict(name="fizz")),
         ("лучшим", "T", dict(text="лучший вариант", st="L", size=60, x=90, y=880, al="l", col="ink", anim="type")),
-        me("для", "circle", d=260, x=250, y=1150, fx=0.5, fy=0.36, zoom=2.2, until="волшебным"),
+        me("для", "circle", d=420, x=300, y=1130, fx=0.5, fy=0.44, zoom=1.35, until="волшебным"),
         ("волшебным", "T", dict(text="волшебный\nнапиток", st="H", size=84, x=540, y=1020, col="acc", anim="pop")),
         ic("волшебным", "heart", 540, 1300, 170, motion="pulse")]),
     dict(bg="cream", num=4, els=[
         num(4), (0.0, "T", dict(text="гранат\nи цитрусы", st="H", size=88, x=90, y=690, al="l", col="ink", anim="up", until="изжогу")),
-        ic(0.0, "pom", 780, 640, 260, until="изжогу"), ic("цитрусы", "orange", 840, 930, 230, until="изжогу"),
+        ic(0.0, "fruits", 800, 820, 300, until="изжогу"),
         ("минус", "T", dict(text="но есть минус", st="L", size=58, x=90, y=1000, al="l", col="ink", anim="type", until="изжогу")),
         ("изжогу", "T", dict(text="изжога", st="H", size=130, x=540, y=700, col="acc", anim="pop")), ("изжогу", "GLITCH", {}),
         ic("изжогу", "flame", 540, 1000, 280, motion="wiggle")]),
     dict(bg="ink", num=5, els=[
         num(5), (0.0, "T", dict(text="дуоника", st="H", size=104, x=90, y=690, al="l", col="ink", anim="up")),
-        ic(0.0, "blister", 800, 560, 260),
+        ic(0.0, "blister", 800, 470, 210),
         ("сильный", "T", dict(text="(если токсикоз сильный)", st="I", size=48, x=90, y=860, al="l", col="ink", anim="type")),
         ("специальный", "T", dict(text="для беременных", st="L", size=58, x=90, y=960, al="l", col="ink", anim="type")),
-        ic("врач", "med", 800, 1080, 200, motion="pulse"),
-        ("назначает", "STAMP", dict(text="ТОЛЬКО С ВРАЧОМ", y=1260))]),
+        me("принимала", "circle", d=330, x=800, y=1000, fx=0.5, fy=0.44, zoom=1.35, until="назначает"),
+        ic("врач", "med", 190, 1120, 160, motion="pulse"),
+        ("назначает", "STAMP", dict(text="ТОЛЬКО С ВРАЧОМ", y=1265))]),
     dict(bg="cream", els=[
         ("большими", "T", dict(text="не большими\nпорциями", st="H", size=80, x=540, y=470, col="ink", anim="up", until="маленькими")),
         ic("большими", "plate", 540, 900, 380, until="маленькими"), ic("большими", "cross", 540, 900, 340, motion="none", until="маленькими"),
         ("маленькими", "T", dict(text="понемногу\nи чаще", st="H", size=88, x=540, y=470, col="acc", anim="pop")),
-        *[ic("маленькими", "plate", x, 880, 200, delay=0.12 * i) for i, x in enumerate((240, 540, 840))],
+        ic("маленькими", "snack", 540, 870, 360),
         ic("чаще", "clock", 540, 1200, 200, motion="none"), ic("чаще", "hands", 540, 1200, 200, motion="spin")]),
     dict(bg="ink", els=[
         ("существует", "T", dict(text="нет единого\nсредства", st="H", size=84, x=540, y=470, col="ink", anim="up")),
-        ("единого", "ORBIT", dict(names=("lemon", "mineral", "cola", "pom", "orange", "blister"), r=300, h=140, cy=1000)),
+        ("единого", "ORBIT", dict(names=("lemon", "mineral", "cola", "fruits", "blister", "snack"), r=300, h=150, cy=1000)),
         ("сожалению", "T", dict(text="(к сожалению)", st="I", size=52, x=540, y=1000, col="acc", anim="type"))]),
     dict(bg="cream", els=[
-        me("может", "card", w=405, h=720, x=540, y=900),
+        me("может", "card", w=500, h=889, x=540, y=930),
         ("может", "T", dict(text="а что помогало\nвам?", st="H", size=70, x=540, y=380, col="ink", anim="up")),
         ("варианты", "BUB", dict(text="а у меня…", x=230, y=760, side="l")),
         ("идеи", "BUB", dict(text="мне помогало…", x=830, y=980, side="r")),
@@ -147,11 +151,11 @@ def scenes_from(words, total):
     return sc
 
 if __name__ == "__main__":
-    base, words_json, work, out = sys.argv[1:5]; end = float(sys.argv[5]) if len(sys.argv) > 5 else None
+    base, words_json, stickers, work, out = sys.argv[1:6]; end = float(sys.argv[6]) if len(sys.argv) > 6 else None
     os.makedirs(work, exist_ok=True)
     words = [tuple(w) for w in json.load(open(words_json))]
     total = end or float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", base], capture_output=True, text=True).stdout)
     V.MONTAGE[:] = M4; V.text_img = text_thin; V.T.stamp_img = stamp_thin; V.BASE_FRAME = Base(base); V.POST = subtitles(words)
     scenes = scenes_from(words, total)
-    events, keyt = V.render(scenes, total, V.Pics(work, work), work)
+    events, keyt = V.render(scenes, total, V.Pics(work, work, stickers), work)
     V3.mix(base, total, events, os.path.join(work, "video_v2.mp4"), out)
