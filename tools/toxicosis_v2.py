@@ -162,7 +162,7 @@ def shadowed(im, k=0.35):
     out.alpha_composite(sh); out.alpha_composite(im, (pad, pad)); return out
 
 STICKERS = {"lemon": "lemon", "slice": "slice", "water": "water", "mineral": "mineral", "cola": "cola", "colabottle": "cola",
-            "fruits": "fruits", "pom": "fruits", "blister": "blister", "snack": "snack"}   # her photo stickers replace the flat icons
+            "fruits": "fruits", "pom": "fruits", "blister": "blister", "snack": "snack", "plate": "plate"}   # her photo stickers replace the flat icons
 
 class Pics:
     def __init__(self, cuts, mats, stickers=None): self.cuts, self.mats, self.st, self.c = cuts, mats, stickers, {}

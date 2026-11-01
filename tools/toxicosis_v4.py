@@ -76,10 +76,8 @@ M4 = [
         ("волшебным", "T", dict(text="волшебный\nнапиток", st="H", size=84, x=540, y=1000, col="acc", anim="pop")),
         ic("волшебным", "heart", 540, 1250, 150, motion="pulse")]),
     dict(bg="cream", num=4, els=[
-        num(4), (0.0, "T", dict(text="гранат\nи цитрусы", st="H", size=84, x=90, y=690, al="l", col="ink", anim="up", until="изжогу")),
-        ic(0.0, "fruits", 540, 1090, 340, until="изжогу"),
-        ("изжогу", "T", dict(text="изжога", st="H", size=130, x=540, y=700, col="acc", anim="pop")), ("изжогу", "GLITCH", {}),
-        ic("изжогу", "flame", 540, 1070, 300, motion="wiggle")]),
+        num(4), (0.0, "T", dict(text="гранат\nи цитрусы", st="H", size=84, x=90, y=690, al="l", col="ink", anim="up")),
+        ic(0.0, "fruits", 540, 1090, 360)]),                             # no extra picture on «изжогу»: it read as a jumble
     dict(bg="ink", num=5, els=[
         num(5), (0.0, "T", dict(text="дуоника", st="H", size=104, x=90, y=690, al="l", col="ink", anim="up")),
         me(0.0, "circle", d=420, x=300, y=1060, **FACE, until="назначает"),
