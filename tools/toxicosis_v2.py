@@ -27,7 +27,7 @@ MONTAGE = [
         ("токсик", "T", dict(text="ТОКСИКОЗОМ", st="H", size=118, x=540, y=680, col="ink", anim="pop")),
         ("токсик", "R", dict(text="ТОКСИКОЗОМ", size=118, x=540, y=680, n=1, step=128, delay=0.3)),
         ("токсик", "T", dict(text="?", st="H", size=230, x=860, y=930, col="acc", anim="pop", motion="wiggle")),
-        (0.0, "IMG", dict(src="cut:IMG_7959", h=760, x=500, y=1330, anim="up")),
+        (0.0, "BGFULL", dict(src="vid:IMG_0755")),
         ("токсик", "SHAKE", {})]),
     dict(bg="cream", els=[
         ("ой", "T", dict(text="ой,", st="I", size=70, x=90, y=420, al="l", col="mute", anim="type")),
@@ -43,7 +43,8 @@ MONTAGE = [
         ("тошнит", "R", dict(text="ТОШНИТ", size=150, x=540, y=630, n=1, step=150, delay=0.15, until="буквально")),
         ("тошнит", "GLITCH", {}), ("тошнит", "SHAKE", {}),
         ("всего", "T", dict(text="от всего", st="L", size=72, x=540, y=820, col="ink", anim="up")),
-        ("запах", "IMG", dict(src="icon:smell", h=300, x=250, y=1110, anim="fade", motion="float")),
+        ("запах", "CIRCLE", dict(src="photo:0E168C5F-0AAE-4E41-96DE-CF882206C536.png", crop=0.56, d=360, x=270, y=1150, fy=0.5, anim="pop", motion="float")),
+        ("запах", "IMG", dict(src="icon:smell", h=200, x=270, y=900, anim="fade", motion="float", shadow=False)),
         ("запах", "CARD", dict(src="IMG_2460.heic", x=730, y=1130, w=420, h=520, rot=-6, anim="slide_r")),
         ("запах", "T", dict(text="даже запахи", st="H", size=66, x=540, y=1460, col="acc", anim="pop")),
         ("замеча", "T", dict(text="(которые раньше не замечала)", st="I", size=40, x=540, y=1540, col="mute", anim="type"))]),
@@ -63,7 +64,8 @@ MONTAGE = [
           for i, n in enumerate(("lemon", "mineral", "cola", "fruits", "blister"))],
         *[("можно", "T", dict(text=f"{i + 1:02d}", st="I", size=36, x=150 + 195 * i, y=1110, col="acc", anim="up", delay=0.15 * i)) for i in range(5)],
         ("облегч", "LINE", dict(p=[(540, 1150), (520, 1200), (540, 1250)])),
-        ("облегч", "T", dict(text="(чтобы облегчить состояние)", st="I", size=48, x=540, y=1320, col="acc", anim="type"))]),
+        ("облегч", "T", dict(text="(чтобы облегчить состояние)", st="I", size=48, x=540, y=1320, col="acc", anim="type")),
+        ("поделиться", "CIRCLE", dict(src="photo:IMG_9141.JPG", d=250, x=540, y=1500, fx=0.47, fy=0.27, zoom=3.2, anim="pop", motion="float"))]),
     dict(bg="ink", num=1, els=[
         num(1, "acc"), (0.0, "T", dict(text="ЛИМОН", st="H", size=118, x=90, y=690, al="l", col="ink", anim="up")),
         (0.0, "IMG", dict(src="icon:lemon", h=380, x=830, y=560, anim="pop", motion="wiggle")),
@@ -73,7 +75,8 @@ MONTAGE = [
         ("добав", "IMG", dict(src="icon:water", h=420, x=780, y=1130, anim="pop")),
         ("дол", "IMG", dict(src="icon:slice", h=150, x=780, y=1010, anim="drop")), ("воду", "SFX", dict(name="splash")),
         ("кисл", "T", dict(text="КИСЛОЕ", st="H", size=112, x=90, y=1250, al="l", col="acc", anim="pop")),
-        ("тошнот", "T", dict(text="(помогает с тошнотой)", st="I", size=44, x=90, y=1350, al="l", col="mute", anim="type"))]),
+        ("тошнот", "T", dict(text="(помогает с тошнотой)", st="I", size=44, x=90, y=1350, al="l", col="mute", anim="type")),
+        ("кисл", "CIRCLE", dict(src="photo:IMG_0764.JPG", d=300, x=840, y=1430, fx=0.55, fy=0.56, zoom=2.4, anim="pop", motion="float"))]),
     dict(bg="cream", num=2, els=[
         num(2, "acc"), (0.0, "T", dict(text="БОРЖОМИ", st="H", size=110, x=90, y=690, al="l", col="ink", anim="up")),
         (0.0, "IMG", dict(src="icon:mineral", h=480, x=880, y=820, anim="pop", motion="float", until="вода")),
@@ -91,6 +94,7 @@ MONTAGE = [
         (0.0, "IMG", dict(src="icon:cola", h=480, x=790, y=700, anim="pop", motion="float", until="литрам")), (0.2, "SFX", dict(name="fizz")),
         ("да-да", "BUB", dict(text="да-да", x=300, y=880, side="l")),
         ("странно", "T", dict(text="звучит странно", st="I", size=56, x=90, y=1010, al="l", col="mute", anim="type")),
+        ("странно", "FULL", dict(src="photo:IMG_7959.HEIC", text="звучит странно?", sub="(но некоторым помогает)", until="глотков")),
         ("странно", "IMG", dict(src="icon:qmark", h=200, x=560, y=880, anim="pop", motion="wiggle", shadow=False, until="литрам")),
         ("глотков", "T", dict(text="пару глотков", st="H", size=72, x=90, y=1120, al="l", col="acc", anim="pop")),
         ("литрам", "IMG", dict(src="icon:colabottle", h=520, x=790, y=760, anim="pop")),
@@ -103,7 +107,7 @@ MONTAGE = [
         (0.0, "IMG", dict(src="icon:fruits", h=400, x=800, y=760, anim="pop", motion="float", until="изжог")),
         ("кислые", "T", dict(text="кислые фрукты", st="L", size=58, x=90, y=930, al="l", col="ink", anim="type", until="изжог")),
         ("реакц", "T", dict(text="СМОТРИ\nНА РЕАКЦИЮ", st="H", size=74, x=90, y=1110, al="l", col="acc", anim="pop", until="изжог")),
-        ("реакц", "IMG", dict(src="cut:IMG_7959", h=460, x=830, y=1340, anim="up", until="изжог")),
+        ("реакц", "CIRCLE", dict(src="vid:IMG_0755", d=380, x=820, y=1330, fx=0.55, fy=0.24, zoom=2.0, anim="pop", motion="float", until="изжог")),
         ("изжог", "IMG", dict(src="icon:flame", h=380, x=540, y=880, anim="pop", motion="wiggle")),
         ("изжог", "T", dict(text="ИЗЖОГА", st="H", size=130, x=540, y=1200, col="acc", anim="pop")),
         ("изжог", "T", dict(text="(у кого-то наоборот)", st="I", size=48, x=540, y=1310, col="mute", anim="type")),
@@ -118,6 +122,7 @@ MONTAGE = [
         ("самостоят", "STAMP", dict(text="ТОЛЬКО С ВРАЧОМ", y=1360))]),
     dict(bg="cream", els=[
         ("важным", "T", dict(text="не заставляй себя", st="I", size=58, x=540, y=430, col="mute", anim="type")),
+        ("кажется", "FULL", dict(src="photo:IMG_2194.HEIC", text="НЕ ЗАСТАВЛЯЙ СЕБЯ", sub="(есть большими порциями)", until="больш")),
         ("больш", "T", dict(text="БОЛЬШИЕ ПОРЦИИ", st="H", size=88, x=540, y=560, col="ink", anim="pop", until="перекус")),
         ("больш", "IMG", dict(src="icon:plate", h=480, x=540, y=900, anim="pop", until="перекус")),
         ("больш", "IMG", dict(src="icon:cross", h=420, x=540, y=900, anim="pop", shadow=False, until="перекус")),
@@ -136,11 +141,11 @@ MONTAGE = [
         ("тебе", "T", dict(text="ИМЕННО ТЕБЕ", st="H", size=100, x=540, y=1480, col="acc", anim="pop"))]),
     dict(bg="cream", els=[
         ("спасало", "T", dict(text="А ЧТО СПАСАЛО\nВАС?", st="H", size=96, x=540, y=520, col="ink", anim="pop")),
-        ("кажется", "BUB", dict(text="а у меня…", x=330, y=820, side="l")),
-        ("каждой", "BUB", dict(text="мне помогало…", x=760, y=930, side="r")),
-        ("список", "BUB", dict(text="у меня свой список!", x=420, y=1050, side="l")),
-        ("список", "IMG", dict(src="icon:list", h=300, x=850, y=1260, anim="pop", motion="float")),
-        (0.0, "IMG", dict(src="cut:IMG_2194", h=640, x=280, y=1330, anim="up")),
+        (0.0, "CIRCLE", dict(src="vid:IMG_0755", d=420, x=540, y=930, fx=0.55, fy=0.24, zoom=1.8, anim="pop", motion="float")),
+        ("кажется", "BUB", dict(text="а у меня…", x=270, y=1200, side="l")),
+        ("каждой", "BUB", dict(text="мне помогало…", x=810, y=1240, side="r")),
+        ("список", "BUB", dict(text="у меня свой список!", x=420, y=1370, side="l")),
+        ("список", "IMG", dict(src="icon:list", h=230, x=880, y=1420, anim="pop", motion="float")),
         ("неожидан", "T", dict(text="(самые неожиданные средства)", st="I", size=46, x=540, y=1540, col="acc", anim="type"))]),
 ]
 
@@ -176,6 +181,45 @@ class Pics:
             im = [shadowed(f) if shadow else f for f in im]; self.c[key] = im; return im
         if shadow: im = shadowed(im)
         self.c[key] = im; return im
+
+    def full(self, src, crop=None):
+        """her photo or clip filling the frame (1080x1920): one image, or a list of frames at 24 fps; crop keeps a photo's top part"""
+        key = ("full", src, crop)
+        if key in self.c: return self.c[key]
+        kind, name = src.split(":", 1)
+        if kind == "vid":
+            import tempfile
+            with tempfile.TemporaryDirectory() as td:
+                subprocess.run(["ffmpeg", "-v", "error", "-ss", "0.5", "-t", "6", "-i", os.path.join(self.mats, name + ".mov"), "-vf",
+                                f"fps=24,scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}", "-q:v", "3",
+                                os.path.join(td, "f_%04d.jpg")], check=True)
+                im = [Image.open(f).convert("RGB") for f in sorted(glob.glob(os.path.join(td, "f_*.jpg")))]
+        else:
+            import pillow_heif; pillow_heif.register_heif_opener()
+            ph = ImageOps.exif_transpose(Image.open(os.path.join(self.mats, name))).convert("RGB")
+            if crop: ph = ph.crop((0, 0, ph.width, int(ph.height * crop)))
+            im = ImageOps.fit(ph, (W, H), Image.LANCZOS, centering=(0.5, 0.35))
+        self.c[key] = im; return im
+
+    def circle(self, src, d, fx=0.5, fy=0.4, zoom=1.0, crop=None):
+        """a round «кружок» of her (photo or clip): circle crop, cream ring, soft shadow"""
+        key = ("circle", src, d, fx, fy, zoom, crop)
+        if key in self.c: return self.c[key]
+        if src.startswith("vid:"): fr = self.full(src); frames = fr
+        else:                                                              # photos: straight from the original, square around her face
+            import pillow_heif; pillow_heif.register_heif_opener()
+            fr = ImageOps.exif_transpose(Image.open(os.path.join(self.mats, src.split(":", 1)[1]))).convert("RGB")
+            if crop: fr = fr.crop((0, 0, fr.width, int(fr.height * crop)))
+            frames = [fr]
+        fw, fh = frames[0].size; side = int(min(fw, fh) / zoom)
+        x0 = int(min(max(fx * fw - side / 2, 0), fw - side)); y0 = int(min(max(fy * fh - side / 2, 0), fh - side))
+        m = Image.new("L", (d * 2, d * 2), 0); ImageDraw.Draw(m).ellipse((0, 0, d * 2 - 1, d * 2 - 1), fill=255); m = m.resize((d, d), Image.LANCZOS)
+        out = []
+        for f in frames:
+            c = f.crop((x0, y0, x0 + side, y0 + side)).resize((d, d), Image.LANCZOS).convert("RGBA"); c.putalpha(m)
+            ring = Image.new("RGBA", (d + 20, d + 20), (0, 0, 0, 0)); ImageDraw.Draw(ring).ellipse((0, 0, d + 19, d + 19), fill=CREAM + (255,))
+            ring.alpha_composite(c, (10, 10)); out.append(shadowed(ring, 0.3))
+        self.c[key] = out if isinstance(fr, list) else out[0]; return self.c[key]
 
     def card(self, name, w, h, rot):
         import pillow_heif; pillow_heif.register_heif_opener()
@@ -258,6 +302,9 @@ def build(scenes, total, pics):
             elif kind == "IMG":
                 el.img = pics.get(o["src"], o["h"], o.get("crop"), o.get("shadow", True)); events.append((t, "pop"))
             elif kind == "CARD": el.img = pics.card(o["src"], o["w"], o["h"], o["rot"]); events.append((t, "whoosh"))
+            elif kind in ("FULL", "BGFULL"): el.img = pics.full(o["src"], o.get("crop")); events.append((t, "whoosh"))
+            elif kind == "CIRCLE":
+                el.kind = "IMG"; el.img = pics.circle(o["src"], o["d"], o.get("fx", 0.5), o.get("fy", 0.4), o.get("zoom", 1.0), o.get("crop")); events.append((t, "pop"))
             elif kind == "BUB": el.img = bubble_img(o["text"], o["side"]); el.o.setdefault("anim", "pop"); events.append((t, "pop"))
             elif kind == "STAMP":
                 el.img = T.stamp_img(o["text"]); el.o.update(x=540, anim="stamp"); events.append((t, "thud")); shakes.append(t)
@@ -269,6 +316,26 @@ def build(scenes, total, pics):
                 continue
             els.append(el)
     return els, events, shakes, glitches, keyt
+
+_GRAD = {}
+def full_frame(fr, el, t, dark=False):
+    """full-bleed photo / clip with a slow push-in; FULL fades in and carries a caption on a soft bottom shade"""
+    o = el.o; src = el.img; u = t - el.t0
+    im = src[int(u * 24) % len(src)] if isinstance(src, list) else src
+    s = 1 + 0.06 * min(u / max(el.t1 - el.t0, 0.5), 1); w, h = int(W * s), int(H * s)
+    im = im.resize((w, h), Image.BILINEAR).crop(((w - W) // 2, (h - H) // 2, (w - W) // 2 + W, (h - H) // 2 + H)).convert("RGBA")
+    al = 1.0 if dark else min(ease(u / 0.15), 1 - ease((t - el.t1) / 0.15) if t > el.t1 else 1)
+    if dark:
+        im = Image.blend(im, Image.new("RGBA", (W, H), INK + (255,)), 0.72)
+    else:
+        if "g" not in _GRAD:
+            a = (np.clip((np.arange(H) - H * 0.55) / (H * 0.4), 0, 1) ** 1.4 * 200).astype(np.uint8)
+            g = Image.new("RGBA", (W, H), INK + (0,)); g.putalpha(Image.fromarray(np.repeat(a[:, None], W, 1))); _GRAD["g"] = g
+        im.alpha_composite(_GRAD["g"])
+        if o.get("text"): paste(im, text_img(o["text"], "H", 92, CREAM), int(W / 2 - text_img(o["text"], "H", 92, CREAM).width / 2), 1330)
+        if o.get("sub"): sp = text_img(o["sub"], "I", 50, BLUSH); paste(im, sp, int(W / 2 - sp.width / 2), 1450)
+    if al < 0.99: im.putalpha(int(255 * al))
+    fr.alpha_composite(im)
 
 def draw_bg(fr, bg, y0=0):
     d = ImageDraw.Draw(fr)
@@ -287,8 +354,11 @@ def render(scenes, total, pics, work):
         wipe = min(starts[k] - t, 0.22) if starts[k] > t and k > 0 else 0  # the next scene's ground slides up over this one
         cur = k - 1 if wipe > 0 and k > 0 else k
         draw_bg(fr, MONTAGE[cur]["bg"])
+        for el in els:                                                     # her clip / photo behind the scene, darkened
+            if el.kind == "BGFULL" and el.o["scene"] == cur and el.t0 <= t <= el.t1: full_frame(fr, el, t, dark=True)
         d = ImageDraw.Draw(fr)
         for el in els:
+            if el.kind in ("FULL", "BGFULL"): continue
             if el.o["scene"] != cur or t < el.t0 or t > el.t1 + 0.2: continue
             o = el.o
             if el.kind == "LINE":                                          # dotted connector, drawn on
@@ -330,6 +400,8 @@ def render(scenes, total, pics, work):
                 continue
             py = y - im.height * (0.72 if el.kind == "T" else 0.5)
             paste(fr, im, int(px + dx - (10 if el.kind == "T" and al == "l" else 0)), int(py + dy))
+        for el in els:                                                     # full-screen moments of her, over everything
+            if el.kind == "FULL" and el.o["scene"] == cur and el.t0 <= t <= el.t1 + 0.15: full_frame(fr, el, t)
         if wipe > 0: draw_bg(fr, MONTAGE[k]["bg"], int(H * (wipe / 0.22)))
         d.rounded_rectangle((60, 236, W - 60, 242), radius=3, fill=(200, 190, 180)); d.rounded_rectangle((60, 236, 60 + int((W - 120) * t / total), 242), radius=3, fill=BROWN)
         img = np.asarray(fr.convert("RGB"))
