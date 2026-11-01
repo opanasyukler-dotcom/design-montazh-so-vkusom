@@ -34,6 +34,19 @@ def segments(words, drops, gap, e, floor):
         j = int(b * 100)
         while j < len(e) - 1 and e[j] > thr and j / 100 - b < 0.5: j += 1             # decay of the last word
         out.append([max(i / 100 - 0.08, 0), j / 100 + 0.12])
+    split = []                                                             # silences inside a run that whisper stretched a word over
+    for a, b in out:
+        i0, i1 = int(a * 100), int(b * 100); quiet = e[i0:i1] < thr; start = a; k = 0
+        while k < len(quiet):
+            if quiet[k]:
+                j = k
+                while j < len(quiet) and quiet[j]: j += 1
+                if (j - k) / 100 > gap and k > 0 and j < len(quiet):
+                    split.append([start, (i0 + k) / 100 + 0.12]); start = (i0 + j) / 100 - 0.08
+                k = j
+            else: k += 1
+        split.append([start, b])
+    out = split
     merged = [out[0]]
     for s in out[1:]:
         if s[0] - merged[-1][1] < 0.12: merged[-1][1] = s[1]
