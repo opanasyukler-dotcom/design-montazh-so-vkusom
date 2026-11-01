@@ -94,10 +94,12 @@ def main(video, voice, words_json, out, sync, drops, gap=0.45, zoom=1.08, speed=
                                 "-video_track_timescale", "12800", p], check=True)
                 L.write(f"file '{p}'\n")
         if speed != 1.0:                                                   # faster picture and voice together (pitch kept)
-            subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-i", raw, "-filter_complex",
-                            f"[0:v]setpts=PTS/{speed},fps={FPS}[v];[1:a]atempo={speed},{ln}[a]", "-map", "[v]", "-map", "[a]",
+            fast = os.path.join(td, "voice_fast.wav")                      # the voice first, on its own (loudnorm + -shortest truncate)
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", raw, "-af", f"atempo={speed},{ln}", "-ar", str(SR), fast], check=True)
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-i", fast, "-filter_complex",
+                            f"[0:v]setpts=PTS/{speed},fps={FPS}[v]", "-map", "[v]", "-map", "1:a",
                             "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "256k",
-                            "-shortest", "-movflags", "+faststart", out], check=True)
+                            "-movflags", "+faststart", out], check=True)
         else: subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-i", raw, "-map", "0:v", "-map", "1:a",
                         "-af", ln, "-c:v", "copy",
                         "-c:a", "aac", "-b:a", "256k", "-shortest", "-movflags", "+faststart", out], check=True)
