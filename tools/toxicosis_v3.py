@@ -174,8 +174,10 @@ def render(base, words, total, pics, out_v):
     enc.stdin.close(); enc.wait(); dec.kill()
     return events
 
-def mix(base, total, events, video, out):
+def mix(base, total, events, video, out, voice_end=None):
     v = V.T.FX.read(base)[:int(total * SR)]; bank = V.T.sfx_bank(); N = len(v); bus = np.zeros((N, 2), np.float32)
+    if voice_end:                                                          # the voice stops after her last word, softly
+        i = int(voice_end * SR); f = int(0.12 * SR); v[i - f:i] *= np.linspace(1, 0, f)[:, None]; v[i:] = 0
     for t, name in events:
         x = bank[name](); i = int(t * SR); m = min(len(x), N - i)
         if m > 0 and i >= 0: bus[i:i + m] += x[:m] * 0.8

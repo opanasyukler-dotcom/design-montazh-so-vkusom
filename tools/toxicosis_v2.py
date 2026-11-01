@@ -14,7 +14,8 @@ from toxicosis_reel import W, H, FPS, SR, CREAM, INK, BROWN, MAUVE, GREY, BLUSH,
 
 C = {"ink": INK, "cream": CREAM, "acc": BROWN, "mute": MAUVE, "blush": BLUSH, "grey": GREY}
 ON_INK = {"ink": CREAM, "acc": BLUSH, "mute": GREY}                        # the same roles on a dark scene
-TYPE_STEP = 0.034
+TYPE_STEP = 0.045
+IN, OUT, WIPE = 0.45, 0.3, 0.35          # calmer: time to read what comes in
 BASE_FRAME = None                 # optional: t → her talking video's frame (1080x1920 RGB), for BASE elements
 POST = None                       # optional: (frame, t) → draws on top of each finished frame (e.g. subtitles)
 SAFE = (60, 260, 950, 1480)       # what Instagram Reels leaves visible: header on top, like/comment column on the right, caption below
@@ -264,8 +265,8 @@ def transform(im, t, el):
     """animation in, idle motion and out → (image, dx, dy) or None"""
     o = el.o; u = t - el.t0; s, a, dx, dy, al = 1.0, 0.0, 0.0, 0.0, 1.0
     an = o.get("anim", "pop")
-    if an == "pop": s = ease_back(u / 0.3)
-    elif an == "up": dy = 90 * (1 - ease(u / 0.35)); al = ease(u / 0.25)
+    if an == "pop": s = ease_back(u / IN)
+    elif an == "up": dy = 90 * (1 - ease(u / IN)); al = ease(u / (IN * 0.7))
     elif an == "fade": al = ease(u / 0.4)
     elif an == "drop": k = min(u / 0.42, 1); dy = -560 * (1 - k) ** 2
     elif an == "slide_r": dx = 700 * (1 - ease(u / 0.35))
@@ -274,7 +275,7 @@ def transform(im, t, el):
     elif mo == "wiggle": a = 6 * math.sin(t * 5)
     elif mo == "pulse": s *= 1 + 0.06 * math.sin(t * 6)
     elif mo == "spin": a = (t - el.t0) * 150
-    if t > el.t1: k = ease((t - el.t1) / 0.2); s *= 1 - k; al *= 1 - k
+    if t > el.t1: k = ease((t - el.t1) / OUT); s *= 1 - k; al *= 1 - k
     if s < 0.02 or al < 0.02: return None
     if abs(s - 1) > 0.01: im = im.resize((max(int(im.width * s), 1), max(int(im.height * s), 1)), Image.BILINEAR)
     if abs(a) > 0.5: im = im.rotate(a, resample=Image.BICUBIC, expand=True)
@@ -284,7 +285,7 @@ def transform(im, t, el):
 def build(scenes, total, pics):
     els, events, shakes, glitches, keyt = [], [], [], [], []
     for k, (sc, mo) in enumerate(zip(scenes, MONTAGE)):
-        end = (scenes[k + 1]["t0"] - 0.22) if k + 1 < len(scenes) else total
+        end = (scenes[k + 1]["t0"] - WIPE) if k + 1 < len(scenes) else total
         events.append((sc["t0"] - 0.24, "whoosh"))
         if mo.get("num"): events.append((sc["t0"] + 0.05, "ding"))
         for key, kind, o in mo["els"]:
@@ -328,14 +329,14 @@ def base_el(fr, el, t, frame):
     fx, fy, zoom = o.get("fx", 0.5), o.get("fy", 0.4), o.get("zoom", 1.6)
     if mode == "card": tw, th, rad = o["w"], o["h"], 40; side = None
     else: tw = th = o["d"]; rad = o["d"] // 2; side = W / zoom
-    k = ease(u / 0.6) if mode in ("shrink", "card") else 1.0
+    k = ease(u / 0.9) if mode in ("shrink", "card") else 1.0
     if mode == "card": sx0, sy0, sw, sh = 0, 0, W, H                       # the whole picture, just smaller
     else:
         tx, ty = min(max(fx * W - side / 2, 0), W - side), min(max(fy * H - side / 2, 0), H - side)
         sx0, sy0, sw, sh = tx * k, ty * k, W + (side - W) * k, H + (side - H) * k
     dw, dh = W + (tw - W) * k, H + (th - H) * k; dx, dy = (x - tw / 2) * k, (y - th / 2) * k
-    if mode == "circle": s = ease_back(u / 0.3); dw, dh = tw * s, th * s; dx, dy = x - dw / 2, y - dh / 2
-    if t > el.t1: q = 1 - ease((t - el.t1) / 0.2); dw, dh = dw * q, dh * q; dx, dy = x - dw / 2, y - dh / 2
+    if mode == "circle": s = ease_back(u / IN); dw, dh = tw * s, th * s; dx, dy = x - dw / 2, y - dh / 2
+    if t > el.t1: q = 1 - ease((t - el.t1) / OUT); dw, dh = dw * q, dh * q; dx, dy = x - dw / 2, y - dh / 2
     if dw < 4 or dh < 4: return
     dy += 8 * math.sin(t * 2.2) * k
     im = frame.crop((int(sx0), int(sy0), int(sx0 + sw), int(sy0 + sh))).resize((int(dw), int(dh)), Image.BILINEAR).convert("RGBA")
@@ -395,8 +396,8 @@ def render(scenes, total, pics, work):
     type_cache = {}
     for fi in range(int(total * FPS)):
         t = fi / FPS; fr = Image.new("RGBA", (W, H), CREAM + (255,))
-        k = max([i for i, s in enumerate(starts) if s - 0.22 <= t] or [0])
-        wipe = min(starts[k] - t, 0.22) if starts[k] > t and k > 0 else 0  # the next scene's ground slides up over this one
+        k = max([i for i, s in enumerate(starts) if s - WIPE <= t] or [0])
+        wipe = min(starts[k] - t, WIPE) if starts[k] > t and k > 0 else 0  # the next scene's ground slides up over this one
         cur = k - 1 if wipe > 0 and k > 0 else k
         draw_bg(fr, MONTAGE[cur]["bg"])
         for el in els:                                                     # her clip / photo behind the scene, darkened
@@ -407,7 +408,7 @@ def render(scenes, total, pics, work):
             if el.kind == "BASE":
                 if el.o["scene"] == cur and el.t0 <= t <= el.t1 + 0.2 and BASE_FRAME: base_el(fr, el, t, BASE_FRAME(t))
                 continue
-            if el.o["scene"] != cur or t < el.t0 or t > el.t1 + 0.2: continue
+            if el.o["scene"] != cur or t < el.t0 or t > el.t1 + OUT: continue
             o = el.o
             if el.kind == "LINE":                                          # dotted connector, drawn on
                 pts = o["p"]; q = min((t - el.t0) / 0.45, 1); segs = [(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
@@ -450,7 +451,7 @@ def render(scenes, total, pics, work):
             paste(fr, im, int(px + dx - (10 if el.kind == "T" and al == "l" else 0)), int(py + dy))
         for el in els:                                                     # full-screen moments of her, over everything
             if el.kind == "FULL" and el.o["scene"] == cur and el.t0 <= t <= el.t1 + 0.15: full_frame(fr, el, t)
-        if wipe > 0: draw_bg(fr, MONTAGE[k]["bg"], int(H * (wipe / 0.22)))
+        if wipe > 0: draw_bg(fr, MONTAGE[k]["bg"], int(H * ease(wipe / WIPE)))
         d.rounded_rectangle((60, 236, W - 60, 242), radius=3, fill=(200, 190, 180)); d.rounded_rectangle((60, 236, 60 + int((W - 120) * t / total), 242), radius=3, fill=BROWN)
         if os.environ.get("SAFE_GUIDE"): ImageDraw.Draw(fr).rectangle(SAFE, outline=(255, 0, 0), width=3)
         if POST: POST(fr, t)
