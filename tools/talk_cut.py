@@ -54,7 +54,7 @@ def main(video, voice, words_json, out, sync, drops, gap=0.45, zoom=1.08):
         f = int(0.02 * SR); r = np.linspace(0, 1, f)[:, None]; x[:f] *= r; x[-f:] *= r[::-1]; parts.append(x)
     y = np.concatenate(parts); total = sum(b - a for a, b, _ in plan)
     print(f"{len(plan)} pieces, {total:.1f} s (from {len(v) / SR:.1f} s)")
-    with tempfile.TemporaryDirectory() as td:
+    with tempfile.TemporaryDirectory(dir=os.path.dirname(os.path.abspath(out))) as td:   # next to the output: 4K pieces are big
         raw = os.path.join(td, "voice.wav")
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", str(SR), "-ac", "2", "-i", "-", raw], input=y.tobytes(), check=True)
         meas = subprocess.run(["ffmpeg", "-hide_banner", "-i", raw, "-af", "loudnorm=I=-15:TP=-1.5:LRA=11:print_format=json", "-f", "null", "-"],
@@ -68,12 +68,11 @@ def main(video, voice, words_json, out, sync, drops, gap=0.45, zoom=1.08):
                 p = os.path.join(td, f"p{i:03d}.mp4")
                 vf = f"scale=iw*{z}:ih*{z}:flags=lanczos,crop=iw/{z}:ih/{z}:(iw-iw/{z})/2:(ih-ih/{z})*0.35," if z != 1.0 else ""
                 subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{a:.3f}", "-i", video, "-t", f"{b - a:.3f}", "-an",
-                                "-vf", vf + "format=yuv420p", "-r", str(FPS), "-c:v", "libx264", "-preset", "medium", "-crf", "16",
+                                "-vf", vf + "format=yuv420p", "-r", str(FPS), "-c:v", "libx264", "-preset", "medium", "-crf", "18",
                                 "-video_track_timescale", "12800", p], check=True)
                 L.write(f"file '{p}'\n")
-        pic = os.path.join(td, "pic.mp4")
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", pic], check=True)
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", pic, "-i", raw, "-map", "0:v", "-map", "1:a", "-af", ln, "-c:v", "copy",
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-i", raw, "-map", "0:v", "-map", "1:a",
+                        "-af", ln, "-c:v", "copy",
                         "-c:a", "aac", "-b:a", "256k", "-shortest", "-movflags", "+faststart", out], check=True)
     json.dump(plan, open(out + ".cuts.json", "w"))
 
