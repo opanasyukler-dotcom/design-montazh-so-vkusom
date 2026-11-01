@@ -15,6 +15,8 @@ from toxicosis_reel import W, H, FPS, SR, CREAM, INK, BROWN, MAUVE, GREY, BLUSH,
 C = {"ink": INK, "cream": CREAM, "acc": BROWN, "mute": MAUVE, "blush": BLUSH, "grey": GREY}
 ON_INK = {"ink": CREAM, "acc": BLUSH, "mute": GREY}                        # the same roles on a dark scene
 TYPE_STEP = 0.034
+BASE_FRAME = None                 # optional: t → her talking video's frame (1080x1920 RGB), for BASE elements
+POST = None                       # optional: (frame, t) → draws on top of each finished frame (e.g. subtitles)
 SAFE = (60, 260, 950, 1480)       # what Instagram Reels leaves visible: header on top, like/comment column on the right, caption below
 
 # ---------- the montage: per scene a background and the elements that come in on the words ----------
@@ -310,6 +312,7 @@ def build(scenes, total, pics):
             elif kind == "STAMP":
                 el.img = T.stamp_img(o["text"]); el.o.update(x=540, anim="stamp"); events.append((t, "thud")); shakes.append(t)
             elif kind == "LINE": el.o["anim"] = "draw"
+            elif kind == "BASE": el.img = None; events.append((t, "whoosh" if o.get("mode") != "circle" else "pop")); els.append(el); continue
             elif kind == "ORBIT":
                 for i, nm in enumerate(o["names"]):
                     e = El("IMG", t + 0.12 * i, end, dict(src="icon:" + nm, h=o["h"], anim="pop", scene=k, orbit=(o["r"], i * 2 * math.pi / len(o["names"]), o["cy"])))
@@ -318,6 +321,31 @@ def build(scenes, total, pics):
             fit_safe(el)
             els.append(el)
     return els, events, shakes, glitches, keyt
+
+def base_el(fr, el, t, frame):
+    """her video inside the animation: «circle» (a round кружок), «shrink» (full frame → кружок), «card» (full frame → small card)"""
+    o = el.o; mode = o.get("mode", "circle"); u = t - el.t0; x, y = o["x"], o["y"]
+    fx, fy, zoom = o.get("fx", 0.5), o.get("fy", 0.4), o.get("zoom", 1.6)
+    if mode == "card": tw, th, rad = o["w"], o["h"], 40; side = None
+    else: tw = th = o["d"]; rad = o["d"] // 2; side = W / zoom
+    k = ease(u / 0.6) if mode in ("shrink", "card") else 1.0
+    if mode == "card": sx0, sy0, sw, sh = 0, 0, W, H                       # the whole picture, just smaller
+    else:
+        tx, ty = min(max(fx * W - side / 2, 0), W - side), min(max(fy * H - side / 2, 0), H - side)
+        sx0, sy0, sw, sh = tx * k, ty * k, W + (side - W) * k, H + (side - H) * k
+    dw, dh = W + (tw - W) * k, H + (th - H) * k; dx, dy = (x - tw / 2) * k, (y - th / 2) * k
+    if mode == "circle": s = ease_back(u / 0.3); dw, dh = tw * s, th * s; dx, dy = x - dw / 2, y - dh / 2
+    if t > el.t1: q = 1 - ease((t - el.t1) / 0.2); dw, dh = dw * q, dh * q; dx, dy = x - dw / 2, y - dh / 2
+    if dw < 4 or dh < 4: return
+    dy += 8 * math.sin(t * 2.2) * k
+    im = frame.crop((int(sx0), int(sy0), int(sx0 + sw), int(sy0 + sh))).resize((int(dw), int(dh)), Image.BILINEAR).convert("RGBA")
+    r = int(rad * k * min(dw / tw, 1)) if mode != "circle" else int(min(dw, dh) / 2)
+    if r > 0:
+        m = Image.new("L", im.size, 0); ImageDraw.Draw(m).rounded_rectangle((0, 0, im.width - 1, im.height - 1), radius=r, fill=255); im.putalpha(m)
+        ring = Image.new("RGBA", (im.width + 16, im.height + 16), (0, 0, 0, 0))
+        ImageDraw.Draw(ring).rounded_rectangle((0, 0, ring.width - 1, ring.height - 1), radius=r + 8, fill=CREAM + (255,)); ring.alpha_composite(im, (8, 8)); im = ring
+        dx -= 8; dy -= 8
+    paste(fr, im, int(dx), int(dy))
 
 _GRAD = {}
 def full_frame(fr, el, t, dark=False):
@@ -376,6 +404,9 @@ def render(scenes, total, pics, work):
         d = ImageDraw.Draw(fr)
         for el in els:
             if el.kind in ("FULL", "BGFULL"): continue
+            if el.kind == "BASE":
+                if el.o["scene"] == cur and el.t0 <= t <= el.t1 + 0.2 and BASE_FRAME: base_el(fr, el, t, BASE_FRAME(t))
+                continue
             if el.o["scene"] != cur or t < el.t0 or t > el.t1 + 0.2: continue
             o = el.o
             if el.kind == "LINE":                                          # dotted connector, drawn on
@@ -422,6 +453,7 @@ def render(scenes, total, pics, work):
         if wipe > 0: draw_bg(fr, MONTAGE[k]["bg"], int(H * (wipe / 0.22)))
         d.rounded_rectangle((60, 236, W - 60, 242), radius=3, fill=(200, 190, 180)); d.rounded_rectangle((60, 236, 60 + int((W - 120) * t / total), 242), radius=3, fill=BROWN)
         if os.environ.get("SAFE_GUIDE"): ImageDraw.Draw(fr).rectangle(SAFE, outline=(255, 0, 0), width=3)
+        if POST: POST(fr, t)
         img = np.asarray(fr.convert("RGB"))
         g = [s for s in glitches if 0 <= t - s < 0.35]
         if g:                                                              # colour split + torn slices
