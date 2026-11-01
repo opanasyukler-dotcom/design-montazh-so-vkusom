@@ -210,7 +210,7 @@ SCENES = [
     dict(num="2 / 5", head="Боржоми", text="Боржоми. Холодная минералка маленькими глотками. Но если от газировки становится хуже, лучше обычная вода.",
          beats=[(0.0, "spr", ("mineral", CX, CY, 500, "pop", "float", "вода")), ("холодн", "spr", ("snow", 800, 700, 200, "pop", "spin", "газир")),
                 ("глотк", "spr", ("drop", 300, 1150, 90, "pop", "float", "газир")), ("глотк", "spr", ("drop", 380, 1190, 70, "pop", "float", "газир", 0.15)),
-                ("глотк", "spr", ("drop", 450, 1150, 55, "pop", "float", "газир", 0.3)), ("газир", "sfx", ("fizz",)), ("хуже", "cross", (CX, CY, 380)),
+                ("глотк", "spr", ("drop", 450, 1150, 55, "pop", "float", "газир", 0.3)), ("газир", "sfx", ("fizz",)), ("хуже", "cross", (CX, CY, 380, "вода")),
                 ("вода", "spr", ("water", CX, CY, 440, "pop", "float")), ("вода", "spr", ("check", 790, 760, 200, "pop", "none"))]),
     dict(num="3 / 5", head="Кола", text="Кока-кола. Да-да, звучит странно, но некоторым помогает несколько глотков холодной колы. Только не стоит пить её литрами из-за сахара и кофеина.",
          beats=[(0.0, "spr", ("cola", CX, CY, 480, "pop", "float", "литрам")), ("кола", "sfx", ("fizz",)),
@@ -221,10 +221,10 @@ SCENES = [
          beats=[(0.0, "spr", ("pom", 340, CY, 380, "pop", "float")), ("цитрус", "spr", ("orange", 750, CY + 30, 340, "pop", "float")),
                 ("реакц", "chip", ("следи за реакцией", CX, 1270)), ("изжог", "spr", ("flame", CX, 690, 300, "pop", "wiggle")), ("изжог", "shake", ())]),
     dict(num="5 / 5", head="Дуоника", text="Дуоника. Если токсикоз сильный, не нужно просто терпеть. Можно обсудить с врачом препараты от тошноты, в том числе Дуонику. Самостоятельно начинать приём во время беременности не стоит.",
-         beats=[(0.0, "spr", ("blister", CX, CY, 480, "pop", "float")), ("терпеть", "chip", ("не нужно терпеть", CX, 1270)),
+         beats=[(0.0, "spr", ("blister", CX, CY, 480, "pop", "float")), ("терпеть", "chip", ("не нужно терпеть", CX, 1215)),
                 ("врач", "spr", ("med", 820, 700, 230, "pop", "pulse")), ("самостоят", "stamp", ("ТОЛЬКО С ВРАЧОМ",))]),
     dict(head="Маленькими порциями", text="Ещё мне кажется важным не заставлять себя есть большими порциями. Иногда проще перекусывать понемногу в течение дня, чем пытаться съесть полноценный обед.",
-         beats=[(0.0, "spr", ("plate", CX, CY, 520, "pop", "float", "перекус")), ("больш", "cross", (CX, CY, 420)),
+         beats=[(0.0, "spr", ("plate", CX, CY, 520, "pop", "float", "перекус")), ("больш", "cross", (CX, CY, 420, "перекус")),
                 ("перекус", "spr", ("plate", 230, 1000, 240, "pop", "float")), ("перекус", "spr", ("plate", 540, 1000, 240, "pop", "float", None, 0.2)),
                 ("перекус", "spr", ("plate", 850, 1000, 240, "pop", "float", None, 0.4)), ("дня", "spr", ("clock", CX, 690, 250, "pop", "none")),
                 ("дня", "spr", ("hands", CX, 690, 250, "pop", "spin")), ("обед", "chip", ("понемногу в течение дня", CX, 1290))]),
@@ -345,10 +345,11 @@ def build(scenes, total):
                 sprs.append(Spr(icon(name), x, y, size, t, t1, enter, motion, seed=len(sprs))); events.append((t, "pop"))
             elif kind == "chip":
                 text, x, y = args; sprs.append(Spr(chip_img(text), x, y, None, t, end, "pop", "none")); events.append((t, "pop"))
-            elif kind == "cross":
-                x, y, size = args; sprs.append(Spr(icon("cross"), x, y, size, t, end, "pop", "none")); events.append((t, "thud"))
+            elif kind == "cross":                                          # optional 4th arg: the word where it goes away
+                x, y, size, *u = args; sprs.append(Spr(icon("cross"), x, y, size, t, word_time(sc, u[0]) if u else end, "pop", "none"))
+                events.append((t, "thud"))
             elif kind == "stamp":
-                im = stamp_img(args[0]); sp = Spr(im, CX, 1260, None, t, end, "pop", "none"); sprs.append(sp); events.append((t, "thud")); shakes.append(t)
+                im = stamp_img(args[0]); sp = Spr(im, CX, 1355, None, t, end, "pop", "none"); sprs.append(sp); events.append((t, "thud")); shakes.append(t)
             elif kind == "shake": shakes.append(t); events.append((t, "shake"))
             elif kind == "sfx": events.append((t, args[0]))
             elif kind == "orbit":
@@ -360,10 +361,11 @@ def build(scenes, total):
 
 def caption_frames(scenes):
     """phrases of ≤ 3 words (≤ 22 letters), broken at punctuation; each word's own time span"""
-    out = []
+    out, cf = [], font(58, 700)
     for sc in scenes:
         cur = []
         for w in sc["words"]:
+            if cur and cf.getlength(" ".join(x[0] for x in cur + [w])) > 900: out.append(cur); cur = []   # never wider than the frame
             cur.append(w)
             if len(cur) >= 3 or len(" ".join(x[0] for x in cur)) >= 20 or re.search(r"[.,!?…—]$", w[0]): out.append(cur); cur = []
         if cur: out.append(cur)
@@ -382,8 +384,8 @@ def render(work, scenes, total, out_video):
     base = Image.new("RGBA", (W, H), CREAM + (255,))
     blobs = []
     for col, r in ((BLUSH, 380), (SKY, 420), (SAGE, 340)):
-        b = Image.new("RGBA", (r * 2, r * 2), (0, 0, 0, 0)); ImageDraw.Draw(b).ellipse((r * .2, r * .2, r * 1.8, r * 1.8), fill=col + (150,))
-        blobs.append(b.filter(ImageFilter.GaussianBlur(r * .25)))
+        a = Image.new("L", (r * 2, r * 2), 0); ImageDraw.Draw(a).ellipse((r * .3, r * .3, r * 1.7, r * 1.7), fill=150)
+        b = Image.new("RGBA", (r * 2, r * 2), col + (0,)); b.putalpha(a.filter(ImageFilter.GaussianBlur(r * .22))); blobs.append(b)
     keyt = []                                                              # typed headline clicks
     for sc in scenes:
         for i, c in enumerate(sc["head"]):
