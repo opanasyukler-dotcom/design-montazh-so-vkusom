@@ -81,29 +81,31 @@ def s1():
     top = H - 90 - sum(s for _, _, s in lines)
     if not NOTEXT: shadowed_text(lines, MARGIN, top, ly)
     shade = fade(top + 40, 380, 0.85) if not NOTEXT else np.zeros((H, 1, 1), np.float32)
-    # «наше до»: low on the left, above the text. The before body turns with her: front, then 3/4, then side (the
-    # clinic's before photos; 3/4 and side mirrored, she turns her right side to the camera here)
+    # «наше до»: low on the left, above the text: the before video (IMG_0713) in the circle, turning with her.
+    # Her angles: here front 0-4 s, side at 9 s, back at 13.5 s (abs 17.5 / 26.5 / 31 s of IMG_2047);
+    # in IMG_0713 front 9.6-10.4 s, side 16.7 s, back 21.5 s -> piecewise-linear time map
     D = 380; R = D // 2 + 6
-    views = [photo("IMG_9150.PNG").crop((115, 1255, 1115, 2255)),
-             ImageOps.mirror(photo("IMG_9151.PNG").crop((-45, 1255, 955, 2255))),
-             ImageOps.mirror(photo("IMG_9152.PNG").crop((170, 1255, 1170, 2255)))]
-    m = Image.new("L", (D, D), 0); ImageDraw.Draw(m).ellipse((0, 0, D - 1, D - 1), fill=255)
-    rings = []
-    for v in views:
-        c = Image.new("RGBA", (D + 12, D + 12), (0, 0, 0, 0)); ImageDraw.Draw(c).ellipse((0, 0, D + 11, D + 11), fill=WHITE + (255,))
-        ph = v.resize((D, D), Image.LANCZOS).convert("RGBA"); ph.putalpha(m); c.alpha_composite(ph, (6, 6))
-        rings.append(np.asarray(c, np.float32) / 255)
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", os.path.join(DRIVE, "IMG_0713.MOV"),
+                          "-vf", f"crop=2400:2400:-120:300,scale={D}:{D},fps={FPS}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                         capture_output=True).stdout
+    if not raw:                                             # crop larger than the frame: pad first
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", os.path.join(DRIVE, "IMG_0713.MOV"),
+                              "-vf", f"pad=2400:ih:120:0,crop=2400:2400:0:300,scale={D}:{D},fps={FPS}", "-f", "rawvideo",
+                              "-pix_fmt", "rgb24", "-"], capture_output=True).stdout
+    bvid = np.frombuffer(raw, np.uint8).reshape(-1, D, D, 3)
+    MAP = [(0.0, 9.6), (4.0, 10.4), (9.0, 16.7), (13.5, 21.5), (15.6, 23.6)]
+    ring = Image.new("RGBA", (D + 12, D + 12), (0, 0, 0, 0)); ImageDraw.Draw(ring).ellipse((0, 0, D + 11, D + 11), fill=WHITE + (255,))
+    ring = np.asarray(ring, np.float32) / 255
+    m = Image.new("L", (D, D), 0); ImageDraw.Draw(m).ellipse((0, 0, D - 1, D - 1), fill=255); m = np.asarray(m, np.float32)[..., None] / 255
     ccx, ccy = 40, (top - 64 - (D + 12)) if not NOTEXT else H - 120 - (D + 12)
     if not NOTEXT:
         f32 = mont(32, 300); shadowed_text([("наше до", f32, 44)], ccx + R - int(f32.getlength("наше до")) // 2, ccy + D + 18, ly)
-    TURN = [(4.3, 5.3, 0, 1), (8.0, 9.0, 1, 2)]           # seconds of this clip: front -> 3/4 (abs 22-23 s), 3/4 -> side (25.5-26.5 s)
 
     def ring_at(t):
-        k = 0
-        for a, b, i0, i1 in TURN:
-            if t >= b: k = i1
-            elif t > a: q = (t - a) / (b - a); return rings[i0] * (1 - q) + rings[i1] * q
-        return rings[k]
+        tb = np.interp(t, [a for a, _ in MAP], [b for _, b in MAP])
+        fr = bvid[min(int(tb * FPS), len(bvid) - 1)].astype(np.float32) / 255
+        out = ring.copy(); out[6:6 + D, 6:6 + D, :3] = out[6:6 + D, 6:6 + D, :3] * (1 - m) + fr * m
+        return out
     ov = np.asarray(ly, np.float32) / 255; oa = ov[..., 3:4]
     p = subprocess.Popen(["ffmpeg", "-v", "error", "-i", src, "-vf", f"scale={W}:{H}:flags=lanczos,fps={FPS}", "-f", "rawvideo",
                           "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE)
@@ -129,21 +131,37 @@ def s1():
 
 # ---------------- story 2: the thesis ----------------
 def s_thesis():
-    """the way to the dream began with this before: the before body on top, the autoimplant method in a few key words"""
-    hb = ImageFont.truetype(BOLD, 52); b = mont(32, 400); bm = mont(32, 600)
-    lines = [("ПУТЬ К МЕЧТЕ", hb, 62), ("НАЧАЛСЯ С ТАКОГО ДО", hb, 80),
-             ("Гигантомастия: от яремной вырезки до соска 32 см.", b, 56),
-             ("Уменьшение груди методом аутоимпланта", bm, 44), ("(метод Рибейро):", bm, 54),
-             ("из собственных тканей нижней части груди", b, 42), ("формируем «аутоимплант» и поднимаем его вверх.", b, 42),
-             ("Он наполняет верхний полюс и держит форму,", b, 42), ("красивый объём без силиконового импланта.", b, 54),
-             ("Сосок с ареолой выше, форма симметричная,", b, 42), ("ткани сохраняем по максимуму.", b, 42)]
-    top = H - 80 - sum(s for _, _, s in lines)
-    body = photo("IMG_9150.PNG").crop((115, 1255, 1115, 2343))                 # the before: neck to the stockings
-    ah = top - 60 - 60; sc = ah / body.height; body = body.resize((int(body.width * sc), ah), Image.LANCZOS)
-    cv = Image.new("RGB", (W, H), (0, 0, 0)); cv.paste(body, ((W - body.width) // 2, 60)); cv = cv.convert("RGBA")
+    """the surgeon at the marking (her own words: gigantomastia, 32 cm, the Ribeiro / autoimplant method) with the thesis
+    low under the usual fade; the clinic's word captions of that video stay"""
+    src = os.path.join(DRIVE, "surgeon_crop.mp4"); out = os.path.join(OUT, "02_put_k_mechte.mp4"); tmp = out + ".v.mp4"
+    dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", src],
+                               capture_output=True, text=True).stdout)
+    hb = ImageFont.truetype(BOLD, 52); b = mont(31, 400); bm = mont(31, 600)
+    lines = [("ПУТЬ К МЕЧТЕ", hb, 62), ("НАЧАЛСЯ С ТАКОГО ДО", hb, 78),
+             ("Гигантомастия: от яремной вырезки до соска 32 см.", b, 54),
+             ("Уменьшение груди методом аутоимпланта", bm, 42), ("(метод Рибейро):", bm, 52),
+             ("из собственных тканей нижней части груди", b, 41), ("формируем «аутоимплант» и поднимаем его вверх.", b, 41),
+             ("Он наполняет верхний полюс и держит форму,", b, 41), ("красивый объём без силиконового импланта.", b, 52),
+             ("Сосок с ареолой выше, форма симметричная,", b, 41), ("ткани сохраняем по максимуму.", b, 41)]
+    top = H - 70 - sum(s for _, _, s in lines)
     ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); shadowed_text(lines, MARGIN, top, ly)
-    p_ = pill("наше до", 28); ly.alpha_composite(p_, ((W - body.width) // 2 + 24, 84))
-    cv.alpha_composite(ly); out = os.path.join(OUT, "02_put_k_mechte.jpg"); cv.convert("RGB").save(out, quality=94); print("wrote", out)
+    ov = np.asarray(ly, np.float32) / 255; oa = ov[..., 3:4]; shade = fade(top + 40, 420, 0.88)
+    p = subprocess.Popen(["ffmpeg", "-v", "error", "-i", src, "-vf", f"scale={W}:{H},fps={FPS}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                         stdout=subprocess.PIPE)
+    enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
+                            "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", tmp], stdin=subprocess.PIPE)
+    last = None
+    for i in range(int(round(dur * FPS))):
+        bb = p.stdout.read(W * H * 3)
+        if len(bb) == W * H * 3: last = np.frombuffer(bb, np.uint8).reshape(H, W, 3)
+        fr = last.astype(np.float32) / 255 * (1 - shade); fr = fr * (1 - oa) + ov[..., :3] * oa
+        o = (fr * 255).astype(np.uint8); enc.stdin.write(o.tobytes())
+        if i == int(6 * FPS): Image.fromarray(o).save(out[:-4] + ".jpg", quality=90)
+    p.kill(); enc.stdin.close(); enc.wait()
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", tmp, "-i", src, "-map", "0:v", "-map", "1:a", "-c:v", "copy",
+                    "-af", f"loudnorm=I=-16:TP=-1.5,afade=t=out:st={dur - 0.4:.2f}:d=0.4", "-c:a", "aac", "-b:a", "160k",
+                    "-shortest", "-movflags", "+faststart", out], check=True)
+    os.remove(tmp); print("wrote", out, flush=True)
 
 
 # ---------------- story 3 ----------------
@@ -156,7 +174,7 @@ def fit_band(img, area=AREA):
     cv = Image.new("RGB", (W, H), (0, 0, 0)); cv.paste(im, ((W - im.width) // 2, area[0])); return np.asarray(cv, np.float32) / 255
 
 
-BODY = (110, 1663)            # the before / after bodies large: neck to mid-thigh across the whole width; button room below
+BODY = (0, H)                 # the before / after bodies on the whole screen: neck down to the knees
 
 
 def month_collage(after_name, after_crop, week_name):
@@ -184,8 +202,13 @@ def s2():
     out = os.path.join(OUT, f"03_do_posle{SUF}.mp4"); tmp = out + ".v.mp4"
     # same framing for both: neck to fingertips (before: neck 1270 .. fingertips 2190 in IMG_9150;
     # after: neck 70 .. fingertips 1540 in IMG_2029 -> scale 0.626), body centred
-    before = fit_band(photo("IMG_9150.PNG").crop((235, 1250, 995, 2343)), BODY)        # all of the before photo, arms in
-    after = fit_band(on_black("IMG_2029.JPG").crop((183, 38, 1397, 1784)), BODY)        # the same framing /0.626
+    # before: the frontal frame of the before video (IMG_0713 at 10.0 s: neck 384, fingertips 2750, axis x 1080), from
+    # under the chin to the bottom of the frame (the knees); after: IMG_2029 (neck 70, fingertips 1540, axis 790) at /1.61
+    fb = subprocess.run(["ffmpeg", "-v", "error", "-ss", "10.0", "-i", os.path.join(DRIVE, "IMG_0713.MOV"), "-frames:v", "1",
+                         "-f", "image2pipe", "-vcodec", "png", "-"], capture_output=True).stdout
+    import io
+    before = fit_band(Image.open(io.BytesIO(fb)).convert("RGB").crop((93, 330, 2067, 3840)), BODY)
+    after = fit_band(photo("IMG_2029.JPG").crop((177, 37, 1403, 2217)), BODY)
     labs = {k: np.asarray(pill(k, 30), np.float32) / 255 for k in ["до", "после"]}
     week = [photo(n) for n in ["IMG_9150.PNG", "IMG_9151.PNG", "IMG_9152.PNG"]]
     month = [month_collage("IMG_2029.JPG", (78, 60, 1502, 1500), "IMG_9150.PNG"),
@@ -208,13 +231,13 @@ def s2():
             xs = int(W * p)                                       # the slider moves left -> right, the after takes over
             fr = before.copy(); fr[:, :xs] = after[:, :xs]
             if 0 < p < 1:                                         # the handle: thin white line + a ring with arrows
-                fr[BODY[0]:BODY[1], max(xs - 2, 0):xs + 2] = 1.0
+                fr[BODY[0]:BODY[1], max(xs - 2, 0):xs + 2] = 1.0              # the slider line, top to bottom
                 ring = Image.new("RGBA", (84, 84), (0, 0, 0, 0)); d = ImageDraw.Draw(ring)
                 d.ellipse((2, 2, 81, 81), outline=WHITE + (255,), width=4, fill=(0, 0, 0, 90))
                 d.polygon([(30, 42), (40, 32), (40, 52)], fill=WHITE + (255,)); d.polygon([(54, 42), (44, 32), (44, 52)], fill=WHITE + (255,))
                 blit(fr, np.asarray(ring, np.float32) / 255, min(max(xs - 42, 0), W - 84), (BODY[0] + BODY[1]) // 2 - 42)
-            if p < 1 and not NOTEXT: blit(fr, labs["до"], W - 40 - labs["до"].shape[1], BODY[0] + 24)
-            if p > 0 and not NOTEXT: blit(fr, labs["после"], 40, BODY[0] + 24)
+            if p < 1 and not NOTEXT: blit(fr, labs["до"], W - 40 - labs["до"].shape[1], BODY[0] + 60)
+            if p > 0 and not NOTEXT: blit(fr, labs["после"], 40, BODY[0] + 60)
         else:
             tc = t - (T_B + T_S + T_A); k = min(int(tc // T_C), len(slides) - 1); lt = tc - k * T_C
             fr = slides[k].copy()
