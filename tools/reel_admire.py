@@ -303,14 +303,15 @@ def put_sticker(img, cx, cy, r):
     else: reg *= 1 - sh; reg *= 1 - a; reg += c * a
 
 # ---------- faces: soft, heavy blur on the tracked face box ----------
-def blur_face(img, box, grow=1.85):
+def blur_face(img, box, grow=1.3):
     x, y, w, h = box; cx, cy = x + w / 2, y + h / 2 - 0.05 * h; rx, ry = w * grow / 2, h * grow / 2
-    x0, y0, x1, y1 = int(max(0, cx - rx - 20)), int(max(0, cy - ry - 20)), int(min(W, cx + rx + 20)), int(min(H, cy + ry + 20))
+    x0, y0, x1, y1 = int(max(0, cx - rx * 1.2)), int(max(0, cy - ry * 1.2)), int(min(W, cx + rx * 1.2)), int(min(H, cy + ry * 1.2))
     reg = img[y0:y1, x0:x1]
-    small = cv2.resize(reg, (max(2, reg.shape[1] // 32), max(2, reg.shape[0] // 32)), interpolation=cv2.INTER_AREA)
-    bl = cv2.resize(cv2.GaussianBlur(small, (0, 0), 3), (reg.shape[1], reg.shape[0]), interpolation=cv2.INTER_LINEAR)
+    small = cv2.resize(reg, (max(2, reg.shape[1] // 16), max(2, reg.shape[0] // 16)), interpolation=cv2.INTER_AREA)
+    bl = cv2.resize(cv2.GaussianBlur(small, (0, 0), 2), (reg.shape[1], reg.shape[0]), interpolation=cv2.INTER_LINEAR)
     yy_, xx_ = np.mgrid[y0:y1, x0:x1]; d = ((xx_ - cx) / rx) ** 2 + ((yy_ - cy) / ry) ** 2
-    m = np.clip((1.25 - d) / 0.25, 0, 1)[..., None]; out = img.copy(); out[y0:y1, x0:x1] = (reg * (1 - m) + bl * m).astype(img.dtype); return out
+    m = (np.clip((1.3 - d) / 0.75, 0, 1) ** 1.5)[..., None]                                 # wide soft edge
+    out = img.copy(); out[y0:y1, x0:x1] = (reg * (1 - m) + bl * m).astype(img.dtype); return out
 def interview(k, src_t):
     i = int(round(src_t * FPS)); f = V[k].at(src_t); return blur_face(f, FACES[k][min(max(i, 0), len(FACES[k]) - 1)])
 def anon_top(img, y=150):
@@ -539,27 +540,37 @@ def up_arrow(fr, t, t0, x=860, y=1080):
     path_draw(fr, [(x, y + 60), (x, yy0)], 1, PINK, 9); fill_poly(fr, [(x - 26, yy0 + 18), (x + 26, yy0 + 18), (x, yy0 - 18)], PINK, min(1, p * 2))
 
 # ---------------- scenes ----------------
-# A — opening: ДО → ПОСЛЕ slider (both cut out onto navy, aligned by neck and navel) under her line «наступил…»
-HA = lift(Drop(["НАСТУПИЛ ПЕРИОД", "*ЛЮБОВАНИЯ СОБОЙ*"], 116, 70, 0, maxw=860), 1255)
+# A — opening: ДО → ПОСЛЕ slider on the full photos (their own backdrop, nothing cut), aligned by neck and navel
+HA = Drop(["НАСТУПИЛ ПЕРИОД", "*ЛЮБОВАНИЯ СОБОЙ*"], 104, 70, 300, maxw=860)
 TA = Track(["больше месяца после операции"], 32, 72, 0, 300)
 SL_B = SL_A = None; T_SW = (0.55, 1.75)
+def full_aligned(n, neck_at=225, span=1100):
+    """the whole photo scaled DOWN so neck→navel = `span`, neck at `neck_at`, body centred; any uncovered strip takes the photo's backdrop"""
+    im = PH[n]; neck, navel = BODY[n]; s = span / (navel - neck)
+    a = cv2.imread(os.path.join(CUT, f"m_{n}.png"), 0).astype(np.float32) / 255; band = a[neck:navel]
+    cx = float((band.sum(0) * np.arange(a.shape[1])).sum() / max(1, band.sum()))
+    r = cv2.resize(im, None, fx=s, fy=s, interpolation=cv2.INTER_AREA); bgc = np.median(np.concatenate([r[:40, :40].reshape(-1, 3), r[:40, -40:].reshape(-1, 3)]), 0)
+    out = np.zeros((H, W, 3), np.float32) + bgc; ox, oy = int(cx * s - W / 2), int(neck * s - neck_at)
+    xs0, ys0 = max(0, ox), max(0, oy); xs1, ys1 = min(r.shape[1], ox + W), min(r.shape[0], oy + H)
+    out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = r[ys0:ys1, xs0:xs1]
+    if ys0 - oy > 0:                                                        # a strip above the photo: soft hand-over to its backdrop
+        k = ys0 - oy; g = np.clip((np.arange(k + 60) - k) / 60, 0, 1)[:, None, None]; out[:k + 60] = out[:k + 60] * g + bgc * (1 - g)
+    return out / 255
 def s_a(t):
     global SL_B, SL_A
-    if SL_B is None:
-        SL_B = panel("p2", W, H, 320, 760); SL_A = panel("IMG_9145", W, H, 320, 760)
-        g = (np.clip((yy[:, :1] - 1080) / 230, 0, 1) ** 1.2)[..., None]; bgc = SL_B[-1:].mean(1, keepdims=True)
-        SL_B = SL_B * (1 - g) + bgc * g; SL_A = SL_A * (1 - g) + bgc * g                     # both fade out at the hips
+    if SL_B is None: SL_B = anon_top((full_aligned("p2") * 255).astype(np.uint8), 200).astype(np.float32) / 255; SL_A = full_aligned("IMG_9145")
     z = lerp(1.04, 1.0, eo(t / 3.0)); xd = int(W * (1 - eio((t - T_SW[0]) / (T_SW[1] - T_SW[0]))))
     fr = SL_B.copy(); fr[:, xd:] = SL_A[:, xd:]
-    if z != 1: fr = cv2.warpAffine(fr, np.float32([[z, 0, 540 * (1 - z)], [0, z, 760 * (1 - z)]]), (W, H), borderMode=cv2.BORDER_REPLICATE)
+    if z != 1: fr = cv2.warpAffine(fr, np.float32([[z, 0, 540 * (1 - z)], [0, z, 900 * (1 - z)]]), (W, H), borderMode=cv2.BORDER_REPLICATE)
+    shade(fr, ((1 - ramp(250, 640)) * 0.6).astype(np.float32)); shade(fr, (ramp(1330, 1560) * 0.6).astype(np.float32))   # light, only where the text sits
     if 0 < xd < W:
         fr[:, max(0, xd - 3):xd + 3] = PINK
-        m = np.zeros((H, W), np.uint8); cv2.circle(m, (xd, 760), 32, 255, -1, cv2.LINE_AA); blend(fr, m.astype(np.float32) / 255, 0, 0, PINK)
-        ar = alpha_img("‹ ›", mont(34, 600)); blend(fr, ar, xd - ar.shape[1] / 2, 760 - ar.shape[0] / 2 - 2, NAVY)
-    chip(fr, "ДО", 40, 300, cl((xd - 200) / 100)); chip(fr, "ПОСЛЕ", 40, 300, cl((160 - xd) / 100))
+        m = np.zeros((H, W), np.uint8); cv2.circle(m, (xd, 900), 32, 255, -1, cv2.LINE_AA); blend(fr, m.astype(np.float32) / 255, 0, 0, PINK)
+        ar = alpha_img("‹ ›", mont(34, 600)); blend(fr, ar, xd - ar.shape[1] / 2, 900 - ar.shape[0] / 2 - 2, NAVY)
+    chip(fr, "ДО", 40, 1300, cl((xd - 200) / 100)); chip(fr, "ПОСЛЕ", 40, 1300, cl((160 - xd) / 100))
     if t > T_SW[1]:
-        for k, (x, y) in enumerate([(330, 600), (780, 640), (560, 470)]): sparkle(fr, x, y, 26, t, T_SW[1] + 0.2 + 0.18 * k)
-    HA.draw(fr, t, 0.1); TA.y = HA.y + HA.h + 40 + TA.top; TA.draw(fr, t, 0.8)
+        for k, (x, y) in enumerate([(330, 760), (780, 800), (560, 640)]): sparkle(fr, x, y, 26, t, T_SW[1] + 0.2 + 0.18 * k)
+    HA.draw(fr, t, 0.1); TA.y = HA.y + HA.h + 36 + TA.top; TA.draw(fr, t, 0.8)
     return fr
 
 # B — back to ДО: «состояние, кожа, тело. хочется быть красивой»
