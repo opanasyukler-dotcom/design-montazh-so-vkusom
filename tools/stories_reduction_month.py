@@ -72,7 +72,7 @@ def s1():
                                capture_output=True, text=True).stdout)
     ly = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     # «наше до»: the before body (chest to hips) in a circle, top right; thin caption under it
-    D = 400; ph = photo("IMG_9150.PNG").crop((215, 1290, 1005, 2080)).resize((D, D), Image.LANCZOS)
+    D = 400; ph = photo("IMG_9150.PNG").crop((255, 1310, 975, 2030)).resize((D, D), Image.LANCZOS)   # square on the body axis (x 615)
     circ = Image.new("RGBA", (D + 12, D + 12), (0, 0, 0, 0)); ImageDraw.Draw(circ).ellipse((0, 0, D + 11, D + 11), fill=WHITE + (255,))
     m = Image.new("L", (D, D), 0); ImageDraw.Draw(m).ellipse((0, 0, D - 1, D - 1), fill=255); ph = ph.convert("RGBA"); ph.putalpha(m)
     circ.alpha_composite(ph, (6, 6)); cx, cy = W - 40 - circ.width, 110; ly.alpha_composite(circ, (cx, cy))
@@ -106,10 +106,13 @@ def s1():
 AREA = (150, 1650)            # picture band; under it (1650..1920) the free room for the consultation button
 
 
-def fit_band(img):
+def fit_band(img, area=AREA):
     """an image on black scaled into the picture band, centred"""
-    h = AREA[1] - AREA[0]; s = h / img.height; im = img.resize((int(img.width * s), h), Image.LANCZOS)
-    cv = Image.new("RGB", (W, H), (0, 0, 0)); cv.paste(im, ((W - im.width) // 2, AREA[0])); return np.asarray(cv, np.float32) / 255
+    h = area[1] - area[0]; s = h / img.height; im = img.resize((int(img.width * s), h), Image.LANCZOS)
+    cv = Image.new("RGB", (W, H), (0, 0, 0)); cv.paste(im, ((W - im.width) // 2, area[0])); return np.asarray(cv, np.float32) / 255
+
+
+BODY = (330, 1480)            # the before / after bodies a bit further away: neck to fingertips with room around
 
 
 def month_collage(after_name, after_crop, week_name):
@@ -117,13 +120,19 @@ def month_collage(after_name, after_crop, week_name):
     before half below (copied from the one-week collage)"""
     wk = photo(week_name); cw, ch = wk.size
     cv = Image.new("RGB", (cw, ch), (0, 0, 0))
-    a = on_black(after_name).crop(after_crop); s = 1150 / a.height; a = a.resize((int(a.width * s), 1150), Image.LANCZOS)
-    if a.width > cw: a = a.crop(((a.width - cw) // 2, 0, (a.width - cw) // 2 + cw, 1150))
+    TOP = 1095                                    # the after photo ends above the caption, as on the clinic's collages
+    a = on_black(after_name).crop(after_crop); s = TOP / a.height; a = a.resize((int(a.width * s), TOP), Image.LANCZOS)
+    if a.width > cw: a = a.crop(((a.width - cw) // 2, 0, (a.width - cw) // 2 + cw, TOP))
     cv.paste(a, ((cw - a.width) // 2, 0))
     cv.paste(wk.crop((0, 1255, cw, ch)), (0, 1255))
-    d = ImageDraw.Draw(cv); f = mont(46, 600)
-    for k, t in enumerate(["Результат спустя", "месяц после операции"]):
-        d.text((cw / 2, 1172 + k * 56), t, font=f, fill=WHITE, anchor="mm")
+    # caption in the clinic's own type (Inter SemiBold): size and line centres measured on that one-week collage
+    a = np.asarray(wk).astype(int); spans = []
+    for r0, r1 in [(1105, 1172), (1176, 1250)]:
+        ys, xs = np.nonzero(a[r0:r1].min(2) > 225); spans.append(((xs.min() + xs.max()) / 2, r0 + (ys.min() + ys.max()) / 2, xs.max() - xs.min()))
+    f = ImageFont.truetype("/usr/share/fonts/opentype/inter/Inter-SemiBold.otf", round(60 * spans[0][2] / 517))
+    d = ImageDraw.Draw(cv)
+    for (cx, cy, _), t in zip(spans, ["Результат спустя", "месяц после операции"]):
+        d.text((cx, cy), t, font=f, fill=WHITE, anchor="mm")
     return cv
 
 
@@ -131,8 +140,8 @@ def s2():
     out = os.path.join(OUT, "02_do_posle.mp4"); tmp = out + ".v.mp4"
     # same framing for both: neck to fingertips (before: neck 1270 .. fingertips 2190 in IMG_9150;
     # after: neck 70 .. fingertips 1540 in IMG_2029 -> scale 0.626), body centred
-    before = fit_band(photo("IMG_9150.PNG").crop((254, 1245, 967, 2235)))
-    after = fit_band(on_black("IMG_2029.JPG").crop((220, 30, 1359, 1611)))
+    before = fit_band(photo("IMG_9150.PNG").crop((150, 1245, 1080, 2235)), BODY)        # 930 x 990 around the body
+    after = fit_band(on_black("IMG_2029.JPG").crop((47, 30, 1533, 1611)), BODY)        # the same /0.626
     labs = {k: np.asarray(pill(k, 30), np.float32) / 255 for k in ["до", "после"]}
     week = [photo(n) for n in ["IMG_9150.PNG", "IMG_9151.PNG", "IMG_9152.PNG"]]
     month = [month_collage("IMG_2029.JPG", (78, 60, 1502, 1500), "IMG_9150.PNG"),
@@ -155,13 +164,13 @@ def s2():
             xs = int(W * p)                                       # the slider moves left -> right, the after takes over
             fr = before.copy(); fr[:, :xs] = after[:, :xs]
             if 0 < p < 1:                                         # the handle: thin white line + a ring with arrows
-                fr[AREA[0]:AREA[1], max(xs - 2, 0):xs + 2] = 1.0
+                fr[BODY[0]:BODY[1], max(xs - 2, 0):xs + 2] = 1.0
                 ring = Image.new("RGBA", (84, 84), (0, 0, 0, 0)); d = ImageDraw.Draw(ring)
                 d.ellipse((2, 2, 81, 81), outline=WHITE + (255,), width=4, fill=(0, 0, 0, 90))
                 d.polygon([(30, 42), (40, 32), (40, 52)], fill=WHITE + (255,)); d.polygon([(54, 42), (44, 32), (44, 52)], fill=WHITE + (255,))
-                blit(fr, np.asarray(ring, np.float32) / 255, min(max(xs - 42, 0), W - 84), (AREA[0] + AREA[1]) // 2 - 42)
-            if p < 1: blit(fr, labs["до"], W - 40 - labs["до"].shape[1], AREA[0] + 24)
-            if p > 0: blit(fr, labs["после"], 40, AREA[0] + 24)
+                blit(fr, np.asarray(ring, np.float32) / 255, min(max(xs - 42, 0), W - 84), (BODY[0] + BODY[1]) // 2 - 42)
+            if p < 1: blit(fr, labs["до"], W - 40 - labs["до"].shape[1], BODY[0] - 70)
+            if p > 0: blit(fr, labs["после"], 40, BODY[0] - 70)
         else:
             tc = t - (T_B + T_S + T_A); k = min(int(tc // T_C), len(slides) - 1); lt = tc - k * T_C
             fr = slides[k].copy()
