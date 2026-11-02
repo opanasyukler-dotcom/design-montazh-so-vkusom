@@ -315,8 +315,8 @@ def lift(hd, bottom=1230):
     hd.y = bottom - hd.h; return hd
 
 # ---------------- building blocks ----------------
-def SUR(t): return V["15"].at(src_of(t, "15"))
-FACE = (560, 760); CC, CR, CS = (540, 560), 280, 0.737                 # face in the take; circle centre, radius, scale (a down-scale)
+def SUR(t): return np.ascontiguousarray(V["15"].at(src_of(t, "15"))[:, ::-1])   # the take mirrored left ↔ right
+FACE = (520, 760); CC, CR, CS = (540, 560), 280, 0.737                 # face in the take; circle centre, radius, scale (a down-scale)
 def ring(fr, cx, cy, r, op=1.0, th=5):
     path_draw(fr, [(cx + r * np.cos(a), cy + r * np.sin(a)) for a in np.linspace(0, 2 * np.pi, 120)], 1, PINK, th, op=op)
 _rng = np.random.default_rng(5); DOTS = [(_rng.uniform(60, 1020), _rng.uniform(0, 1920), _rng.uniform(2, 6), _rng.uniform(20, 60)) for _ in range(22)]
