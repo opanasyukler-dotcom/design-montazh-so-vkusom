@@ -72,7 +72,7 @@ def s1():
                                capture_output=True, text=True).stdout)
     ly = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     # «наше до»: the before body (chest to hips) in a circle, top right; thin caption under it
-    D = 400; ph = photo("IMG_9150.PNG").crop((255, 1310, 975, 2030)).resize((D, D), Image.LANCZOS)   # square on the body axis (x 615)
+    D = 400; ph = photo("IMG_9150.PNG").crop((115, 1255, 1115, 2255)).resize((D, D), Image.LANCZOS)   # neck to thighs, arms in, on the body axis (x 615)
     circ = Image.new("RGBA", (D + 12, D + 12), (0, 0, 0, 0)); ImageDraw.Draw(circ).ellipse((0, 0, D + 11, D + 11), fill=WHITE + (255,))
     m = Image.new("L", (D, D), 0); ImageDraw.Draw(m).ellipse((0, 0, D - 1, D - 1), fill=255); ph = ph.convert("RGBA"); ph.putalpha(m)
     circ.alpha_composite(ph, (6, 6)); cx, cy = W - 40 - circ.width, 110; ly.alpha_composite(circ, (cx, cy))
