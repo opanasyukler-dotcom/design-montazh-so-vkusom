@@ -63,6 +63,15 @@ def fade(top, length=360, a=0.85):
     return (a * p)[:, None, None]
 
 
+def warm(img, da=4.0, db=9.0, dl=2.0):
+    """a little warmth on the skin: a/b towards peach on warm pixels only (the background and briefs keep their colour)"""
+    lab = cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2LAB).astype(np.float32)
+    m = np.clip((lab[..., 2] - 128) / 8, 0, 1) * np.clip((lab[..., 0] - 50) / 40, 0, 1)
+    m = cv2.GaussianBlur(m, (0, 0), 2)
+    lab[..., 0] += dl * m; lab[..., 1] += da * m; lab[..., 2] += db * m
+    return Image.fromarray(cv2.cvtColor(lab.clip(0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB))
+
+
 def on_black(name):
     """the one-month photo cut out onto black (rembg mask), like the clinic's own photos"""
     im = np.asarray(photo(name), np.float32); m = np.asarray(Image.open(os.path.join(DRIVE, name + ".mask.png")).convert("L"), np.float32) / 255
@@ -77,7 +86,8 @@ def s1():
     ly = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     # the quote and what it is, low under the usual fade
     hb, bb = ImageFont.truetype(BOLD, 64), mont(38, 500); sm = mont(34, 400)
-    lines = [("«КАК Я И ХОТЕЛА", hb, 76), ("ОДИН В ОДИН»", hb, 92), ("результат спустя МЕСЯЦ", bb, 52), ("после редукции (аутоимплант)", sm, 46)]
+    lines = [("«КАК Я И ХОТЕЛА", hb, 76), ("ОДИН В ОДИН»", hb, 92), ("результат спустя МЕСЯЦ", bb, 52),
+             ("была выполнена операция по уменьшению", sm, 44), ("груди методом аутоимпланта", sm, 46)]
     top = H - 90 - sum(s for _, _, s in lines)
     if not NOTEXT: shadowed_text(lines, MARGIN, top, ly)
     shade = fade(top + 40, 380, 0.85) if not NOTEXT else np.zeros((H, 1, 1), np.float32)
@@ -138,11 +148,9 @@ def s_thesis():
                                capture_output=True, text=True).stdout)
     hb = ImageFont.truetype(BOLD, 52); b = mont(31, 400); bm = mont(31, 600)
     lines = [("ПУТЬ К МЕЧТЕ", hb, 62), ("НАЧАЛСЯ С ТАКОГО ДО", hb, 78),
-             ("Гигантомастия: от яремной вырезки до соска 32 см.", b, 54),
              ("Уменьшение груди методом аутоимпланта", bm, 42), ("(метод Рибейро):", bm, 52),
              ("из собственных тканей нижней части груди", b, 41), ("формируем «аутоимплант» и поднимаем его вверх.", b, 41),
-             ("Он наполняет верхний полюс и держит форму,", b, 41), ("красивый объём без силиконового импланта.", b, 52),
-             ("Сосок с ареолой выше, форма симметричная,", b, 41), ("ткани сохраняем по максимуму.", b, 41)]
+             ("Он наполняет верхний полюс и держит форму,", b, 41), ("красивый объём без силиконового импланта.", b, 41)]
     top = H - 70 - sum(s for _, _, s in lines)
     ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); shadowed_text(lines, MARGIN, top, ly)
     ov = np.asarray(ly, np.float32) / 255; oa = ov[..., 3:4]; shade = fade(top + 40, 420, 0.88)
@@ -183,7 +191,7 @@ def month_collage(after_name, after_crop, week_name):
     wk = photo(week_name); cw, ch = wk.size
     cv = Image.new("RGB", (cw, ch), (0, 0, 0))
     TOP = 1095                                    # the after photo ends above the caption, as on the clinic's collages
-    a = on_black(after_name).crop(after_crop); s = TOP / a.height; a = a.resize((int(a.width * s), TOP), Image.LANCZOS)
+    a = warm(on_black(after_name)).crop(after_crop); s = TOP / a.height; a = a.resize((int(a.width * s), TOP), Image.LANCZOS)
     if a.width > cw: a = a.crop(((a.width - cw) // 2, 0, (a.width - cw) // 2 + cw, TOP))
     cv.paste(a, ((cw - a.width) // 2, 0))
     cv.paste(wk.crop((0, 1255, cw, ch)), (0, 1255))
@@ -208,14 +216,13 @@ def s2():
                          "-f", "image2pipe", "-vcodec", "png", "-"], capture_output=True).stdout
     import io
     before = fit_band(Image.open(io.BytesIO(fb)).convert("RGB").crop((93, 330, 2067, 3840)), BODY)
-    after = fit_band(photo("IMG_2029.JPG").crop((177, 37, 1403, 2217)), BODY)
+    after = fit_band(warm(photo("IMG_2029.JPG")).crop((177, 37, 1403, 2217)), BODY)
     labs = {k: np.asarray(pill(k, 30), np.float32) / 255 for k in ["до", "после"]}
-    week = [photo(n) for n in ["IMG_9150.PNG", "IMG_9151.PNG", "IMG_9152.PNG"]]
     month = [month_collage("IMG_2029.JPG", (78, 60, 1502, 1500), "IMG_9150.PNG"),
              month_collage("IMG_2045.JPG", (40, 190, 1480, 1630), "IMG_9151.PNG"),
              month_collage("IMG_2042.JPG", (0, 130, 1440, 1570), "IMG_9152.PNG")]
     for i, im in enumerate(month): im.save(os.path.join(OUT, f"kollazh_mesyac_{i + 1}.jpg"), quality=94)
-    slides = [fit_band(im, (0, H)) for im in week + month]                          # the collages on the whole screen
+    slides = [fit_band(im, (0, H)) for im in month]                                 # only the one-month collages, whole screen                          # the collages on the whole screen
 
     def blit(fr, a, x, y, k=1.0):
         h, w = a.shape[:2]; al = a[..., 3:4] * k; fr[y:y + h, x:x + w] = fr[y:y + h, x:x + w] * (1 - al) + a[..., :3] * al
