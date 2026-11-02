@@ -23,8 +23,8 @@ SRC = os.environ.get("REEL_SRC", os.path.join(ROOT, "dl_admire"))
 WORK = os.path.join(SRC, "_work"); CUT = os.path.join(SRC, "_cut")
 NAME = "Reels_admire_yourself"
 W, H, FPS, SR = 1080, 1920, 30, 48000
-NAVY = np.float32([0, 18, 58]) / 255; PINK = np.float32([233, 197, 193]) / 255; WHITE = np.float32([1, 1, 1])
-DEEP = np.float32([0, 8, 30]) / 255
+NAVY = np.float32([0, 12, 40]) / 255; PINK = np.float32([233, 197, 193]) / 255; WHITE = np.float32([1, 1, 1])
+DEEP = np.float32([0, 5, 20]) / 255
 
 def cl(x): return min(1.0, max(0.0, x))
 def eo(x): x = cl(x); return 1 - (1 - x) ** 3
@@ -68,7 +68,7 @@ def vsrc(b, t):
 T_S = {b: vstart(b) - 0.1 for b, *_ in VO}
 T_H2 = TB("H", 9.06) - 0.05                                                # «наступил…»: ПОСЛЕ
 T_K = [vend("H") + 0.4 + 1.8 * k for k in range(3)]                        # three collages, 1.8 s each, shutter on every cut
-T_Z = T_K[-1] + 1.9; DUR = T_Z + 3.1
+T_Z = T_K[-1] + 2.6; DUR = T_Z
 
 # ---------------- fonts & text bitmaps ----------------
 FD = os.path.join(ROOT, "fonts"); _FC = {}
@@ -280,22 +280,13 @@ FACES = {k: np.array(json.load(open(os.path.join(WORK, f"{k}_faces.json")))) for
 PASTIES = np.array(json.load(open(os.path.join(WORK, "v19_pasties.json"))))
 
 # ---------- brand sticker over the nipples (small: just over the nipple / the pasty) ----------
-_lg_icon = None
+_STK = None
 def sticker_rgba(r):
-    """navy disc with a thin inner ring and the logo mark, drawn at 3x and scaled down; float RGBA (2r+8 square)"""
-    global _lg_icon
-    if _lg_icon is None: _lg_icon = _lg[:, :_split]
-    k = 3; R = int(r * k); sz = 2 * R + 8 * k; c = sz / 2
-    im = np.zeros((sz, sz, 4), np.float32); a = np.zeros((sz, sz), np.uint8)
-    cv2.circle(a, (int(c), int(c)), R, 255, -1, cv2.LINE_AA); a = a.astype(np.float32) / 255
-    yy_, xx_ = np.mgrid[0:sz, 0:sz]; shine = np.clip(1 - ((xx_ - c * 0.8) ** 2 + (yy_ - c * 0.7) ** 2) / (R * 1.2) ** 2, 0, 1)[..., None]
-    col = np.float32([0.03, 0.11, 0.29]) * (1 - 0.25 * shine) + np.float32([0.18, 0.28, 0.5]) * 0.25 * shine
-    im[..., :3] = col; im[..., 3] = a
-    ring_ = np.zeros((sz, sz), np.uint8); cv2.circle(ring_, (int(c), int(c)), int(R * 0.86), 255, max(1, int(1.2 * k)), cv2.LINE_AA)
-    rg = ring_.astype(np.float32)[..., None] / 255 * 0.55; im[..., :3] = im[..., :3] * (1 - rg) + rg
-    ic = cv2.resize(_lg_icon, (int(R * 1.05), int(R * 1.05 * _lg_icon.shape[0] / _lg_icon.shape[1])), interpolation=cv2.INTER_AREA)[..., None]
-    y0, x0 = int(c - ic.shape[0] / 2), int(c - ic.shape[1] / 2); reg = im[y0:y0 + ic.shape[0], x0:x0 + ic.shape[1], :3]; reg[:] = reg * (1 - ic) + ic
-    return cv2.resize(im, (sz // k, sz // k), interpolation=cv2.INTER_AREA)
+    """the brand sticker (the client's round «ANNA TVAURI · пластический хирург» artwork), scaled DOWN to radius r; float RGBA"""
+    global _STK
+    if _STK is None:
+        im = cv2.imread(os.path.join(SRC, "sticker.png"), cv2.IMREAD_UNCHANGED); _STK = np.dstack([im[..., 2::-1], im[..., 3]]).astype(np.float32) / 255
+    sz = 2 * r + 2; return cv2.resize(_STK, (sz, sz), interpolation=cv2.INTER_AREA)
 _SC = {}
 def put_sticker(img, cx, cy, r):
     """composite a sticker onto a float or uint8 RGB image in place (with a soft contact shadow)"""
@@ -312,14 +303,14 @@ def put_sticker(img, cx, cy, r):
     else: reg *= 1 - sh; reg *= 1 - a; reg += c * a
 
 # ---------- faces: soft, heavy blur on the tracked face box ----------
-def blur_face(img, box, grow=1.45):
+def blur_face(img, box, grow=1.85):
     x, y, w, h = box; cx, cy = x + w / 2, y + h / 2 - 0.05 * h; rx, ry = w * grow / 2, h * grow / 2
     x0, y0, x1, y1 = int(max(0, cx - rx - 20)), int(max(0, cy - ry - 20)), int(min(W, cx + rx + 20)), int(min(H, cy + ry + 20))
     reg = img[y0:y1, x0:x1]
-    small = cv2.resize(reg, (max(2, reg.shape[1] // 14), max(2, reg.shape[0] // 14)), interpolation=cv2.INTER_AREA)
-    bl = cv2.resize(cv2.GaussianBlur(small, (0, 0), 2), (reg.shape[1], reg.shape[0]), interpolation=cv2.INTER_LINEAR)
+    small = cv2.resize(reg, (max(2, reg.shape[1] // 32), max(2, reg.shape[0] // 32)), interpolation=cv2.INTER_AREA)
+    bl = cv2.resize(cv2.GaussianBlur(small, (0, 0), 3), (reg.shape[1], reg.shape[0]), interpolation=cv2.INTER_LINEAR)
     yy_, xx_ = np.mgrid[y0:y1, x0:x1]; d = ((xx_ - cx) / rx) ** 2 + ((yy_ - cy) / ry) ** 2
-    m = np.clip((1.15 - d) / 0.3, 0, 1)[..., None]; out = img.copy(); out[y0:y1, x0:x1] = (reg * (1 - m) + bl * m).astype(img.dtype); return out
+    m = np.clip((1.25 - d) / 0.25, 0, 1)[..., None]; out = img.copy(); out[y0:y1, x0:x1] = (reg * (1 - m) + bl * m).astype(img.dtype); return out
 def interview(k, src_t):
     i = int(round(src_t * FPS)); f = V[k].at(src_t); return blur_face(f, FACES[k][min(max(i, 0), len(FACES[k]) - 1)])
 def anon_top(img, y=150):
@@ -331,9 +322,9 @@ def v19_frame(src_t):
     return f
 
 # ---------- photos: stickers at source resolution ----------
-NIP = {"p2": [(1008, 1590, 104), (1890, 1577, 104)], "p3": [(1700, 1465, 94), (2378, 1440, 74)], "p12": [(2215, 1440, 60)],
+NIP = {"p2": [(1008, 1590, 104), (1890, 1577, 104)], "p3": [(1700, 1465, 94), (2342, 1442, 64)], "p12": [(2182, 1442, 52)],
        "p0319": [(1024, 1260, 100), (2016, 1276, 100)],
-       "IMG_9145": [(392, 683, 58), (1114, 683, 58)], "IMG_9146": [(822, 660, 56), (1305, 665, 46)], "IMG_9147": [(1098, 683, 48)]}
+       "IMG_9145": [(392, 683, 58), (1114, 683, 58)], "IMG_9146": [(822, 660, 56), (1286, 666, 40)], "IMG_9147": [(1078, 684, 42)]}
 def photo(n):
     p = os.path.join(SRC, n + (".JPG" if n.startswith("IMG") else ".jpeg"))
     im = np.asarray(ImageOps.exif_transpose(Image.open(p)).convert("RGB")).copy()
@@ -358,17 +349,18 @@ P_A, P_C, P_G, P_H = Still("IMG_9146", 0, 760), Still("p2", 250, 1443), Still("p
 
 # ---------- collages: ПОСЛЕ on top, ДО below; person cut out (rembg) onto navy; aligned by neck and navel ----------
 BODY = {"p2": (430, 2530), "p3": (430, 2545), "p12": (450, 2550), "IMG_9145": (0, 1330), "IMG_9146": (0, 1240), "IMG_9147": (0, 1330)}
-PANEL_BG = None
+LEGS = {"p2": 3150, "p3": 3540, "p12": 3540}                                 # ДО: the stockings start below these rows
+PANEL_BG = {}
 def panel(n, pw=W, ph=960, neck_at=70, span=600):
-    global PANEL_BG
-    if PANEL_BG is None:
-        g = np.linspace(0, 1, ph)[:, None, None]; PANEL_BG = (NAVY * (1 - g * 0.6) + DEEP * g * 0.6 + np.zeros((ph, pw, 3))).astype(np.float32)
+    if (ph, pw) not in PANEL_BG:
+        g = np.linspace(0, 1, ph)[:, None, None]; PANEL_BG[ph, pw] = (NAVY * (1 - g * 0.6) + DEEP * g * 0.6 + np.zeros((ph, pw, 3))).astype(np.float32)
     im = PH[n].astype(np.float32) / 255; a = cv2.imread(os.path.join(CUT, f"m_{n}.png"), 0).astype(np.float32) / 255
     neck, navel = BODY[n]; s = span / (navel - neck)
     rows = np.arange(a.shape[0])[:, None]; a = a * np.clip((rows - (neck - 60)) / 60, 0, 1)            # nothing above the neck
+    if n in LEGS: a = a * np.clip((LEGS[n] - rows) / 90, 0, 1)                                    # nor the stockings
     band = a[neck:navel]; cols = np.arange(a.shape[1]); cx = float((band.sum(0) * cols).sum() / max(1, band.sum()))
     im = cv2.resize(im, None, fx=s, fy=s, interpolation=cv2.INTER_AREA); a = cv2.resize(a, None, fx=s, fy=s, interpolation=cv2.INTER_AREA)[..., None]
-    ox, oy = int(cx * s - pw / 2), int(neck * s - neck_at); out = PANEL_BG.copy()
+    ox, oy = int(cx * s - pw / 2), int(neck * s - neck_at); out = PANEL_BG[ph, pw].copy()
     xs0, ys0 = max(0, ox), max(0, oy); xs1, ys1 = min(im.shape[1], ox + pw), min(im.shape[0], oy + ph)
     sub = out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox]; aa = a[ys0:ys1, xs0:xs1]; sub[:] = sub * (1 - aa) + im[ys0:ys1, xs0:xs1] * aa
     return out
@@ -397,8 +389,8 @@ def subtitles(fr, t):
     for w, a, e in SUB_WORDS:
         t0 = a - 0.04
         if not (t0 <= t < e): continue
-        p = eo((t - t0) / 0.12); im = scaled(alpha_img(w, mont(60, 300)), 0.85 + 0.15 * p)   # thin Montserrat, pops in
-        h = 84; bw = im.shape[1] + 40; op = min(1, (e - t) / 0.06)
+        p = eo((t - t0) / 0.12); im = scaled(alpha_img(w, mont(44, 300)), 0.85 + 0.15 * p)   # thin Montserrat, pops in
+        h = 64; bw = im.shape[1] + 34; op = min(1, (e - t) / 0.06)
         box = np.zeros((h, int(bw)), np.uint8); cv2.rectangle(box, (0, 0), (box.shape[1] - 1, h - 1), 255, -1)
         blend(fr, cv2.GaussianBlur(box, (0, 0), 1.2).astype(np.float32) / 255, 500 - bw / 2, SUB_Y - h / 2, DEEP, 0.8 * op)
         blend(fr, im, 500 - im.shape[1] / 2, SUB_Y - im.shape[0] / 2 + 3, WHITE, op)
@@ -547,18 +539,27 @@ def up_arrow(fr, t, t0, x=860, y=1080):
     path_draw(fr, [(x, y + 60), (x, yy0)], 1, PINK, 9); fill_poly(fr, [(x - 26, yy0 + 18), (x + 26, yy0 + 18), (x, yy0 - 18)], PINK, min(1, p * 2))
 
 # ---------------- scenes ----------------
-# A — teaser: ПОСЛЕ in soft focus, a light sweep, her line «наступил прекрасный период любования собой»
+# A — opening: ДО → ПОСЛЕ slider (both cut out onto navy, aligned by neck and navel) under her line «наступил…»
 HA = lift(Drop(["НАСТУПИЛ ПЕРИОД", "*ЛЮБОВАНИЯ СОБОЙ*"], 116, 70, 0, maxw=860), 1255)
 TA = Track(["больше месяца после операции"], 32, 72, 0, 300)
+SL_B = SL_A = None; T_SW = (0.55, 1.75)
 def s_a(t):
-    z = lerp(1.0, 1.08, eio(t / 3.4)); sharp = P_A.at(z, 0.5)
-    bl = cv2.resize(cv2.GaussianBlur(cv2.resize(sharp, (W // 4, H // 4)), (0, 0), 5), (W, H))
-    r = 0.62 + 0.25 * eo((t - 0.4) / 1.6); d = np.sqrt(((xx - 540) / (430 * r)) ** 2 + ((yy - 760) / (560 * r)) ** 2); m = np.clip(1.5 - d, 0, 1)[..., None]
-    fr = bl * (1 - m) + sharp * m; fr *= 1 - 0.35 * (1 - m); fr += 0.35 * (1 - m) * DEEP
-    sweep(fr, t, 0.9, 1.2, mask=m); shade(fr, GBOT)
-    for k, (x, y) in enumerate([(330, 560), (780, 640), (560, 430), (420, 900)]): sparkle(fr, x, y, 26, t, 1.9 + 0.18 * k)
-    blend(fr, logo_alpha(300), 540 - 150, 300, PINK, eo((t + 0.1) / 0.5) * 0.9)
-    HA.draw(fr, t, 0.1); TA.y = HA.y + HA.h + 44 + TA.top; TA.draw(fr, t, 0.8)
+    global SL_B, SL_A
+    if SL_B is None:
+        SL_B = panel("p2", W, H, 320, 760); SL_A = panel("IMG_9145", W, H, 320, 760)
+        g = (np.clip((yy[:, :1] - 1080) / 230, 0, 1) ** 1.2)[..., None]; bgc = SL_B[-1:].mean(1, keepdims=True)
+        SL_B = SL_B * (1 - g) + bgc * g; SL_A = SL_A * (1 - g) + bgc * g                     # both fade out at the hips
+    z = lerp(1.04, 1.0, eo(t / 3.0)); xd = int(W * (1 - eio((t - T_SW[0]) / (T_SW[1] - T_SW[0]))))
+    fr = SL_B.copy(); fr[:, xd:] = SL_A[:, xd:]
+    if z != 1: fr = cv2.warpAffine(fr, np.float32([[z, 0, 540 * (1 - z)], [0, z, 760 * (1 - z)]]), (W, H), borderMode=cv2.BORDER_REPLICATE)
+    if 0 < xd < W:
+        fr[:, max(0, xd - 3):xd + 3] = PINK
+        m = np.zeros((H, W), np.uint8); cv2.circle(m, (xd, 760), 32, 255, -1, cv2.LINE_AA); blend(fr, m.astype(np.float32) / 255, 0, 0, PINK)
+        ar = alpha_img("‹ ›", mont(34, 600)); blend(fr, ar, xd - ar.shape[1] / 2, 760 - ar.shape[0] / 2 - 2, NAVY)
+    chip(fr, "ДО", 40, 300, cl((xd - 200) / 100)); chip(fr, "ПОСЛЕ", 40, 300, cl((160 - xd) / 100))
+    if t > T_SW[1]:
+        for k, (x, y) in enumerate([(330, 600), (780, 640), (560, 470)]): sparkle(fr, x, y, 26, t, T_SW[1] + 0.2 + 0.18 * k)
+    HA.draw(fr, t, 0.1); TA.y = HA.y + HA.h + 40 + TA.top; TA.draw(fr, t, 0.8)
     return fr
 
 # B — back to ДО: «состояние, кожа, тело. хочется быть красивой»
@@ -679,9 +680,9 @@ def s_z(t):
     HZ.draw(fr, t, T_Z + 0.3); TZ.y = HZ.y + HZ.h + 40 + TZ.top; TZ.draw(fr, t, T_Z + 1.0)
     return fr
 
-SCENES = [(0, s_a), (T_S["B"], s_b), (T_S["C"], s_c), (T_S["D"], s_d), (T_S["E"], s_e), (T_S["F"], s_f), (T_S["G"], s_g), (T_S["H"], s_h), (T_K[0], s_k), (T_Z, s_z)]
+SCENES = [(0, s_a), (T_S["B"], s_b), (T_S["C"], s_c), (T_S["D"], s_d), (T_S["E"], s_e), (T_S["F"], s_f), (T_S["G"], s_g), (T_S["H"], s_h), (T_K[0], s_k)]
 TRANS = {T_S["B"]: ("zoom", 0.35), T_S["C"]: ("flash", 0.2), T_S["D"]: ("zoom", 0.35), T_S["E"]: ("diag", 0.45), T_S["F"]: ("zoom", 0.35),
-         T_S["G"]: ("flash", 0.2), T_S["H"]: ("push", 0.4), T_K[0]: ("iris", 0.5), T_Z: ("iris", 0.55)}
+         T_S["G"]: ("flash", 0.2), T_S["H"]: ("push", 0.4), T_K[0]: ("iris", 0.5)}
 def push(old, new, p):
     e = eio(p); x = int(W * e); fr = np.empty_like(old); fr[:, :W - x] = old[:, x:]; fr[:, W - x:] = new[:, :x]
     if 0 < x < W: fr[:, max(0, W - x - 2):W - x + 2] = PINK
@@ -829,8 +830,8 @@ def build_audio(path):
     mus = track(n) * ((G_GAP - (G_GAP - G_VO) * np.clip(dd, 0, 1)) * fade)[:, None]
     sfx = np.zeros(n + 2 * SR)
     def put(x, t, g): i = int(max(0, t) * SR); seg = sfx[i:i + len(x)]; seg += x[:len(seg)] * g
-    put(glitter(1.0), 0.9, 0.10)                                                                       # light sweep (teaser)
-    for k in range(4): put(bubble(700 + 120 * k, 1500 + 120 * k, 0.1), 1.9 + 0.18 * k, 0.06)          # sparkles
+    put(kalimba(KAL[4], 0.7), T_SW[1], 0.14)                                                           # ПОСЛЕ revealed
+    for k in range(3): put(bubble(700 + 120 * k, 1500 + 120 * k, 0.1), T_SW[1] + 0.2 + 0.18 * k, 0.06)  # sparkles
     put(kalimba(KAL[0], 0.5), T_S["B"] + 0.1, 0.12)                                                    # timeline appears
     put(bubble(), vstart("B") + 1.22, 0.16); put(bubble(420, 980), vstart("B") + 1.74, 0.16)             # «кожа», «тело»
     for k, (_, t0) in enumerate(ITEMS): put(kalimba(KAL[2 + k * 2], 0.6), t0 + 0.1, 0.2)                # the plan ticks
@@ -845,8 +846,6 @@ def build_audio(path):
     put(kalimba(KAL[3], 0.5), T_S["H"] + 0.2, 0.12)                                                    # timeline → 1+ месяц
     put(glitter(1.2), T_H2 + 0.6, 0.12); [put(kalimba(f, 0.8), T_H2 + 0.05 + 0.1 * i, 0.1) for i, f in enumerate([KAL[0], KAL[2], KAL[4]])]
     for tk in T_K: put(shutter_cam(), tk, 0.22)                                                        # collages
-    put(glitter(1.4), T_Z + 0.2, 0.1)
-    for i, f in enumerate([KAL[0], KAL[2], KAL[3], KAL[5]]): put(kalimba(f, 0.8), T_Z + 1.1 + i * 0.12, 0.12)
     sfx[:n] *= 1 - 0.75 * np.clip(dd, 0, 1)
     mix = vo[:, None] + mus + sfx[:n, None] * np.float64([[0.92, 1.0]])
     mix *= 10 ** (1.0 / 20); mix /= max(1, np.abs(mix).max() / 0.95)
