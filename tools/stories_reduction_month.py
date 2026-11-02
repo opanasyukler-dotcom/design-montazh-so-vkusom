@@ -1,7 +1,9 @@
-"""2 simple stories (1080x1920): breast reduction (autoimplant), result after one month.
+"""3 simple stories (1080x1920): breast reduction (autoimplant), result after one month.
 
-1. the patient's own words over the one-month video (from 0:21, face blurred, voice gently changed) + «наше до» circle.
-2. one video: the before body (neck to fingertips) -> a slider -> the after body (same framing, same scale), then the
+1. the patient's own words over the one-month video (from the frontal view at 0:17.5, face blurred, voice gently
+   changed) + «наше до» circle low on the left whose before body turns with her (front -> 3/4 -> side photos).
+2. the thesis: the way to the dream started with this before; the reduction by the autoimplant (Ribeiro) method.
+3. one video: the before body (neck to fingertips) -> a slider -> the after body (same framing, same scale), then the
    clinic's one-week collages and the same collages made with the one-month photos; the bottom stays free for the
    «Записаться на консультацию» button.
 
@@ -10,7 +12,7 @@ Sources (drive/ from the Drive folder 1EyuB8yLY1E7px4mXB37EBpnS-B6fB_zJ): IMG_20
 (month_blur.mp4 = 21-33 s through face_blur_track.py), IMG_9150-9152 the clinic's one-week collages (after on top,
 before below), IMG_2029 / 2045 / 2042 one-month photos (front / 3/4 / side; <name>.mask.png = rembg cut-out).
 
-usage: python3 stories_reduction_month.py SRC_DIR OUT_DIR [1|2] [notext]   (notext: *_bez_teksta.mp4)
+usage: python3 stories_reduction_month.py SRC_DIR OUT_DIR [1|2|3] [notext]   (notext: *_bez_teksta.mp4)
 """
 import os, subprocess, sys
 import numpy as np, cv2
@@ -69,22 +71,39 @@ def on_black(name):
 
 # ---------------- story 1 ----------------
 def s1():
-    src = os.path.join(DRIVE, "month_blur.mp4"); out = os.path.join(OUT, f"01_odin_v_odin{SUF}.mp4"); tmp = out + ".v.mp4"
+    src = os.path.join(DRIVE, "month_blur17.mp4"); out = os.path.join(OUT, f"01_odin_v_odin{SUF}.mp4"); tmp = out + ".v.mp4"
     dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", src],
                                capture_output=True, text=True).stdout)
     ly = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    # «наше до»: the before body (chest to hips) in a circle, top right; thin caption under it
-    D = 400; ph = photo("IMG_9150.PNG").crop((115, 1255, 1115, 2255)).resize((D, D), Image.LANCZOS)   # neck to thighs, arms in, on the body axis (x 615)
-    circ = Image.new("RGBA", (D + 12, D + 12), (0, 0, 0, 0)); ImageDraw.Draw(circ).ellipse((0, 0, D + 11, D + 11), fill=WHITE + (255,))
-    m = Image.new("L", (D, D), 0); ImageDraw.Draw(m).ellipse((0, 0, D - 1, D - 1), fill=255); ph = ph.convert("RGBA"); ph.putalpha(m)
-    circ.alpha_composite(ph, (6, 6)); cx, cy = W - 40 - circ.width, 110; ly.alpha_composite(circ, (cx, cy))
-    if not NOTEXT: shadowed_text([("наше до", mont(32, 300), 44)], cx + circ.width // 2 - int(mont(32, 300).getlength("наше до")) // 2, cy + circ.height + 6, ly)
     # the quote and what it is, low under the usual fade
     hb, bb = ImageFont.truetype(BOLD, 64), mont(38, 500); sm = mont(34, 400)
     lines = [("«КАК Я И ХОТЕЛА", hb, 76), ("ОДИН В ОДИН»", hb, 92), ("результат спустя МЕСЯЦ", bb, 52), ("после редукции (аутоимплант)", sm, 46)]
     top = H - 90 - sum(s for _, _, s in lines)
     if not NOTEXT: shadowed_text(lines, MARGIN, top, ly)
     shade = fade(top + 40, 380, 0.85) if not NOTEXT else np.zeros((H, 1, 1), np.float32)
+    # «наше до»: low on the left, above the text. The before body turns with her: front, then 3/4, then side (the
+    # clinic's before photos; 3/4 and side mirrored, she turns her right side to the camera here)
+    D = 380; R = D // 2 + 6
+    views = [photo("IMG_9150.PNG").crop((115, 1255, 1115, 2255)),
+             ImageOps.mirror(photo("IMG_9151.PNG").crop((-45, 1255, 955, 2255))),
+             ImageOps.mirror(photo("IMG_9152.PNG").crop((170, 1255, 1170, 2255)))]
+    m = Image.new("L", (D, D), 0); ImageDraw.Draw(m).ellipse((0, 0, D - 1, D - 1), fill=255)
+    rings = []
+    for v in views:
+        c = Image.new("RGBA", (D + 12, D + 12), (0, 0, 0, 0)); ImageDraw.Draw(c).ellipse((0, 0, D + 11, D + 11), fill=WHITE + (255,))
+        ph = v.resize((D, D), Image.LANCZOS).convert("RGBA"); ph.putalpha(m); c.alpha_composite(ph, (6, 6))
+        rings.append(np.asarray(c, np.float32) / 255)
+    ccx, ccy = 40, (top - 64 - (D + 12)) if not NOTEXT else H - 120 - (D + 12)
+    if not NOTEXT:
+        f32 = mont(32, 300); shadowed_text([("наше до", f32, 44)], ccx + R - int(f32.getlength("наше до")) // 2, ccy + D + 18, ly)
+    TURN = [(4.3, 5.3, 0, 1), (8.0, 9.0, 1, 2)]           # seconds of this clip: front -> 3/4 (abs 22-23 s), 3/4 -> side (25.5-26.5 s)
+
+    def ring_at(t):
+        k = 0
+        for a, b, i0, i1 in TURN:
+            if t >= b: k = i1
+            elif t > a: q = (t - a) / (b - a); return rings[i0] * (1 - q) + rings[i1] * q
+        return rings[k]
     ov = np.asarray(ly, np.float32) / 255; oa = ov[..., 3:4]
     p = subprocess.Popen(["ffmpeg", "-v", "error", "-i", src, "-vf", f"scale={W}:{H}:flags=lanczos,fps={FPS}", "-f", "rawvideo",
                           "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE)
@@ -97,7 +116,9 @@ def s1():
         z = 1.0 + 0.03 * i / n; M = cv2.getRotationMatrix2D((W / 2, H * 0.55), 0, z)
         fr = cv2.warpAffine(last, M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT).astype(np.float32) / 255
         fr = fr * (1 - shade); fr = fr * (1 - oa) + ov[..., :3] * oa
-        o = (fr * 255).astype(np.uint8); enc.stdin.write(o.tobytes())
+        rg = ring_at(i / FPS); al = rg[..., 3:4]; h, w = rg.shape[:2]
+        fr[ccy:ccy + h, ccx:ccx + w] = fr[ccy:ccy + h, ccx:ccx + w] * (1 - al) + rg[..., :3] * al
+        o = (np.clip(fr, 0, 1) * 255).astype(np.uint8); enc.stdin.write(o.tobytes())
         if i == int(3 * FPS): Image.fromarray(o).save(out[:-4] + ".jpg", quality=90)
     p.kill(); enc.stdin.close(); enc.wait()
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", tmp, "-i", src, "-map", "0:v", "-map", "1:a", "-c:v", "copy",
@@ -106,7 +127,26 @@ def s1():
     os.remove(tmp); print("wrote", out, flush=True)
 
 
-# ---------------- story 2 ----------------
+# ---------------- story 2: the thesis ----------------
+def s_thesis():
+    """the way to the dream began with this before: the before body on top, the autoimplant method in a few key words"""
+    hb = ImageFont.truetype(BOLD, 52); b = mont(32, 400); bm = mont(32, 600)
+    lines = [("ПУТЬ К МЕЧТЕ", hb, 62), ("НАЧАЛСЯ С ТАКОГО ДО", hb, 80),
+             ("Гигантомастия: от яремной вырезки до соска 32 см.", b, 56),
+             ("Уменьшение груди методом аутоимпланта", bm, 44), ("(метод Рибейро):", bm, 54),
+             ("из собственных тканей нижней части груди", b, 42), ("формируем «аутоимплант» и поднимаем его вверх.", b, 42),
+             ("Он наполняет верхний полюс и держит форму,", b, 42), ("красивый объём без силиконового импланта.", b, 54),
+             ("Сосок с ареолой выше, форма симметричная,", b, 42), ("ткани сохраняем по максимуму.", b, 42)]
+    top = H - 80 - sum(s for _, _, s in lines)
+    body = photo("IMG_9150.PNG").crop((115, 1255, 1115, 2343))                 # the before: neck to the stockings
+    ah = top - 60 - 60; sc = ah / body.height; body = body.resize((int(body.width * sc), ah), Image.LANCZOS)
+    cv = Image.new("RGB", (W, H), (0, 0, 0)); cv.paste(body, ((W - body.width) // 2, 60)); cv = cv.convert("RGBA")
+    ly = Image.new("RGBA", (W, H), (0, 0, 0, 0)); shadowed_text(lines, MARGIN, top, ly)
+    p_ = pill("наше до", 28); ly.alpha_composite(p_, ((W - body.width) // 2 + 24, 84))
+    cv.alpha_composite(ly); out = os.path.join(OUT, "02_put_k_mechte.jpg"); cv.convert("RGB").save(out, quality=94); print("wrote", out)
+
+
+# ---------------- story 3 ----------------
 AREA = (150, 1650)            # picture band; under it (1650..1920) the free room for the consultation button
 
 
@@ -116,7 +156,7 @@ def fit_band(img, area=AREA):
     cv = Image.new("RGB", (W, H), (0, 0, 0)); cv.paste(im, ((W - im.width) // 2, area[0])); return np.asarray(cv, np.float32) / 255
 
 
-BODY = (330, 1480)            # the before / after bodies a bit further away: neck to fingertips with room around
+BODY = (110, 1663)            # the before / after bodies large: neck to mid-thigh across the whole width; button room below
 
 
 def month_collage(after_name, after_crop, week_name):
@@ -141,18 +181,18 @@ def month_collage(after_name, after_crop, week_name):
 
 
 def s2():
-    out = os.path.join(OUT, f"02_do_posle{SUF}.mp4"); tmp = out + ".v.mp4"
+    out = os.path.join(OUT, f"03_do_posle{SUF}.mp4"); tmp = out + ".v.mp4"
     # same framing for both: neck to fingertips (before: neck 1270 .. fingertips 2190 in IMG_9150;
     # after: neck 70 .. fingertips 1540 in IMG_2029 -> scale 0.626), body centred
-    before = fit_band(photo("IMG_9150.PNG").crop((150, 1245, 1080, 2235)), BODY)        # 930 x 990 around the body
-    after = fit_band(on_black("IMG_2029.JPG").crop((47, 30, 1533, 1611)), BODY)        # the same /0.626
+    before = fit_band(photo("IMG_9150.PNG").crop((235, 1250, 995, 2343)), BODY)        # all of the before photo, arms in
+    after = fit_band(on_black("IMG_2029.JPG").crop((183, 38, 1397, 1784)), BODY)        # the same framing /0.626
     labs = {k: np.asarray(pill(k, 30), np.float32) / 255 for k in ["до", "после"]}
     week = [photo(n) for n in ["IMG_9150.PNG", "IMG_9151.PNG", "IMG_9152.PNG"]]
     month = [month_collage("IMG_2029.JPG", (78, 60, 1502, 1500), "IMG_9150.PNG"),
              month_collage("IMG_2045.JPG", (40, 190, 1480, 1630), "IMG_9151.PNG"),
              month_collage("IMG_2042.JPG", (0, 130, 1440, 1570), "IMG_9152.PNG")]
     for i, im in enumerate(month): im.save(os.path.join(OUT, f"kollazh_mesyac_{i + 1}.jpg"), quality=94)
-    slides = [fit_band(im) for im in week + month]
+    slides = [fit_band(im, (0, H)) for im in week + month]                          # the collages on the whole screen
 
     def blit(fr, a, x, y, k=1.0):
         h, w = a.shape[:2]; al = a[..., 3:4] * k; fr[y:y + h, x:x + w] = fr[y:y + h, x:x + w] * (1 - al) + a[..., :3] * al
@@ -173,8 +213,8 @@ def s2():
                 d.ellipse((2, 2, 81, 81), outline=WHITE + (255,), width=4, fill=(0, 0, 0, 90))
                 d.polygon([(30, 42), (40, 32), (40, 52)], fill=WHITE + (255,)); d.polygon([(54, 42), (44, 32), (44, 52)], fill=WHITE + (255,))
                 blit(fr, np.asarray(ring, np.float32) / 255, min(max(xs - 42, 0), W - 84), (BODY[0] + BODY[1]) // 2 - 42)
-            if p < 1 and not NOTEXT: blit(fr, labs["до"], W - 40 - labs["до"].shape[1], BODY[0] - 70)
-            if p > 0 and not NOTEXT: blit(fr, labs["после"], 40, BODY[0] - 70)
+            if p < 1 and not NOTEXT: blit(fr, labs["до"], W - 40 - labs["до"].shape[1], BODY[0] + 24)
+            if p > 0 and not NOTEXT: blit(fr, labs["после"], 40, BODY[0] + 24)
         else:
             tc = t - (T_B + T_S + T_A); k = min(int(tc // T_C), len(slides) - 1); lt = tc - k * T_C
             fr = slides[k].copy()
@@ -188,4 +228,5 @@ def s2():
 
 
 if not ONLY or 1 in ONLY: s1()
-if not ONLY or 2 in ONLY: s2()
+if (not ONLY or 2 in ONLY) and not NOTEXT: s_thesis()
+if not ONLY or 3 in ONLY: s2()
