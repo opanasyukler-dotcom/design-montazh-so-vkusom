@@ -164,12 +164,9 @@ def warm(img, da=4.0, db=10.0, dl=3.0):
 def s2():
     """the scars now (IMG_2065 as shot: the whole photo, 1536x2730 = 9:16, only scaled to 1080x1920); the text low on
     the left, the circle with the scar after one month (whole chest as shot, warmed up) low on the right with its
-    caption; «Подробнее…» tilted at the bottom"""
+    caption; «Подробнее…» straight in italics at the bottom; no dark haze"""
     bg = np.asarray(Image.open(os.path.join(DRIVE, "IMG_2065.JPG.png")).convert("RGB").resize((W, H), Image.LANCZOS), np.float32) / 255
-    ys = np.arange(H, dtype=np.float32)[:, None, None]; xs = np.arange(W, dtype=np.float32)[None, :, None]
-    shade = 0.72 * np.clip((ys - 900) / 260, 0, 1) * np.clip((700 - xs) / 300, 0.35, 1)      # dark under the text (lower left)
-    shade = np.maximum(shade, 0.75 * np.clip((ys - 1640) / 220, 0, 1))
-    fr = bg * (1 - shade)
+    fr = bg                                                  # no dark haze: the text holds by its own shadow
     lay = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(lay)
     hb = ImageFont.truetype(BOLD, 40); f = mont(29, 400); fb = mont(30, 600); y = 990; x = 56
     for t in ["ПРОШЁЛ 1 ГОД И 3 МЕСЯЦА", "ПОСЛЕ ОПЕРАЦИИ"]: d.text((x, y), t, font=hb, fill=WHITE); y += 48
@@ -181,19 +178,20 @@ def s2():
     for ln in ["Поэтому не стоит оценивать", "их слишком рано."]: d.text((x, y), ln, font=fb, fill=WHITE); y += 40
     # the circle on the right: the chest one month after, as shot (both breasts, the scars visible), warmed up
     D = 430; cx, cy = W - 40 - (D + 14), 1000
-    ph = warm(Image.open(os.path.join(DRIVE, "scar_1m.bin.png")).convert("RGB")).crop((800, 820, 2200, 2220)).resize((D, D), Image.LANCZOS)
+    ph = warm(Image.open(os.path.join(DRIVE, "scar_1m.bin.png")).convert("RGB")).crop((400, 450, 2600, 2650)).resize((D, D), Image.LANCZOS)   # further away: both breasts whole
     circ = Image.new("RGBA", (D + 14, D + 14), (0, 0, 0, 0)); ImageDraw.Draw(circ).ellipse((0, 0, D + 13, D + 13), fill=WHITE + (255,))
     m = Image.new("L", (D, D), 0); ImageDraw.Draw(m).ellipse((0, 0, D - 1, D - 1), fill=255); ph = ph.convert("RGBA"); ph.putalpha(m)
     circ.alpha_composite(ph, (7, 7)); lay.alpha_composite(circ, (cx, cy))
     fc = mont(26, 400); yc = cy + D + 26
     for ln in ["здесь вы можете видеть рубец", "спустя всего месяц после операции"]:
         d.text((cx + (D + 14) / 2, yc), ln, font=fc, fill=WHITE, anchor="ma"); yc += 34
-    # «Подробнее…» tilted a little, like a handwritten note
-    note = Image.new("RGBA", (900, 120), (0, 0, 0, 0)); dn = ImageDraw.Draw(note)
-    dn.text((450, 60), "Подробнее про рубцы в актуальном «Рубцы»", font=mont(32, 600), fill=WHITE + (255,), anchor="mm")
-    note = note.rotate(6, resample=Image.BICUBIC, expand=True); lay.alpha_composite(note, ((W - note.width) // 2, H - 90 - note.height // 2))
-    sh = Image.new("RGBA", (W, H), GRAPHITE + (0,)); sh.putalpha(lay.getchannel("A").point(lambda v: v * 150 // 255))
-    lay2 = Image.alpha_composite(sh.filter(ImageFilter.GaussianBlur(8)), lay)
+    # «Подробнее…» straight, in the italic Montserrat
+    fi = ImageFont.truetype(os.path.join(ROOT, "fonts/Montserrat-Italic-VariableFont_wght.ttf"), 34); fi.set_variation_by_axes([600])
+    d.text((W // 2, H - 90), "Подробнее про рубцы в актуальном «Рубцы»", font=fi, fill=WHITE, anchor="mm")
+    a = lay.getchannel("A")                                  # soft shadow, a bit denser now that there is no haze
+    sh = Image.new("RGBA", (W, H), GRAPHITE + (0,)); sh.putalpha(a.point(lambda v: v * 200 // 255).filter(ImageFilter.GaussianBlur(9)))
+    sh2 = Image.new("RGBA", (W, H), GRAPHITE + (0,)); sh2.putalpha(a.point(lambda v: v * 170 // 255).filter(ImageFilter.GaussianBlur(3)))
+    lay2 = Image.alpha_composite(Image.alpha_composite(sh, sh2), lay)
     fr = over(fr, np.asarray(lay2, np.float32) / 255)
     out = os.path.join(OUT, "02_rubcy.jpg"); Image.fromarray((np.clip(fr, 0, 1) * 255).astype(np.uint8)).save(out, quality=94); print("wrote", out)
 
