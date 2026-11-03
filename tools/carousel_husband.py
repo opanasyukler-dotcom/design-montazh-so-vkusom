@@ -1,7 +1,7 @@
 """@mcg.va — carousel post «спасибо мужу» (1080x1350): a full-bleed cover, then cream «paper» slides — her photo in a frame,
 thin Montserrat text (small spaced CAPS kicker, thin lowercase body, thin italic accents), photo above / below the text in turns.
 Every word of her text is kept, in order.
-  python3 -I carousel_husband.py PHOTOS_DIR OUT_DIR
+  python3 -I carousel_husband.py PHOTOS_DIR OUT_DIR MPENV_PYTHON MODELS_DIR
 """
 import os, sys
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
@@ -106,8 +106,61 @@ S = [  # photo, kicker, [(paragraph, style)], fx, fy
         ("Я вас очень люблю!", "i")], 0.5, 0.3),
 ]
 
+
+# ── full-bleed slides: the photo fills the slide, the text lies over it away from faces (MediaPipe, mpenv) ──
+import json, subprocess, tempfile
+import numpy as np
+MPPY = MODELS = None
+
+def people(im):
+    with tempfile.TemporaryDirectory() as td:
+        p = os.path.join(td, "f.png"); im.save(p)
+        r = subprocess.run([MPPY, os.path.join(HERE, "face_boxes.py"), MODELS, p], capture_output=True, text=True, check=True)
+    j = json.loads(r.stdout.strip().splitlines()[-1]); return j["faces"], np.array(j["person"], np.float32)
+
+def full(src, kicker, paras, out, fx=0.5, fy=0.4, n=None, total=None, prefer=None, avoid=(), widths=(W - 2 * M, 700, 560, 440)):
+    bg = crop(ImageOps.exif_transpose(Image.open(src)).convert("RGB"), W, H, fx, fy); faces, person = people(bg)
+    faces = [[b[0] - 40, b[1] - 40, b[2] + 40, b[3] + 40] for b in faces] + [list(a) for a in avoid]; print("faces", faces)
+    top, bot = 100, H - 120; best = None
+    for cw in widths:
+        lines = text_block(paras, cw); th = 46 + text_h(lines); tw = max(BODY[0], *(l[1].getlength(l[0]) for l in lines if l))
+        for x in ({M, W - M - int(tw)} if cw < W - 2 * M else {M}):
+            for y in range(top, bot - th + 1, 10):
+                r = (x - 30, y - 30, x + tw + 30, y + th + 30)
+                if any(not (r[2] <= b[0] or r[0] >= b[2] or r[3] <= b[1] or r[1] >= b[3]) for b in faces): continue
+                g = person[max(r[1] // 20, 0):r[3] // 20 + 1, max(r[0] // 20, 0):int(r[2]) // 20 + 1]
+                ps = float(g.mean()) if g.size else 0
+                edge = min(y - top, bot - th - y)                                     # hug the top or the bottom edge
+                sc = 1200 * ps + edge * 0.6 + (0 if cw == W - 2 * M else 60) + (0 if prefer is None else abs(y - prefer) * 0.5)
+                if best is None or sc < best[0]: best = (sc, x, y, lines, th, tw)
+    _, x, y, lines, th, tw = best
+    a = np.asarray(bg.convert("L"), np.float32)[y:y + th, x:x + int(tw)]; m, sd = a.mean(), a.std()
+    light = m > 175 and sd < 35; haze = not light and (m > 75 or sd > 32)
+    im = bg.convert("RGBA"); size = (W, H)
+    if haze:
+        hz = Image.new("L", size, 0); ImageDraw.Draw(hz).rounded_rectangle((x - 60, y - 50, x + tw + 60, y + th + 40), 70, fill=255)
+        h_ = Image.new("RGBA", size, (12, 8, 6, 0)); h_.putalpha(hz.filter(ImageFilter.GaussianBlur(45)).point(lambda v: v * 0.45)); im.alpha_composite(h_)
+    col = INK if light else (255, 255, 255); kc = MAUVE if light else (255, 255, 255)
+    t = Image.new("RGBA", size, (0, 0, 0, 0)); sh = Image.new("L", size, 0); d, ds = ImageDraw.Draw(t), ImageDraw.Draw(sh)
+    for dd, c, k, off in ((ds, 140, 140, 2), (d, col + (255,), kc + (235,), 0)):
+        if light and dd is ds: continue
+        spaced(dd, (x, y + 22 + off), kicker, font(22, 400 if not light else 300), k, 5); yy = y + 46 + int(BODY[0] * 1.05) + off
+        for l in lines:
+            if l is None: yy += int(BODY[0] * 0.55); continue
+            dd.text((x, yy), l[0], font=font(BODY[0], 350 if not light else 300, "Italic" in l[1].path), fill=c, anchor="ls"); yy += int(BODY[0] * BODY[2])
+        f = font(18, 400); fc = kc if dd is d else 140
+        dd.text((M, H - 50 + off), "@mcg.va", font=f, fill=fc, anchor="ls"); dd.text((W - M, H - 50 + off), f"{n:02d} / {total:02d}", font=f, fill=fc, anchor="rs")
+    s = Image.new("RGBA", size, (15, 10, 8, 0)); s.putalpha(sh.filter(ImageFilter.GaussianBlur(6))); im.alpha_composite(s); im.alpha_composite(t)
+    im.convert("RGB").save(out, quality=95); print(out, "at", x, y, "w", int(tw), "light" if light else ("haze" if haze else "white"))
+
+
+FULL_FOCUS = {2: (0.5, 0.45), 4: (0.5, 0.5), 6: (0.5, 0.5), 9: (0.5, 0.5), 10: (0.5, 0.5)}
+AVOID = {4: [(150, 60, 1000, 620)], 6: [(550, 330, 1080, 1350)]}          # the two heads (the kiss hides them from the detector)
+
 if __name__ == "__main__":
-    src, out = sys.argv[1], sys.argv[2]; os.makedirs(out, exist_ok=True); total = len(S) + 1
+    src, out, MPPY, MODELS = sys.argv[1:5]; os.makedirs(out, exist_ok=True); total = len(S) + 1
     cover(os.path.join(src, "IMG_5772.jpg"), os.path.join(out, "slide_01.jpg"), 0.5, 0.42)
     for i, (p, k, paras, fx, fy) in enumerate(S):
-        paper(os.path.join(src, p), k, paras, os.path.join(out, f"slide_{i + 2:02d}.jpg"), fx, fy, photo_top=(i % 2 == 0), n=i + 2, total=total)
+        n = i + 2; o = os.path.join(out, f"slide_{n:02d}.jpg")
+        if n in FULL_FOCUS: full(os.path.join(src, p), k, paras, o, *FULL_FOCUS[n], n=n, total=total, avoid=AVOID.get(n, ()), **({"widths": (W - 2 * M,)} if n == 2 else {}))
+        else: paper(os.path.join(src, p), k, paras, o, fx, fy, photo_top=(i % 2 == 0), n=n, total=total)
