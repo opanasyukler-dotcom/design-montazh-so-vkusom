@@ -43,6 +43,12 @@ TEXT_4 = ("Спасибо за то, что вместо спокойствия,
           "после рождения дочки я\u00a0испытывала боль, злость, страх и\u00a0полную "
           "безысходность.")
 
+# Story 5: same calm lead + body layout as story 3
+LEAD_5 = ("Я правда не понимаю, зачем идти работать в\u00a0роддом, если ты не готов "
+          "нормально относиться к\u00a0женщинам, которые только что родили.")
+TEXT_5 = ("Это ведь место, где женщина даёт новую жизнь. Где она находится в\u00a0максимально "
+          "уязвимом состоянии и\u00a0нуждается хотя бы в\u00a0элементарной поддержке.")
+
 # Bold lines use Inter Display Bold, the closest open match to Instagram's "Classic" font
 CLASSIC = os.path.join(ROOT, "fonts", "commercial-safe", "Inter", "InterDisplay-Bold.otf")
 
@@ -134,6 +140,14 @@ def story_2():
 
 
 def story_3():
+    return lead_and_body(LEAD_3, TEXT_3)
+
+
+def story_5():
+    return lead_and_body(LEAD_5, TEXT_5)
+
+
+def lead_and_body(lead_text, body_text):
     img = Image.blend(blurred(), Image.new("RGB", (W, H), (38, 24, 20)), 0.62)
     d = ImageDraw.Draw(img)
     x, width = 100, W - 200
@@ -141,8 +155,8 @@ def story_3():
     soft = (226, 216, 206)
 
     lf, bf = classic(58), manrope(42, "Light")
-    lead = wrap(d, LEAD_3, lf, width)
-    body = wrap(d, TEXT_3, bf, width)
+    lead = wrap(d, lead_text, lf, width)
+    body = wrap(d, body_text, bf, width)
     block = len(lead) * 74 + 140 + len(body) * 62
     y = (H - block) // 2 - 60
 
@@ -192,7 +206,7 @@ def story_4():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    for k, make in enumerate((story_1, story_2, story_3, story_4), 1):
+    for k, make in enumerate((story_1, story_2, story_3, story_4, story_5), 1):
         path = os.path.join(OUT, f"story_{k:02d}.jpg")
         make().save(path, quality=95)
         print(path)
