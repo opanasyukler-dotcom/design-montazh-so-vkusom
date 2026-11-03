@@ -35,6 +35,14 @@ TEXT_3 = ("У меня даже есть заключение специалис
           "в\u00a0суд, но в\u00a0итоге решила, что не хочу больше тратить на\u00a0эту "
           "историю свои силы.")
 
+# Story 4: sarcastic "thank you", the word itself as a marker highlight
+THANKS = "«СПАСИБО»"
+LEAD_4 = ("И отдельное «спасибо» персоналу, который работал в\u00a0послеродовом отделении "
+          "с\u00a022.05.2026 по\u00a025.05.2026.")
+TEXT_4 = ("Спасибо за то, что вместо спокойствия, радости и\u00a0возможности восстановиться "
+          "после рождения дочки я\u00a0испытывала боль, злость, страх и\u00a0полную "
+          "безысходность.")
+
 # Bold lines use Inter Display Bold, the closest open match to Instagram's "Classic" font
 CLASSIC = os.path.join(ROOT, "fonts", "commercial-safe", "Inter", "InterDisplay-Bold.otf")
 
@@ -150,9 +158,41 @@ def story_3():
     return img
 
 
+def story_4():
+    img = Image.blend(blurred(), Image.new("RGB", (W, H), (38, 24, 20)), 0.62)
+    d = ImageDraw.Draw(img)
+    x, width = 100, W - 200
+    white = (250, 247, 242)
+    soft = (226, 216, 206)
+
+    hf, lf, bf = classic(96), classic(52), manrope(42, "Light")
+    lead = wrap(d, LEAD_4, lf, width)
+    body = wrap(d, TEXT_4, bf, width)
+    block = 130 + 70 + len(lead) * 68 + 140 + len(body) * 62
+    y = (H - block) // 2 - 60
+
+    # Marker-style paper highlight, same as the hospital name in story 2
+    pad_x, pad_y = 24, 14
+    l, t, r, b = d.textbbox((x + pad_x, y), THANKS, font=hf)
+    d.rounded_rectangle((l - pad_x, t - pad_y, r + pad_x, b + pad_y), radius=12, fill=PAPER)
+    d.text((x + pad_x, y), THANKS, font=hf, fill=BROWN)
+    y += 130 + 70
+
+    for line in lead:
+        d.text((x, y), line, font=lf, fill=white)
+        y += 68
+    y += 60
+    d.line((x, y, x + 120, y), fill=white, width=2)
+    y += 80
+    for line in body:
+        d.text((x, y), line, font=bf, fill=soft)
+        y += 62
+    return img
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    for k, make in enumerate((story_1, story_2, story_3), 1):
+    for k, make in enumerate((story_1, story_2, story_3, story_4), 1):
         path = os.path.join(OUT, f"story_{k:02d}.jpg")
         make().save(path, quality=95)
         print(path)
