@@ -30,11 +30,11 @@ def eback(x): x = cl(x); c = 1.7; return 1 + (c + 1) * (x - 1) ** 3 + c * (x - 1
 def lerp(a, b, p): return a + (b - a) * p
 
 # ---------------- voice edit: (block, source, [(in, out), …]) — whole sentences from the one take; the pauses between them are tightened
-VO = [("S1", "C0811", [(6.90, 11.24)]),                                  # пациентка пришла с запросом коррекции асимметрии груди и увеличения груди
-      ("S2", "C0811", [(13.02, 15.30), (18.16, 21.40)]),                  # она хотела пуш-ап эффект, (…) при пуш-ап эффекте он лучше добивается именно круглыми имплантами
-      ("S3", "C0811", [(22.48, 26.56), (27.52, 30.80), (32.66, 33.78)]),  # у нас здесь проблема деформации грудной клетки, и всё-таки круглые импланты дают лучшую возможность скорректировать асимметрию
-      ("S4", "C0811", [(34.80, 38.84)]),                                  # у круглого импланта только два параметра — проекция и диаметр
-      ("S5", "C0811", [(53.50, 56.72), (57.22, 61.80)]),                  # мы планируем разные объёмы, либо где-то 225 и 250, либо 200 и 250
+VO = [("S1", "C0811", [(6.90, 10.88)]),                                  # (the trailing «а…» left out)                                  # пациентка пришла с запросом коррекции асимметрии груди и увеличения груди
+      ("S2", "C0811", [(13.02, 14.50), (18.16, 21.40)]),                  # «а-а» after «эффект» and the aside to the nurse cut                  # она хотела пуш-ап эффект, (…) при пуш-ап эффекте он лучше добивается именно круглыми имплантами
+      ("S3", "C0811", [(22.48, 23.86), (24.70, 26.38), (27.52, 30.80), (32.66, 33.78)]),   # «проблема а-а-а деформации» → «проблема деформации»  # у нас здесь проблема деформации грудной клетки, и всё-таки круглые импланты дают лучшую возможность скорректировать асимметрию
+      ("S4", "C0811", [(34.80, 37.62), (38.10, 38.84)]),                  # the drawn-out «и-и» shortened                                  # у круглого импланта только два параметра — проекция и диаметр
+      ("S5", "C0811", [(53.50, 53.72), (54.15, 56.72), (57.22, 61.80)]),   # the drawn-out «мы-ы» shortened                  # мы планируем разные объёмы, либо где-то 225 и 250, либо 200 и 250
       ("S6", "C0811", [(63.14, 68.56)]),                                  # к сожалению, такая операция, которую невозможно точно предугадать перед операцией
       ("S7", "C0811", [(71.46, 76.20)]),                                  # здесь разная анатомия абсолютно желёз, разная анатомия грудной клетки
       ("S8", "C0811", [(78.62, 81.60)])]                                  # много параметров, которые нужно одновременно учитывать
@@ -65,9 +65,9 @@ def src_of(t, name):
     return best[0] + t - best[1]
 
 def T(s_): return at_src("C0811", s_)
-T_S = {b: vstart(b) - 0.08 for b, *_ in VO}; T_END = vend("S8") + 0.3; DUR = T_END + 2.6
+T_S = {b: vstart(b) - 0.08 for b, *_ in VO}; T_END = vend("S8") + 0.3; DUR = T_END + 1.6 + 2.2 * 2 + 2.8
 T_PUSH = T(13.50); T_ROUND = T(20.26)                                   # «push-up» · «круглыми»
-T_DEF = T(23.86); T_ASYM = T(33.14)                                     # «деформации» · «асимметрию»
+T_DEF = T(24.82); T_ASYM = T(33.14)                                     # «деформации» · «асимметрию»
 T_PROJ = T(36.84); T_DIAM = T(38.30)                                    # «проекция» · «диаметр»
 T_V1 = T(57.60); T_V2 = T(59.32); T_V3 = T(60.58); T_V4 = T(61.18)      # 225 · 250 · 200 · 250
 T_GL = T(72.12); T_CH = T(74.46)                                        # «анатомия желёз» · «грудной клетки»
@@ -279,11 +279,11 @@ def diag_wipe(old, new, p):
 
 # ---------------- subtitles: hand-checked words, timings from speech recognition (relative to each line's start)
 SUBS = {
-    'S1': [('Пациентка', 0.04, 0.68), ('пришла', 0.68, 1.04), ('с', 1.04, 1.06), ('запросом', 1.06, 1.64), ('асимметрии', 1.64, 2.38), ('груди', 2.38, 2.76), ('и', 2.76, 2.8), ('увеличения', 2.8, 3.42), ('груди.', 3.42, 4.02)],
-    'S2': [('Она', 0.04, 0.12), ('хотела', 0.12, 0.48), ('пуш-ап', 0.48, 0.92), ('эффект.', 0.92, 2.02), ('Пуш-ап', 2.24, 2.72), ('эффект', 2.72, 3.16), ('лучше', 3.16, 3.52), ('добивается', 3.52, 4.04), ('именно', 4.04, 4.38), ('круглыми', 4.38, 4.78), ('имплантами.', 4.78, 5.32)],
-    'S3': [('У', 0.04, 0.08), ('нас', 0.08, 0.4), ('здесь', 0.4, 0.74), ('проблема', 0.74, 1.38), ('деформации', 1.38, 2.96), ('грудной', 2.96, 3.42), ('клетки,', 3.42, 4.0), ('и', 4.0, 4.2), ('всё-таки', 4.2, 4.58), ('круглыми', 4.58, 5.08), ('имплантами', 5.08, 5.72), ('они', 5.72, 5.88), ('дают', 5.88, 6.24), ('лучшую', 6.24, 6.62), ('возможность', 6.62, 7.28), ('корректировать', 7.28, 7.82), ('асимметрию.', 7.82, 8.38)],
-    'S4': [('У', 0.04, 0.28), ('круглого', 0.28, 0.68), ('импланта', 0.68, 1.14), ('только', 1.14, 1.34), ('два', 1.34, 1.52), ('параметра:', 1.52, 2.06), ('проекция', 2.28, 2.7), ('и', 2.7, 3.48), ('диаметр.', 3.48, 4.02)],
-    'S5': [('Мы', 0.04, 0.88), ('планируем', 0.88, 1.46), ('разные', 1.46, 1.92), ('объёмы,', 1.92, 2.68), ('либо', 3.22, 3.24), ('это', 3.24, 3.6), ('225', 3.6, 4.82), ('и', 4.82, 5.32), ('250,', 5.32, 5.92), ('либо', 6.28, 6.56), ('200', 6.56, 6.98), ('и', 6.98, 7.16), ('250.', 7.16, 7.68)],
+    'S1': [('Пациентка', 0.04, 0.68), ('пришла', 0.68, 1.04), ('с', 1.04, 1.08), ('запросом', 1.08, 1.64), ('асимметрии', 1.64, 2.38), ('груди', 2.38, 2.76), ('и', 2.76, 3.02), ('увеличения', 3.02, 3.42), ('груди.', 3.42, 3.9)],
+    'S2': [('Она', 0.04, 0.12), ('хотела', 0.12, 0.48), ('пуш-ап', 0.48, 0.94), ('эффект.', 0.94, 1.4), ('Пуш-ап', 1.74, 2.1), ('эффект', 2.1, 2.46), ('лучше', 2.46, 2.74), ('добивается', 2.74, 3.24), ('именно', 3.24, 3.58), ('круглыми', 3.58, 3.98), ('имплантами.', 3.98, 4.52)],
+    'S3': [('У', 0.04, 0.08), ('нас', 0.08, 0.4), ('здесь', 0.4, 0.74), ('проблема', 0.74, 1.28), ('деформации', 1.28, 2.12), ('грудной', 2.12, 2.56), ('клетки.', 2.56, 3.1), ('Всё-таки', 3.12, 3.56), ('круглыми', 3.56, 4.04), ('имплантами', 4.04, 4.68), ('они', 4.68, 4.88), ('дают', 4.88, 5.2), ('лучшую', 5.2, 5.58), ('возможность', 5.58, 6.26), ('корректировать', 6.26, 6.8), ('асимметрию.', 6.8, 7.38)],
+    'S4': [('У', 0.04, 0.28), ('круглого', 0.28, 0.68), ('импланта', 0.68, 1.14), ('только', 1.14, 1.34), ('два', 1.34, 1.5), ('параметра:', 1.5, 2.06), ('проекция', 2.26, 2.68), ('и', 2.68, 2.98), ('диаметр.', 2.98, 3.52)],
+    'S5': [('Мы', 0.04, 0.44), ('планируем', 0.44, 1.0), ('разные', 1.0, 1.46), ('объёмы,', 1.46, 2.22), ('либо', 2.78, 2.8), ('это', 2.8, 3.14), ('225', 3.14, 4.5), ('и', 4.5, 4.88), ('250,', 4.88, 5.5), ('либо', 5.82, 6.16), ('200', 6.16, 6.54), ('и', 6.54, 6.74), ('250.', 6.74, 7.24)],
     'S6': [('К', 0.04, 0.22), ('сожалению,', 0.22, 0.56), ('такая', 0.8, 0.86), ('операция,', 0.86, 1.36), ('которую', 1.6, 1.7), ('невозможно', 1.7, 2.5), ('точно', 2.5, 3.22), ('предугадать', 3.22, 4.02), ('перед', 4.02, 4.38), ('операцией.', 4.38, 4.81)],
     'S7': [('Здесь', 0.04, 0.26), ('разная', 0.26, 0.68), ('анатомия', 0.68, 1.26), ('абсолютно', 1.26, 1.82), ('желёз,', 1.82, 2.28), ('разная', 2.78, 3.02), ('анатомия', 3.02, 3.5), ('грудной', 3.5, 3.96), ('клетки.', 3.96, 4.52)],
     'S8': [('Много', 0.04, 0.38), ('параметров,', 0.38, 1.02), ('которые', 1.26, 1.38), ('нужно', 1.38, 1.68), ('одновременно', 1.68, 2.3), ('учитывать.', 2.3, 2.92)],
@@ -313,7 +313,7 @@ FACES = np.array(json.load(open(os.path.join(WORK, "C0811_faces.json"))))   # Yu
 def face_at(t):
     """face centre (a little above the box centre, so the cap is in) and the scale that fits the head in the circle"""
     i = min(max(int(round(src_of(t, "C0811") * FPS)), 0), len(FACES) - 1); x, y, w, h = FACES[i]
-    return (x + w / 2, y + h * 0.38), float(np.clip(410 / h, 0.62, 0.95))
+    return (x + w / 2, y + h * 0.3), float(np.clip(300 / h, 0.45, 0.7))     # head and shoulders in the circle
 FACE = (580, 930); CC, CR, CS = (540, 540), 270, 0.78                 # face in the take; circle centre, radius, scale (a down-scale)
 def ring(fr, cx, cy, r, op=1.0, th=5):
     path_draw(fr, [(cx + r * np.cos(a), cy + r * np.sin(a)) for a in np.linspace(0, 2 * np.pi, 120)], 1, PINK, th, op=op)
@@ -435,16 +435,14 @@ def arrow(fr, p0, p1, p, col=PINK, th=6, both=False):
     for (hx, hy, aa) in ([(xe, ye, a)] + ([(x0, y0, a + np.pi)] if both else [])):
         fill_poly(fr, [(hx, hy), (hx - hs * np.cos(aa - 0.45), hy - hs * np.sin(aa - 0.45)), (hx - hs * np.cos(aa + 0.45), hy - hs * np.sin(aa + 0.45))], col)
 
-# ДО photos: scaled DOWN to the frame (3376x6000 is exactly 9:16), chin blurred
+# ДО photos (the client's new set, 1974/1932 x 2576): shown through cover() — a down-scale; chin blurred
 from PIL import ImageOps
-def photo(n): return np.asarray(ImageOps.exif_transpose(Image.open(os.path.join(SRC, n))).convert("RGB"))
+def photo(n): return np.asarray(ImageOps.exif_transpose(Image.open(os.path.join(SRC, "new", n + ".jpg"))).convert("RGB")).copy()
 def anon_top(img, y=150):
     top = img[:y + 80].astype(np.float32); bl = cv2.resize(cv2.GaussianBlur(cv2.resize(top, None, fx=0.1, fy=0.1), (0, 0), 3), (img.shape[1], y + 80))
     m = np.clip((y + 40 - np.arange(y + 80)) / 80, 0, 1)[:, None, None]; out = img.copy(); out[:y + 80] = (top * (1 - m) + bl * m).astype(np.uint8); return out
-DO_F = anon_top(cv2.resize(photo("DSC01078.JPG"), (W, H), interpolation=cv2.INTER_AREA), 70)
-DO_Q = anon_top(cv2.resize(photo("DSC01088.JPG"), (W, H), interpolation=cv2.INTER_AREA), 110)
-PS = W / 3376                                                            # photo px → frame px
-def at_photo(M, x, y): return M[0, 0] * x * PS + M[0, 2], M[1, 1] * y * PS + M[1, 2]
+DO_F = anon_top(photo("do_front"), 70); DO_Q = anon_top(photo("do_34"), 130)
+def at_photo(M, x, y): return M[0, 0] * x + M[0, 2], M[1, 1] * y + M[1, 2]
 
 # S1 — straight in: the question
 H1 = lift(Drop(["ПОЧЕМУ ПРИ АСИММЕТРИИ", "*МЫ ВЫБРАЛИ КРУГЛЫЕ ИМПЛАНТЫ?*"], 84, 70, 0, maxw=860), 1340)
@@ -481,11 +479,11 @@ def s2(t):
 HB2 = lift(Drop(["СКОРРЕКТИРОВАТЬ", "*АСИММЕТРИЮ*"], 92, 80, 0, maxw=880), 1270)
 TB2 = Track(["учитываем и форму груди,", "и анатомию грудной клетки"], 30, 80, 0, 300)
 T_Q = T(29.20)                                                            # the 3/4 photo
-LV = [((1010, 1440), (2280, 1430), "соски"), ((1020, 1660), (2300, 1745), "складки")]   # photo px: nipples, inframammary folds
+LV = [((813, 540), (1245, 540), "соски"), ((800, 603), (1250, 618), "складки")]          # do_front px: nipples, inframammary folds
 def s3(t):
     t0 = T_S["S3"]; q = t >= T_Q
     if not q:
-        z = lerp(1.32, 1.42, eio((t - t0) / 5)); fr, M = cover(DO_F, W, H, 0.5, 0.2, z)
+        z = lerp(1.0, 1.08, eio((t - t0) / 5)); fr, M = cover(DO_F, W, H, 0.5, 0.25, z)
         for k, ((x0, y0), (x1, y1), lab) in enumerate(LV):
             p = eio((t - t0 - 0.5 - 0.5 * k) / 0.6)
             if p <= 0: continue
@@ -496,7 +494,7 @@ def s3(t):
             if k == 1 and t > T_DEF:                                      # Δ bracket between the two fold levels
                 pb = eio((t - T_DEF) / 0.5); xb = 920; path_draw(fr, [(xb - 20, a0[1]), (xb, a0[1]), (xb, lerp(a0[1], a1[1], pb)), (xb - 20, lerp(a0[1], a1[1], pb))], 1, PINK, 5)
     else:
-        lt = t - T_Q; fr, M = cover(DO_Q, W, H, 0.5, 0.2, lerp(1.32, 1.4, eio(lt / 4)))
+        lt = t - T_Q; fr, M = cover(DO_Q, W, H, 0.45, 0.25, lerp(1.0, 1.06, eio(lt / 4)))
         fr = fr * (1 - (1 - eo(lt / 0.2))) + (1 - eo(lt / 0.2))
     shade(fr, VIG); shade(fr, GBOT); chip(fr, "ДО", 40, 290)
     badge(fr, "ЗАДАЧА 2", 80, HB2.y - 110, eo((t - t0 - 0.2) / 0.3)); HB2.draw(fr, t, t0 + 0.35)
@@ -564,8 +562,41 @@ def s8(t):
         lt = t - T_END; blend(fr, logo_alpha(300), 540 - 150, 1310, PINK, eo(lt / 0.5))
     return fr
 
-SCENES = [(0, s1), (T_S["S2"], s2), (T_S["S3"], s3), (T_S["S4"], s4), (T_S["S5"], s5), (T_S["S6"], s6), (T_S["S8"], s8)]
-TRANS = {T_S["S2"]: ("zoom", 0.35), T_S["S3"]: ("iris", 0.5), T_S["S4"]: ("zoom", 0.35), T_S["S5"]: ("diag", 0.45), T_S["S6"]: ("zoom", 0.35), T_S["S8"]: ("zoom", 0.35)}
+# K — collages: ПОСЛЕ on top, ДО below, on black; ПОСЛЕ colour-matched to the ДО of the same angle (skin statistics in Lab)
+ALIGN = {"do_front": (135, 926, 990), "posle_front": (144, 948, 651), "do_34": (198, 908, 845), "posle_34": (215, 1060, 656),
+         "do_side": (144, 1000, 845), "posle_side": (180, 1010, 656)}   # (neck, navel / waist row, body centre x) in photo px
+def skin(rgb):
+    hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV); return (hsv[..., 2] > 90) & (hsv[..., 1] > 25) & (hsv[..., 1] < 170) & ((hsv[..., 0] < 25) | (hsv[..., 0] > 165))
+def match_colour(src, ref):
+    a = cv2.cvtColor(src, cv2.COLOR_RGB2LAB).astype(np.float32); b = cv2.cvtColor(ref, cv2.COLOR_RGB2LAB).astype(np.float32)
+    ms, mr = skin(src), skin(ref)
+    for c in range(3):
+        s0, s1_ = a[..., c][ms].mean(), a[..., c][ms].std() + 1e-3; r0, r1 = b[..., c][mr].mean(), b[..., c][mr].std() + 1e-3
+        k = float(np.clip(r1 / s1_, 0.75, 1.35))
+        a[..., c] = (a[..., c] - s0) * k + r0
+    return cv2.cvtColor(np.clip(a, 0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB)
+def panel(im, n, ph=960, neck_at=40, span=470):
+    neck, navel, cx = ALIGN[n]; s_ = span / (navel - neck); r = cv2.resize(im, None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+    out = np.zeros((ph, W, 3), np.float32); ox, oy = int(cx * s_ - W / 2), int(neck * s_ - neck_at)
+    xs0, ys0 = max(0, ox), max(0, oy); xs1, ys1 = min(r.shape[1], ox + W), min(r.shape[0], oy + ph)
+    out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = r[ys0:ys1, xs0:xs1]
+    lum = out.mean(2); k = np.clip((lum - 0.2) / 0.14, 0, 1); k = k * k * (3 - 2 * k)
+    k = np.maximum(k, np.clip((out[..., 2] - out[..., 0] - 0.04) / 0.05, 0, 1)); out *= k[..., None]   # the navy stickers keep their colour          # studio backdrop → pure black
+    return out
+COLL = []
+for ang in ("front", "34", "side"):
+    d = photo("do_" + ang); a = match_colour(photo("posle_" + ang), d)
+    COLL.append(np.vstack([panel(anon_top(a, ALIGN["posle_" + ang][0] - 40), "posle_" + ang), panel(anon_top(d, ALIGN["do_" + ang][0] - 40), "do_" + ang)]))
+COLL8 = [(np.clip(c, 0, 1) * 255).astype(np.uint8) for c in COLL]
+T_K = [T_END + 1.6 + 2.2 * k for k in range(3)]                          # after the finale and the logo
+def s_k(t):
+    k = max(i for i, tk in enumerate(T_K) if t >= tk - 1e-6); lt = t - T_K[k]
+    fr = full(COLL8[k], 0.5, 0.5, 1 + 0.03 * (1 - eo(lt / 0.35))); fr[957:963] = PINK
+    chip(fr, "ПОСЛЕ", 40, 290); chip(fr, "ДО", 40, 1000)
+    f = 1 - eo(lt / 0.18) if k else 0; return fr * (1 - f) + f
+
+SCENES = [(0, s1), (T_S["S2"], s2), (T_S["S3"], s3), (T_S["S4"], s4), (T_S["S5"], s5), (T_S["S6"], s6), (T_S["S8"], s8), (T_K[0], s_k)]
+TRANS = {T_S["S2"]: ("zoom", 0.35), T_S["S3"]: ("iris", 0.5), T_S["S4"]: ("zoom", 0.35), T_S["S5"]: ("diag", 0.45), T_S["S6"]: ("zoom", 0.35), T_S["S8"]: ("zoom", 0.35), T_K[0]: ("iris", 0.5)}
 def push(old, new, p):
     e = eio(p); x = int(W * e); fr = np.empty_like(old); fr[:, :W - x] = old[:, x:]; fr[:, W - x:] = new[:, :x]
     if 0 < x < W: fr[:, max(0, W - x - 2):W - x + 2] = PINK
@@ -697,6 +728,7 @@ def build_audio(path):
     put(water(600, 1500), T_GL, 0.22); put(water(700, 1600), T_CH, 0.22)
     for k in range(len(PARAMS)): put(pop(1000 + 60 * k, 450, 0.08), T_S["S8"] + 0.3 + 0.22 * k, 0.09)
     put(glass(1174.7), T_END, 0.14)
+    for tk in T_K: put(click(), tk, 0.9)                                                              # shutter on every collage
     sfx[:n] *= 1 - 0.8 * np.clip(dd, 0, 1)
     mix = vo[:, None] + mus + sfx[:n, None] * np.float64([[0.92, 1.0]])
     mix *= 10 ** (-1.5 / 20); mix /= max(1, np.abs(mix).max() / 0.95)                           # ≈ -16.5 LUFS like the other reels
@@ -706,7 +738,7 @@ def build_audio(path):
 def make_cover(path):
     """everything inside the centre 3:4 (y 240-1680) that the profile grid shows; a deeper navy than the video"""
     CBG = np.clip(np.float32([0, 8, 28]) / 255 * (1 + 0.3 * np.exp(-(((xx - 540) / 900) ** 2 + ((yy - 520) / 900) ** 2)))[..., None], 0, 1).astype(np.float32)
-    fr = CBG.copy(); im, M = cover(DO_F, W, 820, 0.5, 0.15, 1.35); y0 = 330
+    fr = CBG.copy(); im, M = cover(DO_F, W, 820, 0.5, 0.18, 1.0); y0 = 330
     g = np.maximum(np.clip((np.arange(820) - 600) / 220, 0, 1), np.clip((120 - np.arange(820)) / 120, 0, 1))[:, None, None]; fr[y0:y0 + 820] = im * (1 - g) + CBG[y0:y0 + 820] * g
     for k, ((x0, y0_), (x1, y1_), _) in enumerate(LV):
         for xa, ya in (at_photo(M, x0, y0_), at_photo(M, x1, y1_)):
