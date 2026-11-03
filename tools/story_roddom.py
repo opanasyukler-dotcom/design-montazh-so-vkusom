@@ -57,6 +57,16 @@ LEAD_6 = ("Если вы настолько устали от своей раб�
           "на\u00a0роженицах, пожалуйста, задумайтесь, стоит ли вам продолжать работать "
           "в\u00a0таком месте.")
 
+# Story 7: disclaimer in an outlined note on top, statement at the bottom
+# with the "good impressions" literally crossed out
+NOTE_7 = ("И да, я\u00a0понимаю, что у\u00a0кого-то мог быть совершенно другой опыт "
+          "в\u00a0этом роддоме. Я\u00a0рассказываю исключительно о\u00a0том, с\u00a0чем "
+          "столкнулась лично.")
+STATEMENT_7 = ("Но для меня эти четыре дня перечеркнули все хорошие впечатления "
+               "от\u00a0самих родов.")
+STRUCK_7 = {"хорошие", "впечатления"}
+STRIKE = (214, 112, 92)
+
 # Bold lines use Inter Display Bold, the closest open match to Instagram's "Classic" font
 CLASSIC = os.path.join(ROOT, "fonts", "commercial-safe", "Inter", "InterDisplay-Bold.otf")
 
@@ -217,9 +227,49 @@ def story_4():
     return img
 
 
+def story_7():
+    img = Image.blend(blurred(), Image.new("RGB", (W, H), (38, 24, 20)), 0.62)
+    d = ImageDraw.Draw(img)
+    white = (250, 247, 242)
+    soft = (226, 216, 206)
+
+    # Outlined note, like a quiet aside
+    nf = manrope(38, "Light")
+    nx, pad = 100, 48
+    note = wrap(d, NOTE_7, nf, W - 2 * nx - 2 * pad)
+    top = 300
+    bottom = top + 2 * pad + len(note) * 58 - 10
+    d.rounded_rectangle((nx, top, W - nx, bottom), radius=28, outline=soft, width=2)
+    y = top + pad - 6
+    for line in note:
+        d.text((nx + pad, y), line, font=nf, fill=soft)
+        y += 58
+
+    # Bottom statement, word by word so struck words can be crossed out
+    sf = classic(72)
+    x0, step = 100, 88
+    lines = wrap(d, STATEMENT_7, sf, W - 200)
+    y = 1560 - len(lines) * step
+    space = d.textlength(" ", font=sf)
+    for line in lines:
+        x, span = x0, None
+        for word in line.split(" "):
+            wl = d.textlength(word, font=sf)
+            d.text((x, y), word, font=sf, fill=white)
+            if word.strip(".,") in STRUCK_7:
+                span = (span[0] if span else x, x + wl)
+            x += wl + space
+        if span:
+            _, t, _, b = d.textbbox((0, y), "о", font=sf)  # strike at x-height middle
+            mid = (t + b) // 2
+            d.line((span[0] - 6, mid, span[1] + 6, mid), fill=STRIKE, width=7)
+        y += step
+    return img
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    for k, make in enumerate((story_1, story_2, story_3, story_4, story_5, story_6), 1):
+    for k, make in enumerate((story_1, story_2, story_3, story_4, story_5, story_6, story_7), 1):
         path = os.path.join(OUT, f"story_{k:02d}.jpg")
         make().save(path, quality=95)
         print(path)
