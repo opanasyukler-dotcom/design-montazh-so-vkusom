@@ -49,6 +49,14 @@ LEAD_5 = ("Я правда не понимаю, зачем идти работа
 TEXT_5 = ("Это ведь место, где женщина даёт новую жизнь. Где она находится в\u00a0максимально "
           "уязвимом состоянии и\u00a0нуждается хотя бы в\u00a0элементарной поддержке.")
 
+# Story 6: story first, the appeal to the staff in bold at the end
+TEXT_6 = ("Я не требовала особенного отношения. Я\u00a0просто хотела, чтобы со\u00a0мной "
+          "разговаривали по-человечески, объясняли, что происходит с\u00a0моим ребёнком, "
+          "и\u00a0помогали, когда я\u00a0об\u00a0этом просила.")
+LEAD_6 = ("Если вы настолько устали от своей работы, что позволяете себе срываться "
+          "на\u00a0роженицах, пожалуйста, задумайтесь, стоит ли вам продолжать работать "
+          "в\u00a0таком месте.")
+
 # Bold lines use Inter Display Bold, the closest open match to Instagram's "Classic" font
 CLASSIC = os.path.join(ROOT, "fonts", "commercial-safe", "Inter", "InterDisplay-Bold.otf")
 
@@ -147,7 +155,12 @@ def story_5():
     return lead_and_body(LEAD_5, TEXT_5)
 
 
-def lead_and_body(lead_text, body_text):
+def story_6():
+    return lead_and_body(LEAD_6, TEXT_6, body_first=True)
+
+
+def lead_and_body(lead_text, body_text, body_first=False):
+    """Bold white lead and light body split by a thin rule; order is configurable."""
     img = Image.blend(blurred(), Image.new("RGB", (W, H), (38, 24, 20)), 0.62)
     d = ImageDraw.Draw(img)
     x, width = 100, W - 200
@@ -155,20 +168,20 @@ def lead_and_body(lead_text, body_text):
     soft = (226, 216, 206)
 
     lf, bf = classic(58), manrope(42, "Light")
-    lead = wrap(d, lead_text, lf, width)
-    body = wrap(d, body_text, bf, width)
-    block = len(lead) * 74 + 140 + len(body) * 62
-    y = (H - block) // 2 - 60
+    blocks = [(wrap(d, lead_text, lf, width), lf, white, 74),
+              (wrap(d, body_text, bf, width), bf, soft, 62)]
+    if body_first:
+        blocks.reverse()
+    y = (H - sum(len(b[0]) * b[3] for b in blocks) - 140) // 2 - 60
 
-    for line in lead:
-        d.text((x, y), line, font=lf, fill=white)
-        y += 74
-    y += 60
-    d.line((x, y, x + 120, y), fill=white, width=2)
-    y += 80
-    for line in body:
-        d.text((x, y), line, font=bf, fill=soft)
-        y += 62
+    for k, (lines, font, color, step) in enumerate(blocks):
+        if k:
+            y += 60
+            d.line((x, y, x + 120, y), fill=white, width=2)
+            y += 80
+        for line in lines:
+            d.text((x, y), line, font=font, fill=color)
+            y += step
     return img
 
 
@@ -206,7 +219,7 @@ def story_4():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    for k, make in enumerate((story_1, story_2, story_3, story_4, story_5), 1):
+    for k, make in enumerate((story_1, story_2, story_3, story_4, story_5, story_6), 1):
         path = os.path.join(OUT, f"story_{k:02d}.jpg")
         make().save(path, quality=95)
         print(path)
