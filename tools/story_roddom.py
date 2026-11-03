@@ -5,7 +5,7 @@ Usage: python3 tools/story_roddom.py
 import os
 from PIL import Image, ImageDraw, ImageFilter
 
-from stories_editorial import (BODY, BROWN, H, ROOT, UPLOADS, W, cover_crop, linen,
+from stories_editorial import (BODY, BROWN, H, PAPER, ROOT, UPLOADS, W, cover_crop, linen,
                                manrope, montserrat, wrap)
 
 OUT = os.path.join(ROOT, "stories_roddom")
@@ -21,12 +21,23 @@ PARAGRAPHS = [
 ACCENT = "НО!"
 PUNCHLINE = "Всё впечатление испортило послеродовое отделение."
 
+# Story 2: angry statement, white type straight on a darkened blur
+TEXT_2 = ("За четыре дня мне попадались просто УЖАСНЫЕ смены! Отношение максимально "
+          "советское. Меня унижали, оскорбляли, а\u00a0когда я\u00a0просила помощи, "
+          "вместо неё получала замечания.")
+STATEMENT = ["Я НИКОГДА", "БОЛЬШЕ НЕ ПОШЛА", "БЫ РОЖАТЬ", "В РОДДОМ"]
+HIGHLIGHT = "ИМЕНИ ЮДИНА!"
+
 BLUR = 30
 PLATE_X, PAD, LINE = 60, 55, 56
 
 
-def main():
-    img = cover_crop(PHOTO, W, H, (0.5, 0.5)).filter(ImageFilter.GaussianBlur(BLUR))
+def blurred():
+    return cover_crop(PHOTO, W, H, (0.5, 0.5)).filter(ImageFilter.GaussianBlur(BLUR))
+
+
+def story_1():
+    img = blurred()
     d = ImageDraw.Draw(img)
 
     tf, af = montserrat(78, "Bold"), montserrat(64, "Bold")
@@ -68,11 +79,41 @@ def main():
         d.text((tx, y), line, font=pf, fill=BROWN)
         y += 58
 
-    os.makedirs(OUT, exist_ok=True)
-    path = os.path.join(OUT, "story_01.jpg")
-    img.save(path, quality=95)
-    print(path)
+    return img
+
+
+def story_2():
+    img = Image.blend(blurred(), Image.new("RGB", (W, H), (38, 24, 20)), 0.62)
+    d = ImageDraw.Draw(img)
+    x, width = 100, W - 200
+    white = (250, 247, 242)
+
+    bf = manrope(42, "Light")
+    y = 330
+    for line in wrap(d, TEXT_2, bf, width):
+        d.text((x, y), line, font=bf, fill=white)
+        y += 62
+
+    y += 70
+    d.line((x, y, x + 120, y), fill=white, width=2)
+    y += 70
+
+    sf = montserrat(80, "Bold")
+    for line in STATEMENT:
+        d.text((x, y), line, font=sf, fill=white)
+        y += 96
+
+    # Marker-style paper highlight on the hospital name
+    pad_x, pad_y = 22, 12
+    l, t, r, b = d.textbbox((x + pad_x, y + 10), HIGHLIGHT, font=sf)
+    d.rounded_rectangle((l - pad_x, t - pad_y, r + pad_x, b + pad_y), radius=10, fill=PAPER)
+    d.text((x + pad_x, y + 10), HIGHLIGHT, font=sf, fill=BROWN)
+    return img
 
 
 if __name__ == "__main__":
-    main()
+    os.makedirs(OUT, exist_ok=True)
+    for k, make in enumerate((story_1, story_2), 1):
+        path = os.path.join(OUT, f"story_{k:02d}.jpg")
+        make().save(path, quality=95)
+        print(path)
