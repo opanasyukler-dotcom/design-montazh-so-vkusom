@@ -153,35 +153,46 @@ def s1():
     os.remove(tmp); print("wrote", out, f"{total:.1f}s", flush=True)
 
 
+def warm(img, da=4.0, db=10.0, dl=3.0):
+    """a little warmth on the skin (a/b towards peach on warm pixels only)"""
+    lab = cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2LAB).astype(np.float32)
+    m = cv2.GaussianBlur(np.clip((lab[..., 2] - 128) / 8, 0, 1) * np.clip((lab[..., 0] - 50) / 40, 0, 1), (0, 0), 2)
+    lab[..., 0] += dl * m; lab[..., 1] += da * m; lab[..., 2] += db * m
+    return Image.fromarray(cv2.cvtColor(lab.clip(0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB))
+
+
 def s2():
-    """the scars now (IMG_2065, full screen): the text on top under a soft top fade, the scar after one month in a big
-    circle low on the left with its caption, «Подробнее…» at the bottom"""
+    """the scars now (IMG_2065 as shot: the whole photo, 1536x2730 = 9:16, only scaled to 1080x1920); the text low on
+    the left, the circle with the scar after one month (whole chest as shot, warmed up) low on the right with its
+    caption; «Подробнее…» tilted at the bottom"""
     bg = np.asarray(Image.open(os.path.join(DRIVE, "IMG_2065.JPG.png")).convert("RGB").resize((W, H), Image.LANCZOS), np.float32) / 255
-    ys = np.arange(H, dtype=np.float32)[:, None, None]
-    shade = 0.78 * np.clip((640 - ys) / 520, 0, 1) ** 1.2 + 0.8 * np.clip((ys - 1560) / 300, 0, 1)
+    ys = np.arange(H, dtype=np.float32)[:, None, None]; xs = np.arange(W, dtype=np.float32)[None, :, None]
+    shade = 0.72 * np.clip((ys - 900) / 260, 0, 1) * np.clip((700 - xs) / 300, 0.35, 1)      # dark under the text (lower left)
+    shade = np.maximum(shade, 0.75 * np.clip((ys - 1640) / 220, 0, 1))
     fr = bg * (1 - shade)
-    hb = ImageFont.truetype(BOLD, 46); lay = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(lay)
-    f = mont(31, 400); fb = mont(32, 600); y = 70
-    d.text((MARGIN, y), "ПРОШЁЛ 1 ГОД И 3 МЕСЯЦА", font=hb, fill=WHITE); y += 56
-    d.text((MARGIN, y), "ПОСЛЕ ОПЕРАЦИИ", font=hb, fill=WHITE); y += 70
-    d.text((MARGIN, y), "Вот так сейчас выглядят рубцы.", font=fb, fill=WHITE); y += 52
-    for ln in ["В первые месяцы они могут быть яркими и заметными,", "и этого многие пациентки боятся. Но со временем",
-               "рубцы светлеют, становятся мягче и практически", "сливаются с кожей.", ]:
-        d.text((MARGIN, y), ln, font=f, fill=WHITE); y += 42
-    y += 8; d.text((MARGIN, y), "Поэтому не стоит оценивать их слишком рано.", font=fb, fill=WHITE)
-    # the circle: the scar one month after (IMG scar_1m), big enough to see it
-    D = 520; R = D // 2 + 7; cx, cy = 40, 980
-    ph = Image.open(os.path.join(DRIVE, "scar_1m.bin.png")).convert("RGB").crop((815, 1340, 1375, 1900)).resize((D, D), Image.LANCZOS)
+    lay = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(lay)
+    hb = ImageFont.truetype(BOLD, 40); f = mont(29, 400); fb = mont(30, 600); y = 990; x = 56
+    for t in ["ПРОШЁЛ 1 ГОД И 3 МЕСЯЦА", "ПОСЛЕ ОПЕРАЦИИ"]: d.text((x, y), t, font=hb, fill=WHITE); y += 48
+    y += 16; d.text((x, y), "Вот так сейчас", font=fb, fill=WHITE); y += 38; d.text((x, y), "выглядят рубцы.", font=fb, fill=WHITE); y += 52
+    for ln in ["В первые месяцы они могут", "быть яркими и заметными,", "и этого многие пациентки", "боятся. Но со временем",
+               "рубцы светлеют, становятся", "мягче и практически", "сливаются с кожей."]:
+        d.text((x, y), ln, font=f, fill=WHITE); y += 38
+    y += 12
+    for ln in ["Поэтому не стоит оценивать", "их слишком рано."]: d.text((x, y), ln, font=fb, fill=WHITE); y += 40
+    # the circle on the right: the chest one month after, as shot (both breasts, the scars visible), warmed up
+    D = 430; cx, cy = W - 40 - (D + 14), 1000
+    ph = warm(Image.open(os.path.join(DRIVE, "scar_1m.bin.png")).convert("RGB")).crop((800, 820, 2200, 2220)).resize((D, D), Image.LANCZOS)
     circ = Image.new("RGBA", (D + 14, D + 14), (0, 0, 0, 0)); ImageDraw.Draw(circ).ellipse((0, 0, D + 13, D + 13), fill=WHITE + (255,))
     m = Image.new("L", (D, D), 0); ImageDraw.Draw(m).ellipse((0, 0, D - 1, D - 1), fill=255); ph = ph.convert("RGBA"); ph.putalpha(m)
     circ.alpha_composite(ph, (7, 7)); lay.alpha_composite(circ, (cx, cy))
-    fc = mont(30, 400); yc = cy + D + 30
+    fc = mont(26, 400); yc = cy + D + 26
     for ln in ["здесь вы можете видеть рубец", "спустя всего месяц после операции"]:
-        d.text((cx + 4, yc), ln, font=fc, fill=WHITE); yc += 40
-    d.text((MARGIN, H - 120), "Подробнее про рубцы в актуальном «Рубцы»", font=mont(31, 500), fill=WHITE)
-    sh = Image.new("RGBA", (W, H), GRAPHITE + (0,)); a = lay.getchannel("A")
-    txt_only = Image.new("L", (W, H), 0); txt_only.paste(a)
-    sh.putalpha(txt_only.point(lambda v: v * 150 // 255))
+        d.text((cx + (D + 14) / 2, yc), ln, font=fc, fill=WHITE, anchor="ma"); yc += 34
+    # «Подробнее…» tilted a little, like a handwritten note
+    note = Image.new("RGBA", (900, 120), (0, 0, 0, 0)); dn = ImageDraw.Draw(note)
+    dn.text((450, 60), "Подробнее про рубцы в актуальном «Рубцы»", font=mont(32, 600), fill=WHITE + (255,), anchor="mm")
+    note = note.rotate(6, resample=Image.BICUBIC, expand=True); lay.alpha_composite(note, ((W - note.width) // 2, H - 90 - note.height // 2))
+    sh = Image.new("RGBA", (W, H), GRAPHITE + (0,)); sh.putalpha(lay.getchannel("A").point(lambda v: v * 150 // 255))
     lay2 = Image.alpha_composite(sh.filter(ImageFilter.GaussianBlur(8)), lay)
     fr = over(fr, np.asarray(lay2, np.float32) / 255)
     out = os.path.join(OUT, "02_rubcy.jpg"); Image.fromarray((np.clip(fr, 0, 1) * 255).astype(np.uint8)).save(out, quality=94); print("wrote", out)
