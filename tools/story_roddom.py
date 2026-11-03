@@ -28,6 +28,13 @@ TEXT_2 = ("За четыре дня мне попадались просто У�
 STATEMENT = ["Я НИКОГДА", "БОЛЬШЕ НЕ ПОШЛА", "БЫ РОЖАТЬ", "В РОДДОМ"]
 HIGHLIGHT = "ИМЕНИ ЮДИНА!"
 
+# Story 3: quiet ending, same dark blur, calmer type
+LEAD_3 = "Для меня это был самый ужасный опыт общения с\u00a0медицинским персоналом."
+TEXT_3 = ("У меня даже есть заключение специалиста о\u00a0психологической травме, "
+          "полученной после этого опыта. Я\u00a0рассматривала возможность обратиться "
+          "в\u00a0суд, но в\u00a0итоге решила, что не хочу больше тратить на\u00a0эту "
+          "историю свои силы.")
+
 BLUR = 30
 PLATE_X, PAD, LINE = 60, 55, 56
 
@@ -111,9 +118,34 @@ def story_2():
     return img
 
 
+def story_3():
+    img = Image.blend(blurred(), Image.new("RGB", (W, H), (38, 24, 20)), 0.62)
+    d = ImageDraw.Draw(img)
+    x, width = 100, W - 200
+    white = (250, 247, 242)
+    soft = (226, 216, 206)
+
+    lf, bf = manrope(56, "Medium"), manrope(42, "Light")
+    lead = wrap(d, LEAD_3, lf, width)
+    body = wrap(d, TEXT_3, bf, width)
+    block = len(lead) * 74 + 140 + len(body) * 62
+    y = (H - block) // 2 - 60
+
+    for line in lead:
+        d.text((x, y), line, font=lf, fill=white)
+        y += 74
+    y += 60
+    d.line((x, y, x + 120, y), fill=white, width=2)
+    y += 80
+    for line in body:
+        d.text((x, y), line, font=bf, fill=soft)
+        y += 62
+    return img
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    for k, make in enumerate((story_1, story_2), 1):
+    for k, make in enumerate((story_1, story_2, story_3), 1):
         path = os.path.join(OUT, f"story_{k:02d}.jpg")
         make().save(path, quality=95)
         print(path)
