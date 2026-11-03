@@ -357,19 +357,24 @@ LEGS = {"p2": 3150, "p3": 3540, "p12": 3540}                                 # Ð
 PANEL_BG = {}
 def panel(n, pw=W, ph=960, neck_at=70, span=600):
     if (ph, pw) not in PANEL_BG:
-        g = np.linspace(0, 1, ph)[:, None, None]; PANEL_BG[ph, pw] = (NAVY * (1 - g * 0.6) + DEEP * g * 0.6 + np.zeros((ph, pw, 3))).astype(np.float32)
+        PANEL_BG[ph, pw] = np.zeros((ph, pw, 3), np.float32) if ph == 960 else \
+            (NAVY * (1 - np.linspace(0, 1, ph)[:, None, None] * 0.6) + DEEP * np.linspace(0, 1, ph)[:, None, None] * 0.6 + np.zeros((ph, pw, 3))).astype(np.float32)   # collages on black
     im = PH[n].astype(np.float32) / 255; a = cv2.imread(os.path.join(CUT, f"m_{n}.png"), 0).astype(np.float32) / 255
     neck, navel = BODY[n]; s = span / (navel - neck)
     rows = np.arange(a.shape[0])[:, None]; a = a * np.clip((rows - (neck - 60)) / 60, 0, 1)            # nothing above the neck
-    if n in LEGS: a = a * np.clip((LEGS[n] - rows) / 90, 0, 1)                                    # nor the stockings
     for x, y, r in NIP.get(n, []): cv2.circle(a, (int(x), int(y)), int(r) + 1, 1.0, -1, cv2.LINE_AA)       # stickers stay whole even past the body edge
+    if ph == 960:                                                         # collage on black: dark parts of the photo (backdrop, stockings) stay as shot
+        lum = im.mean(2); a = np.maximum(a, np.clip((0.22 - lum) / 0.12, 0, 1)); a = a * np.clip((rows - (neck - 60)) / 60, 0, 1)
+        k = np.clip((lum - 0.12) / 0.2, 0, 1); k = k * k * (3 - 2 * k)
+        for x, y, r in NIP.get(n, []): cv2.circle(k, (int(x), int(y)), int(r) + 2, 1.0, -1, cv2.LINE_AA)          # the navy stickers keep their colour
+        im = im * k[..., None]                 # crush the dark backdrop to pure black (skin is far brighter)
     band = a[neck:navel]; cols = np.arange(a.shape[1]); cx = float((band.sum(0) * cols).sum() / max(1, band.sum()))
     im = cv2.resize(im, None, fx=s, fy=s, interpolation=cv2.INTER_AREA); a = cv2.resize(a, None, fx=s, fy=s, interpolation=cv2.INTER_AREA)[..., None]
     ox, oy = int(cx * s - pw / 2), int(neck * s - neck_at); out = PANEL_BG[ph, pw].copy()
     xs0, ys0 = max(0, ox), max(0, oy); xs1, ys1 = min(im.shape[1], ox + pw), min(im.shape[0], oy + ph)
     sub = out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox]; aa = a[ys0:ys1, xs0:xs1]; sub[:] = sub * (1 - aa) + im[ys0:ys1, xs0:xs1] * aa
     return out
-COLL = [np.vstack([panel(a), panel(b)]) for a, b in (("IMG_9145", "p2"), ("IMG_9146", "p3"), ("IMG_9147", "p12"))]
+COLL = [np.vstack([panel(a, neck_at=50, span=520), panel(b, neck_at=50, span=520)]) for a, b in (("IMG_9145", "p2"), ("IMG_9146", "p3"), ("IMG_9147", "p12"))]   # as much body as the photos hold
 COLL8 = [(np.clip(c, 0, 1) * 255).astype(np.uint8) for c in COLL]
 
 
