@@ -551,7 +551,7 @@ def up_arrow(fr, t, t0, x=860, y=1080):
 # ---------------- scenes ----------------
 # A — opening: ДО → ПОСЛЕ slider on the full photos (their own backdrop, nothing cut), aligned by neck and navel
 HA = Drop(["НАСТУПИЛ ПЕРИОД", "*ЛЮБОВАНИЯ СОБОЙ*"], 104, 70, 300, maxw=860)
-TA = Track(["больше месяца после операции"], 32, 72, 0, 300)
+TA = Track(["больше месяца после операции:", "абдоминопластика, липофилинг", "и Т-образная подтяжка груди"], 30, 72, 0, 300)
 SL_B = SL_A = None; T_SW = (0.55, 1.75)
 def full_aligned(n, neck_at=225, span=1100):
     """the whole photo scaled DOWN so neck→navel = `span`, neck at `neck_at`, body centred; any uncovered strip takes the photo's backdrop"""
@@ -593,7 +593,7 @@ def s_b(t):
 
 # C — the plan on the ДО photo: belly zone and both breasts light up as she names them
 HC = Drop(["ПЛАН *ОПЕРАЦИИ*"], 104, 70, 300, maxw=860)
-ITEMS = [("АБДОМИНОПЛАСТИКА", vstart("C") + 0.05), ("ЛИПОФИЛИНГ ГРУДИ", vstart("C") + 1.6)]
+ITEMS = [("АБДОМИНОПЛАСТИКА", vstart("C") + 0.05), ("ЛИПОФИЛИНГ ГРУДИ", vstart("C") + 1.6), ("Т-ОБРАЗНАЯ ПОДТЯЖКА ГРУДИ", vstart("C") + 2.4)]   # the lift is not said in the interview: caption only
 def checklist(fr, t, x=80, y0=420, dy=80, size=62):
     for k, (lab, t0) in enumerate(ITEMS):
         lt = t - t0
