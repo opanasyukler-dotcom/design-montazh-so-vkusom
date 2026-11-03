@@ -614,21 +614,14 @@ def click():
     x = x * e / 2; k = felt(160, 0.08); x[:len(k)] += k * 0.4; return x
 PENTA = [587.3, 659.3, 740.0, 880.0, 987.8, 1174.7]                    # D major pentatonic, matches the music
 
-MUSIC = os.path.join(SRC, "music.wav")
-M_DROP = 14.45; M0 = M_DROP - T_S["B"]                                # the drop lands on the first explainer
+MUSIC = os.path.join(SRC, "song3.wav")                                 # the client's track (audio of the screen recording, 48 kHz stereo)
+M0 = 0.3                                                               # the track outlasts the reel, no loop needed
 G_VO, G_GAP = 0.022, 0.075
 def track(n):
     w = wave.open(MUSIC); x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64).reshape(-1, w.getnchannels()) / 32768
     if x.shape[1] == 1: x = np.repeat(x, 2, 1)
-    x = x / np.sqrt(np.mean(x[int(M_DROP * SR):].mean(1) ** 2)); x[:int(M_DROP * SR)] *= 4.5
-    bar = 4 * 60 / 137.0; b = int((M_DROP + 20 * bar) * SR); a0 = int((M_DROP + 4 * bar) * SR); w = SR; cf = int(0.3 * SR)
-    ref = x[b:b + w].mean(1); a = max(range(a0 - int(0.08 * SR), a0 + int(0.08 * SR), 12), key=lambda k: float(np.dot(ref, x[k:k + w].mean(1))))
-    fade = np.sin(np.linspace(0, np.pi / 2, cf))[:, None] ** 2; seam = x[b:b + cf] * (1 - fade) + x[a:a + cf] * fade
-    parts = [x[:b]]; total = b
-    while total < int(M0 * SR) + n:
-        parts += [seam, x[a + cf:b]]; total += b - a
-    x = np.concatenate(parts)
-    seg = x[int(M0 * SR):int(M0 * SR) + n]; return np.pad(seg, ((0, n - len(seg)), (0, 0)))
+    seg = x[int(M0 * SR):int(M0 * SR) + n]; seg = seg / np.sqrt(np.mean(seg.mean(1) ** 2))
+    return np.pad(seg, ((0, n - len(seg)), (0, 0)))
 
 def build_audio(path):
     n = int(DUR * SR); vo = np.zeros(n); act = np.zeros(n); srcs = {}
@@ -665,7 +658,7 @@ def build_audio(path):
     for tk in T_K: put(click(), tk, 0.9)
     sfx[:n] *= 1 - 0.8 * np.clip(dd, 0, 1)
     mix = vo[:, None] + mus + sfx[:n, None] * np.float64([[0.92, 1.0]])
-    mix *= 10 ** (0.5 / 20); mix /= max(1, np.abs(mix).max() / 0.95)                           # ≈ -16.5 LUFS like the other reels
+    mix *= 10 ** (1.7 / 20); mix /= max(1, np.abs(mix).max() / 0.95)                           # ≈ -16.5 LUFS like the other reels
     with wave.open(path, "wb") as w:
         w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR); w.writeframes((mix * 32767).astype(np.int16).tobytes())
 
