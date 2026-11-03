@@ -3,10 +3,10 @@
 Usage: python3 tools/story_roddom.py
 """
 import os
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from stories_editorial import (BODY, BROWN, H, PAPER, ROOT, UPLOADS, W, cover_crop, linen,
-                               manrope, montserrat, wrap)
+                               manrope, wrap)
 
 OUT = os.path.join(ROOT, "stories_roddom")
 PHOTO = f"{UPLOADS}/1c049e08-image.jpg"
@@ -35,8 +35,15 @@ TEXT_3 = ("У меня даже есть заключение специалис
           "в\u00a0суд, но в\u00a0итоге решила, что не хочу больше тратить на\u00a0эту "
           "историю свои силы.")
 
+# Bold lines use Inter Display Bold, the closest open match to Instagram's "Classic" font
+CLASSIC = os.path.join(ROOT, "fonts", "commercial-safe", "Inter", "InterDisplay-Bold.otf")
+
 BLUR = 30
 PLATE_X, PAD, LINE = 60, 55, 56
+
+
+def classic(size):
+    return ImageFont.truetype(CLASSIC, size)
 
 
 def blurred():
@@ -47,8 +54,8 @@ def story_1():
     img = blurred()
     d = ImageDraw.Draw(img)
 
-    tf, af = montserrat(78, "Bold"), montserrat(64, "Bold")
-    bf, pf = manrope(38, "Light"), manrope(40, "Medium")
+    tf, af = classic(80), classic(66)
+    bf, pf = manrope(38, "Light"), classic(42)
     tx = PLATE_X + PAD
     width = W - 2 * tx
     paras = [wrap(d, p, bf, width) for p in PARAGRAPHS]
@@ -105,7 +112,7 @@ def story_2():
     d.line((x, y, x + 120, y), fill=white, width=2)
     y += 70
 
-    sf = montserrat(80, "Bold")
+    sf = classic(84)
     for line in STATEMENT:
         d.text((x, y), line, font=sf, fill=white)
         y += 96
@@ -125,7 +132,7 @@ def story_3():
     white = (250, 247, 242)
     soft = (226, 216, 206)
 
-    lf, bf = manrope(56, "Medium"), manrope(42, "Light")
+    lf, bf = classic(58), manrope(42, "Light")
     lead = wrap(d, LEAD_3, lf, width)
     body = wrap(d, TEXT_3, bf, width)
     block = len(lead) * 74 + 140 + len(body) * 62
