@@ -178,7 +178,7 @@ def s2():
     for ln in ["Поэтому не стоит оценивать", "их слишком рано."]: d.text((x, y), ln, font=fb, fill=WHITE); y += 40
     # the circle on the right: the chest one month after, as shot (both breasts, the scars visible), warmed up
     D = 430; cx, cy = W - 40 - (D + 14), 1000
-    ph = warm(Image.open(os.path.join(DRIVE, "scar_1m.bin.png")).convert("RGB")).crop((400, 450, 2600, 2650)).resize((D, D), Image.LANCZOS)   # further away: both breasts whole
+    ph = warm(Image.open(os.path.join(DRIVE, "scar_1m.bin.png")).convert("RGB")).crop((1500, 950, 2500, 1950)).resize((D, D), Image.LANCZOS)   # close-up of the right breast: areola and vertical scar
     circ = Image.new("RGBA", (D + 14, D + 14), (0, 0, 0, 0)); ImageDraw.Draw(circ).ellipse((0, 0, D + 13, D + 13), fill=WHITE + (255,))
     m = Image.new("L", (D, D), 0); ImageDraw.Draw(m).ellipse((0, 0, D - 1, D - 1), fill=255); ph = ph.convert("RGBA"); ph.putalpha(m)
     circ.alpha_composite(ph, (7, 7)); lay.alpha_composite(circ, (cx, cy))
