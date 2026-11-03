@@ -417,7 +417,6 @@ HA = lift(Drop(["ХОЧУ *ТРОЕЧКУ*"], 150, 70, 0, maxw=860), 1260)
 TA = Track(["уменьшить грудь, но сохранить объём"], 32, 72, 0, 300)
 def s_a(t):
     fr = full(vid("IMG_6964", line_src("A", t)), 0.5, 0.45, pull(t, 0, 1.18, 1.04, 2.4)); shade(fr, GBOT)
-    if t > R("A", 0.04): text_c(fr, "3", 860, 560, bebas(int(190 * eback((t - R("A", 0.04)) / 0.35))), PINK, min(1, (t - R("A", 0.04)) * 4))
     HA.draw(fr, t, 0.05); TA.y = HA.y + HA.h + 44 + TA.top; TA.draw(fr, t, 0.7); return fr
 
 # B — НАШЕ ДО: the two problems pop in on «гигантомастия»
@@ -653,7 +652,7 @@ def build_audio(path):
     mus = track(n) * ((G_GAP - (G_GAP - G_VO) * np.clip(dd, 0, 1)) * fade)[:, None]
     sfx = np.zeros(n + 2 * SR)
     def put(x, t, g): i = int(max(0, t) * SR); seg = sfx[i:i + len(x)]; seg += x[:len(seg)] * g
-    put(pop(1300, 500, 0.1), R("A", 0.04), 0.12); put(marimba(PENTA[4], 0.5), R("A", 1.32), 0.14)                 # «3» pops
+    put(marimba(PENTA[4], 0.5), R("A", 1.32), 0.14)
     put(felt(110, 0.25), R("B", 2.68), 0.25); put(water(500, 1400), R("B", 2.68), 0.2); put(water(600, 1500), R("B", 3.2), 0.2)
     for j in range(16): put(tick(), R("C", 1.38) + 2.4 * j / 16, 0.2)                                              # tape ticks
     for j in range(10): put(tick(), R("C", 4.86) - 0.6 + 0.09 * j, 0.25)                                           # counter
