@@ -17,6 +17,8 @@ person masks from rembg (isnet-general-use) in $REEL_SRC/_cut/m_<photo>.png.
 """
 import os, sys, json, subprocess, wave, numpy as np, cv2
 from PIL import Image, ImageDraw, ImageFont, ImageOps
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from body_retouch import retouch
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.environ.get("REEL_SRC", os.path.join(ROOT, "dl_admire"))
@@ -323,12 +325,13 @@ def v19_frame(src_t):
     return f
 
 # ---------- photos: stickers at source resolution ----------
-NIP = {"p2": [(1008, 1590, 104), (1890, 1577, 104)], "p3": [(1700, 1465, 94), (2342, 1442, 64)], "p12": [(2182, 1442, 52)],
+NIP = {"p2": [(1030, 1633, 100), (1894, 1588, 100)], "p3": [(1726, 1519, 96), (2376, 1472, 76)], "p12": [(2230, 1452, 64)],   # centred on the pasties / nipples
        "p0319": [(1024, 1260, 100), (2016, 1276, 100)],
-       "IMG_9145": [(392, 683, 58), (1114, 683, 58)], "IMG_9146": [(822, 660, 56), (1286, 666, 40)], "IMG_9147": [(1078, 684, 42)]}
+       "IMG_9145": [(392, 673, 58), (1114, 665, 58)], "IMG_9146": [(822, 648, 56), (1306, 660, 44)], "IMG_9147": [(1105, 696, 44)]}
 def photo(n):
     p = os.path.join(SRC, n + (".JPG" if n.startswith("IMG") else ".jpeg"))
     im = np.asarray(ImageOps.exif_transpose(Image.open(p)).convert("RGB")).copy()
+    im = retouch(im, 0.3, 0.45, 0.06).copy()                              # light skin retouch: softer underwear marks and unevenness, texture kept
     for x, y, r in NIP.get(n, []): put_sticker(im, x, y, r)
     return im
 PH = {n: photo(n) for n in NIP}
@@ -359,6 +362,7 @@ def panel(n, pw=W, ph=960, neck_at=70, span=600):
     neck, navel = BODY[n]; s = span / (navel - neck)
     rows = np.arange(a.shape[0])[:, None]; a = a * np.clip((rows - (neck - 60)) / 60, 0, 1)            # nothing above the neck
     if n in LEGS: a = a * np.clip((LEGS[n] - rows) / 90, 0, 1)                                    # nor the stockings
+    for x, y, r in NIP.get(n, []): cv2.circle(a, (int(x), int(y)), int(r) + 1, 1.0, -1, cv2.LINE_AA)       # stickers stay whole even past the body edge
     band = a[neck:navel]; cols = np.arange(a.shape[1]); cx = float((band.sum(0) * cols).sum() / max(1, band.sum()))
     im = cv2.resize(im, None, fx=s, fy=s, interpolation=cv2.INTER_AREA); a = cv2.resize(a, None, fx=s, fy=s, interpolation=cv2.INTER_AREA)[..., None]
     ox, oy = int(cx * s - pw / 2), int(neck * s - neck_at); out = PANEL_BG[ph, pw].copy()
