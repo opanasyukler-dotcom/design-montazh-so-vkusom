@@ -854,7 +854,7 @@ def build_audio(path):
     for k in range(3): put(bubble(700 + 120 * k, 1500 + 120 * k, 0.1), T_SW[1] + 0.2 + 0.18 * k, 0.06)  # sparkles
     put(kalimba(KAL[0], 0.5), T_S["B"] + 0.1, 0.12)                                                    # timeline appears
     put(bubble(), vstart("B") + 1.22, 0.16); put(bubble(420, 980), vstart("B") + 1.74, 0.16)             # «кожа», «тело»
-    for k, (_, t0) in enumerate(ITEMS): put(kalimba(KAL[2 + k * 2], 0.6), t0 + 0.1, 0.2)                # the plan ticks
+    for k, (_, t0) in enumerate(ITEMS): put(kalimba(KAL[2 + k * 2] if k < 2 else KAL[5], 0.6), t0 + 0.1, 0.2)              # the plan ticks
     for k, (_, rel) in enumerate(REASONS): put(bubble(450 + 80 * k, 1100 + 80 * k), vstart("D") + rel - 0.1, 0.15)
     put(kalimba(KAL[3], 0.6), vstart("D") + 4.54, 0.14); put(kalimba(KAL[5], 0.7), vstart("D") + 4.66, 0.12)   # heart
     put(kalimba(KAL[1], 0.5), T_S["E"] + 0.2, 0.12)                                                    # timeline → 1 день
