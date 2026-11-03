@@ -528,7 +528,10 @@ def place(im, n, ph=H, neck_at=300, span=900, black=False):
     neck, navel, cx = ALIGN[n]; s_ = span / (navel - neck); r = cv2.resize(anon_top(im, neck - 40), None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
     bgc = np.median(r[:40, :40].reshape(-1, 3), 0); out = np.zeros((ph, W, 3), np.float32) + (0 if black else bgc)
     ox, oy = int(cx * s_ - W / 2), int(neck * s_ - neck_at); xs0, ys0 = max(0, ox), max(0, oy); xs1, ys1 = min(r.shape[1], ox + W), min(r.shape[0], oy + ph)
-    out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = r[ys0:ys1, xs0:xs1]
+    if not black:                                                         # backdrop kept: extend the photo's own edges instead of a flat fill
+        P_ = 1400; rr = cv2.copyMakeBorder(r, P_, P_, P_, P_, cv2.BORDER_REPLICATE); rr = cv2.blur(rr, (1, 1))
+        out = rr[P_ + oy:P_ + oy + ph, P_ + ox:P_ + ox + W].copy()
+    else: out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = r[ys0:ys1, xs0:xs1]
     if black:
         out *= np.clip((neck_at + 1.75 * span - np.arange(ph)) / 80, 0, 1)[:, None, None]          # down to mid-thigh: no floor
         lum = out.mean(2); k = np.clip((lum - 0.12) / 0.14, 0, 1); k = k * k * (3 - 2 * k)
@@ -549,7 +552,7 @@ def s_g(t):
     HG.draw(fr, t, R("G", 4.04)); return fr
 
 # K — collages: ПОСЛЕ on top, ДО below, on black; shutter on every cut
-COLL8 = [(np.clip(np.vstack([place(PH[a_], a_, 960, 40, 470, True), place(PH[d_], d_, 960, 40, 470, True)]), 0, 1) * 255).astype(np.uint8)
+COLL8 = [(np.clip(np.vstack([place(PH[a_], a_, 960, 40, 470), place(PH[d_], d_, 960, 40, 470)]), 0, 1) * 255).astype(np.uint8)   # the photos' own backdrop kept
          for a_, d_ in (("IMG_0539", "IMG_9436"), ("IMG_0548", "IMG_9437"), ("IMG_0549", "IMG_9441"))]
 def s_k(t):
     k = max(i for i, tk in enumerate(T_K) if t >= tk - 1e-6); lt = t - T_K[k]
