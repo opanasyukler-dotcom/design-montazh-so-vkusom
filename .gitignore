@@ -2,3 +2,5 @@
 tools/__pycache__/
 # videos sent directly: the repo LFS budget is full
 carousel_lipofilling/*.mp4
+# videos sent directly: the repo LFS budget is full
+post_age54/*.mp4
