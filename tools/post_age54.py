@@ -219,7 +219,7 @@ def render(name, dur, bg, els, voice=None, at=0.4, post=None):
 
 
 B = ct.bebas
-M = lambda s, w=500: ct.mont(s, w)
+M = lambda s, w=300: ct.mont(s, w)  # secondary type: thin Montserrat Light
 MI = lambda s: ct.mont(s, 300, italic=True)
 
 
@@ -232,15 +232,15 @@ def s1():
            El(rule(580), 0.0, "fade", 0.01),
            El(text_center(["вопрос, который я получила от пациентки"], MI(36), 606), 0.0, "fade", 0.01)]
     # the message itself, redrawn without the sender's name or avatar
-    im = layer(); d = ImageDraw.Draw(im); f = M(50, 400)
+    im = layer(); d = ImageDraw.Draw(im); f = M(50)
     lines = wrap("Меня останавливает мой возраст)), мне 54, не поздно ли?", f, 760)
     bw, bh = 860, 60 + 64 * len(lines) + 44; x0, y0 = (W - bw) // 2, 850
     d.rounded_rectangle((x0, y0, x0 + bw, y0 + bh), radius=34, fill=(38, 41, 48, 245))
     d.polygon([(x0 + 4, y0 + bh - 40), (x0 - 18, y0 + bh), (x0 + 40, y0 + bh - 8)], fill=(38, 41, 48, 245))
     for i, ln in enumerate(lines): d.text((x0 + 44, y0 + 34 + i * 64), ln, font=f, fill=WHITE)
-    d.text((x0 + bw - 40, y0 + bh - 30), "20:08", font=M(24, 400), fill=(140, 146, 160), anchor="rm")
+    d.text((x0 + bw - 40, y0 + bh - 30), "20:08", font=M(24), fill=(140, 146, 160), anchor="rm")
     els.append(El(im, 3.3, "pop", 0.55))
-    els.append(El(pill("сообщение пациентки", M(26, 600), W // 2, y0 - 76), 3.1, "rise"))
+    els.append(El(pill("сообщение пациентки", M(26, 400), W // 2, y0 - 76), 3.1, "rise"))
     render("01_cover", dur, video_bg("copy_28DEC6FD-30C5-4A62-A30A-83288D9DE14E.mov", 0, dur, blur=5, dim=0.58), els, (0.0, 8.0), 0.35)
 
 
@@ -276,7 +276,7 @@ def s4():
            El(text_center(["ПЕРЕД ОПЕРАЦИЕЙ", "МЫ ОЦЕНИВАЕМ:"], B(86), 170), 0.2)]
     items = ["состояние здоровья", "хронические заболевания", "результаты обследований", "риски анестезии",
              "объём предполагаемой операции"]
-    f = M(38, 500); x0 = 190
+    f = M(38); x0 = 190
     for i, it in enumerate(items):
         im = layer(); d = ImageDraw.Draw(im); y = 400 + i * 96
         S = 3; hi = Image.new("RGBA", (64 * S, 64 * S), (0, 0, 0, 0)); hd = ImageDraw.Draw(hi)
@@ -295,7 +295,7 @@ def s5():
     els = [El(logo(), 0, "fade"),
            El(text_center(["ЕСЛИ ПРОТИВОПОКАЗАНИЙ НЕТ,", "ВОЗРАСТ НЕ ОБЯЗАТЕЛЬНО", "СТАНОВИТСЯ ПРЕПЯТСТВИЕМ"], B(80), 170), 0.3)]
     def card(text, y, icon):
-        im = layer(); d = ImageDraw.Draw(im); f = M(36, 500); lines = wrap(text, f, 680)
+        im = layer(); d = ImageDraw.Draw(im); f = M(36); lines = wrap(text, f, 680)
         hh = 60 + 48 * len(lines); x0, w = 110, W - 220
         d.rounded_rectangle((x0, y, x0 + w, y + hh), radius=26, fill=(255, 255, 255, 236))
         d.ellipse((x0 + 30, y + hh / 2 - 30, x0 + 90, y + hh / 2 + 30), fill=PINK)
@@ -313,7 +313,7 @@ def s6():
     lines = [("Я знаю,", 0.3), ("Сначала дети.", 1.1), ("Потом работа.", 1.9), ("Потом «сейчас не время».", 2.7),
              ("А потом появляется мысль:", 3.8)]
     els = [El(logo(), 0, "fade")]
-    f = M(46, 500)
+    f = M(46)
     for i, (ln, t) in enumerate(lines):
         im = layer(); ct.shadow_text(im, (110, 220 + i * 74), ln, f, WHITE, blur=7, a=170); els.append(El(im, t))
     els += [El(text_center(["«НАВЕРНОЕ, УЖЕ ПОЗДНО»"], B(104), 640, box=NAVY), 4.8, "pop", 0.55),
@@ -327,7 +327,7 @@ def s7():
     cell = ((W - 470) // 2, 560, 470, 760)
     els = [El(logo(62), 0, "fade"),
            El(text_center(["НЕ РЕШАЙТЕ ЗА СЕБЯ ЗАРАНЕЕ,", "ЧТО ВАМ УЖЕ НЕЛЬЗЯ"], B(70), 112), 0.2)]
-    f = M(30, 500)
+    f = M(30)
     t1 = wrap("Если желание есть, начните с консультации и обследования.", f, 900)
     t2 = wrap("И уже после этого можно понять, подходит ли вам операция сейчас и какой объём вмешательства будет безопасным.", f, 900)
     els += [El(text_center(t1, f, 270, color=PINK, lh=40), 1.0),
