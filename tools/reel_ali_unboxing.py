@@ -216,14 +216,14 @@ def build_subs():
         ln[-1][1] = min(nxt, ln[-1][1] + 0.35)
     return lines
 SUBS = None; _sub_spr = {}
-SUB_SIZE, SUB_PAD = 50, 26
+SUB_SIZE, SUB_PAD, SUB_W = 40, 22, 250   # small, thin Montserrat
 def sub_line_sprites(ln):
     k = id(ln)
     if k not in _sub_spr:
-        f = font(SUB_SIZE, 500); sp = f.getlength(" ")
+        f = font(SUB_SIZE, SUB_W); sp = f.getlength(" ")
         xs = []; x = 0
         for w in ln: xs.append(x); x += f.getlength(w[2]) + sp
-        tw = int(x - sp); ww = [text_sprite(w[2], SUB_SIZE, 500, INK) for w in ln]
+        tw = int(x - sp); ww = [text_sprite(w[2], SUB_SIZE, SUB_W, INK) for w in ln]
         _sub_spr[k] = (tw, xs, ww)
     return _sub_spr[k]
 def draw_subs(f, t):
@@ -239,9 +239,9 @@ def draw_subs(f, t):
         f[y0:y0 + bh, x0:x0 + bw] = f[y0:y0 + bh, x0:x0 + bw] * (1 - m) + np.array(BLUSH, np.float32) / 255 * m
         for w, wx, spr in zip(ln, xs, ww):        # current word: rose underline pill
             if w[0] <= t < max(w[1], w[0] + 0.12):
-                hw = spr.shape[1] - 4; hm = rrect_mask(hw + 16, 8, 4)[..., None] * a
-                hx, hy = x0 + SUB_PAD + int(wx) - 8, y0 + bh - 20
-                f[hy:hy + 8, hx:hx + hw + 16] = f[hy:hy + 8, hx:hx + hw + 16] * (1 - hm) + np.array(ROSE, np.float32) / 255 * hm
+                hw = spr.shape[1] - 12; hm = rrect_mask(hw, 6, 3)[..., None] * a
+                hx, hy = x0 + SUB_PAD + int(wx) + 2, y0 + bh - 16
+                f[hy:hy + 6, hx:hx + hw] = f[hy:hy + 6, hx:hx + hw] * (1 - hm) + np.array(ROSE, np.float32) / 255 * hm
             paste(f, spr, x0 + SUB_PAD + int(wx) - 2, y0 + (bh - spr.shape[0]) // 2 + 4, a * (1.0 if w[0] <= t + 0.02 else 0.55))
 def overlays(f, t):
     global TITLE
