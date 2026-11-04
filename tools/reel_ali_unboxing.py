@@ -74,9 +74,11 @@ def rrect_mask(w, h, r):
 def ease(x): x = np.clip(x, 0, 1); return 1 - (1 - x) ** 3
 def ease_io(x): x = np.clip(x, 0, 1); return x * x * (3 - 2 * x)
 
-def shot(name):  # product photo out of an AliExpress screenshot (1320x2868)
+def shot(name):  # product photo out of an AliExpress screenshot (1320x2868, or name:y0:y1:x0:x1 for other sizes)
+    name, *box = name.split(":")
     im = cv2.cvtColor(cv2.imread(os.path.join(SRC, name)), cv2.COLOR_BGR2RGB)
-    return im[420:1460, 40:1180]
+    y0, y1, x0, x1 = map(int, box) if box else (420, 1460, 40, 1180)
+    return im[y0:y1, x0:x1]
 
 # product card: photo + CAPS name + thin note + price chip
 class Card:
@@ -106,7 +108,7 @@ def paste_rgba(dst, s, x, y):
     a = s[:h, :w, 3:4]; dst[y:y + h, x:x + w, :3] = dst[y:y + h, x:x + w, :3] * (1 - a) + s[:h, :w, :3] * a
     dst[y:y + h, x:x + w, 3:4] = a + dst[y:y + h, x:x + w, 3:4] * (1 - a)
 
-CARDS = [Card(58.0, "СПОРТИВНЫЙ КОСТЮМ", "с ромашкой, на флисе", None, None),
+CARDS = [Card(55.6, "СПОРТИВНЫЙ КОСТЮМ", "с ромашкой, на флисе", "1 159 ₽", "suit_daisy.png:480:1500:0:1175"),
          Card(82.0, "БОТИНОЧКИ", "тёплые, на липучке", "359 ₽", "IMG_9423.PNG"),
          Card(114.2, "КУРТКА", "с капюшоном", "1 096 ₽", "IMG_9421.PNG"),
          Card(135.4, "ВЯЗАНЫЙ КОСТЮМ", "свитер + штанишки, хлопок", "1 069 ₽", "IMG_9424.PNG"),
@@ -242,7 +244,7 @@ if __name__ == "__main__":
     # env: VOICE (wav to mux, default voice_edit.wav), CRF (default 18), KEYS ("t1,t2" forced keyframes for lossless splitting), OUT
     enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
                             "-i", os.path.join(WK, os.environ.get("VOICE", "voice_edit.wav")), "-c:v", "libx264", "-preset", "slow",
-                            "-crf", os.environ.get("CRF", "18"), "-profile:v", "high", "-pix_fmt", "yuv420p",
+                            "-crf", os.environ.get("CRF", "18"), *(["-maxrate", os.environ["MAXRATE"], "-bufsize", "20M"] if os.environ.get("MAXRATE") else []), "-profile:v", "high", "-pix_fmt", "yuv420p",
                             *(["-force_key_frames", os.environ["KEYS"]] if os.environ.get("KEYS") else []),
                             "-c:a", "aac", "-b:a", "320k", "-shortest", "-movflags", "+faststart", os.path.join(WK, os.environ.get("OUT", "out.mp4"))], stdin=subprocess.PIPE)
     n = int(DUR * FPS)
