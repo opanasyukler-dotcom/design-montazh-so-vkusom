@@ -27,12 +27,12 @@ ct.LILAC = PINK
 # ---------------------------------------------------------------- layers
 class El:
     """an RGBA layer cropped to its bbox, shown from t0 with an entrance animation"""
-    def __init__(self, img, t0=0.0, kind="rise", d=0.5):
+    def __init__(self, img, t0=0.0, kind="rise", d=0.5, t1=None):
         bb = img.getbbox() or (0, 0, 1, 1)
         self.x, self.y = bb[0], bb[1]
         a = np.asarray(img.crop(bb)).astype(np.float32) / 255
         self.rgb = a[..., :3] * a[..., 3:]; self.a = a[..., 3:]
-        self.t0, self.kind, self.d = t0, kind, d
+        self.t0, self.kind, self.d, self.t1 = t0, kind, d, t1
 
     def draw(self, fr, t):
         p = (t - self.t0) / self.d
@@ -54,6 +54,9 @@ class El:
             w0 = a.shape[1]; cut = max(1, int(w0 * e)); rgb = rgb[:, :cut]; a = a[:, :cut]; k = 1
         else:
             k = 1
+        if self.t1 is not None:  # fade out
+            k *= 1 - min(max((t - self.t1) / 0.35, 0), 1)
+            if k <= 0: return
         blend(fr, rgb, a, x, y, k)
 
 
@@ -125,6 +128,18 @@ def flat_bg(col=GRAPHITE, dark_bottom=0.5):
 def body_cell(fname, w, h):
     im = ImageOps.exif_transpose(Image.open(os.path.join(SRC, fname))).convert("RGB")
     return np.asarray(ct.body_crop(im, w / h).resize((w, h), Image.LANCZOS)).astype(np.float32) / 255
+
+
+def ba_labels(cell, t_in, t_wipe, wipe_d, size=40):
+    """ДО sits on the before photo and leaves as the line passes; ПОСЛЕ arrives with the after photo"""
+    x, y, w, h = cell; out = []
+    for txt, right in (("ДО", False), ("ПОСЛЕ", True)):
+        im = layer(); d = ImageDraw.Draw(im); f = B(size); tw = f.getlength(txt)
+        x0 = x + w - tw - 46 if right else x + 18
+        d.rounded_rectangle((x0, y + 16, x0 + tw + 28, y + 16 + size + 10), radius=12, fill=NAVY + (235,))
+        d.text((x0 + 14, y + 19), txt, font=f, fill=WHITE)
+        out.append(El(im, t_wipe + 0.45 * wipe_d, "fade", 0.35) if right else El(im, t_in, "fade", 0.4, t1=t_wipe + 0.55 * wipe_d))
+    return out
 
 
 def wipe_bg(before, after, cell, t_wipe, wipe_d=1.4):
@@ -236,12 +251,7 @@ def s2():
     els = [El(logo(70), 0, "fade"),
            El(text_center(["ВОЗРАСТ САМ ПО СЕБЕ НЕ ЯВЛЯЕТСЯ", "ПРИЧИНОЙ ОТКАЗЫВАТЬСЯ", "ОТ ОПЕРАЦИИ"], B(68), 132), 0.2),
            El(text_center(["У меня оперируются пациентки и старше."], M(32), 360, color=PINK), 1.0)]
-    x, y, w, h = cell
-    lab = layer(); d = ImageDraw.Draw(lab)
-    for txt, xx in (("ДО", x + 18), ("ПОСЛЕ", x + w - 18)):
-        f = B(40); tw = f.getlength(txt); x0 = xx if txt == "ДО" else xx - tw - 28
-        d.rounded_rectangle((x0, y + 18, x0 + tw + 28, y + 68), radius=12, fill=NAVY + (235,)); d.text((x0 + 14, y + 22), txt, font=f, fill=WHITE)
-    els.append(El(lab, 1.4, "fade"))
+    els += ba_labels(cell, 1.4, 6.6, 1.6)
     render("02_age_is_not_a_reason", dur, wipe_bg("IMG_9377.JPG", "IMG_9386.JPG", cell, 6.6, 1.6), els, (8.76, 18.95), 0.35)
 
 
@@ -322,12 +332,7 @@ def s7():
     t2 = wrap("И уже после этого можно понять, подходит ли вам операция сейчас и какой объём вмешательства будет безопасным.", f, 900)
     els += [El(text_center(t1, f, 270, color=PINK, lh=40), 1.0),
             El(text_center(t2, f, 270 + 40 * len(t1) + 18, lh=40), 1.7)]
-    x, y, w, h = cell
-    lab = layer(); d = ImageDraw.Draw(lab)
-    for txt, right in (("ДО", False), ("ПОСЛЕ", True)):
-        fb = B(38); tw = fb.getlength(txt); x0 = x + w - tw - 46 if right else x + 18
-        d.rounded_rectangle((x0, y + 14, x0 + tw + 28, y + 62), radius=12, fill=NAVY + (235,)); d.text((x0 + 14, y + 17), txt, font=fb, fill=WHITE)
-    els.append(El(lab, 2.4, "fade"))
+    els += ba_labels(cell, 2.4, 4.0, 1.6, size=38)
     render("07_dont_decide_for_yourself", dur, wipe_bg("IMG_9379.JPG", "IMG_9384.JPG", cell, 4.0, 1.6), els, (41.1, 43.35), 0.5)
 
 
