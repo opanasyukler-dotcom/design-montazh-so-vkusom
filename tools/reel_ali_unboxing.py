@@ -88,7 +88,7 @@ class Card:
     def build(self):
         pad = 26
         t1 = text_sprite(self.name, 34, 550, INK, 0.12); t2 = text_sprite(self.note, 28, 400, INK)
-        cw = max(470, t1.shape[1] + 2 * pad, t2.shape[1] + 2 * pad); ph = 0 if self.photo is None else 400
+        cw = max(470, t1.shape[1] + 2 * pad, t2.shape[1] + 2 * pad); ph = 0 if self.photo is None else 340
         pr = text_sprite(self.price, 36, 600, BLUSH, 0.02) if self.price else None
         ch = ph + pad + t1.shape[0] + t2.shape[0] + (64 if pr is not None else 0) + pad - 6
         im = np.zeros((ch, cw, 4), np.float32); im[..., :3] = np.array(BLUSH) / 255; im[..., 3] = rrect_mask(cw, ch, 28)
@@ -179,6 +179,70 @@ def grade(f):
     return f
 
 TITLE = None
+# Instagram Reels safe area (1080x1920): top 250 px = header, bottom 420 px = caption/buttons, right 140 px low = like/comment column
+SAFE_TOP, SAFE_BOTTOM = 250, 1500
+
+# ---- word subtitles: words from the source transcript (tr.json), mapped through the edit ----
+import json
+FIX = {"флеску": "флиску", "алиэкспресс": "AliExpress", "все": "всё", "еще": "ещё", "пришел": "пришёл", "прошел": "прошёл", "желтый": "жёлтый"}
+def build_subs():
+    words = []
+    for seg in json.load(open(os.path.join(WK, "tr.json"))):
+        for j, (ws, we, w) in enumerate(seg["w"]):
+            w = w.strip()
+            if j == len(seg["w"]) - 1 and w[-1] not in ".,!?": w += ","
+            if w.startswith("-") and words and abs(words[-1][3] - ws) < 0.3:   # "хоп -хоп", "что -то"
+                words[-1][2] += w; words[-1][1] = we; words[-1][3] = we; continue
+            words.append([ws, we, w, we])
+    out = []
+    for ws, we, w, _ in words:
+        core = w.strip(".,!?«»").lower(); core = FIX.get(core, core)
+        if we - ws < 0.03:                      # zero-length tokens are alignment noise, except a word we hear in the edit
+            if core != "через": continue
+            we = ws + 0.2
+        best = max(CLIPS, key=lambda c: min(c[1], we) - max(c[0], ws))
+        a, b, tag, o = best
+        if min(b, we) - max(a, ws) < min((we - ws) * 0.5, 0.2): continue
+        out.append([o + max(0, ws - a), o + min(b, we) - a, core, w[-1] in ".,!?", ws])
+    out.sort(key=lambda x: x[0])
+    lines = []; cur = []
+    for wd in out:
+        if cur and (len(" ".join(x[2] for x in cur + [wd])) > 20 or wd[0] - cur[-1][1] > 0.5 or abs(wd[4] - cur[-1][4]) > 2.5): lines.append(cur); cur = []
+        cur.append(wd)
+        if wd[3] and len(" ".join(x[2] for x in cur)) > 8: lines.append(cur); cur = []
+    if cur: lines.append(cur)
+    for i, ln in enumerate(lines):
+        nxt = lines[i + 1][0][0] if i + 1 < len(lines) else DUR
+        ln[-1][1] = min(nxt, ln[-1][1] + 0.35)
+    return lines
+SUBS = None; _sub_spr = {}
+SUB_SIZE, SUB_PAD = 50, 26
+def sub_line_sprites(ln):
+    k = id(ln)
+    if k not in _sub_spr:
+        f = font(SUB_SIZE, 500); sp = f.getlength(" ")
+        xs = []; x = 0
+        for w in ln: xs.append(x); x += f.getlength(w[2]) + sp
+        tw = int(x - sp); ww = [text_sprite(w[2], SUB_SIZE, 500, INK) for w in ln]
+        _sub_spr[k] = (tw, xs, ww)
+    return _sub_spr[k]
+def draw_subs(f, t):
+    global SUBS
+    if SUBS is None: SUBS = build_subs()
+    for ln in SUBS:
+        t0, t1 = ln[0][0], ln[-1][1]
+        if not (t0 - 0.05 <= t <= t1): continue
+        tw, xs, ww = sub_line_sprites(ln)
+        a = ease((t - t0 + 0.05) / 0.15) * (1 - ease_io((t - t1 + 0.12) / 0.12))
+        bw, bh = tw + 2 * SUB_PAD, int(SUB_SIZE * 1.55); x0 = (W - bw) // 2; y0 = SAFE_BOTTOM - 40 - bh
+        m = rrect_mask(bw, bh, bh // 2)[..., None] * 0.9 * a
+        f[y0:y0 + bh, x0:x0 + bw] = f[y0:y0 + bh, x0:x0 + bw] * (1 - m) + np.array(BLUSH, np.float32) / 255 * m
+        for w, wx, spr in zip(ln, xs, ww):        # current word: rose underline pill
+            if w[0] <= t < max(w[1], w[0] + 0.12):
+                hw = spr.shape[1] - 4; hm = rrect_mask(hw + 16, 8, 4)[..., None] * a
+                hx, hy = x0 + SUB_PAD + int(wx) - 8, y0 + bh - 20
+                f[hy:hy + 8, hx:hx + hw + 16] = f[hy:hy + 8, hx:hx + hw + 16] * (1 - hm) + np.array(ROSE, np.float32) / 255 * hm
+            paste(f, spr, x0 + SUB_PAD + int(wx) - 2, y0 + (bh - spr.shape[0]) // 2 + 4, a * (1.0 if w[0] <= t + 0.02 else 0.55))
 def overlays(f, t):
     global TITLE
     if TITLE is None:
@@ -187,7 +251,7 @@ def overlays(f, t):
     # intro title on a blush band (first ~3.6 s)
     a = ease(t / 0.4) * (1 - ease_io((t - 3.4) / 0.35))
     if a > 0:
-        bh = 330; y0 = 170
+        bh = 330; y0 = 250
         band = rrect_mask(W - 120, bh, 34)[..., None] * 0.9 * a
         f[y0:y0 + bh, 60:W - 60] = f[y0:y0 + bh, 60:W - 60] * (1 - band) + np.array(BLUSH, np.float32) / 255 * band
         for j, s in enumerate(TITLE[:2]):
@@ -199,7 +263,7 @@ def overlays(f, t):
         if not (t0 <= t <= t1): continue
         if not hasattr(c, "spr"): c.build()
         p = ease((t - t0) / 0.45); q = 1 - ease_io((t - (t1 - 0.3)) / 0.3)
-        s = c.spr; x = W - s.shape[1] - 30 + int((1 - p) * 120); y = 150
+        s = c.spr; x = W - s.shape[1] - 30 + int((1 - p) * 120); y = SAFE_TOP - 22
         paste(f, s, x, y, p * q)
     # bodysuit plate text
     ks = [c for c in CLIPS if c[2] == "K"]
@@ -209,7 +273,7 @@ def overlays(f, t):
             global KS
             if "KS" not in globals():
                 KS = (text_sprite("НАБОР БОДИ", 70, 500, INK, 0.14), text_sprite("5 штук · хлопок 60%", 34, 300, INK, 0.02), text_sprite("900 ₽", 64, 600, BLUSH, 0.02))
-            a = ease((t - k0) / 0.4) * (1 - ease_io((t - k1 + 0.15) / 0.25)); bh = 330; y0 = 1220
+            a = ease((t - k0) / 0.4) * (1 - ease_io((t - k1 + 0.15) / 0.25)); bh = 330; y0 = SAFE_TOP
             band = rrect_mask(W - 120, bh, 34)[..., None] * 0.92 * a
             f[y0:y0 + bh, 60:W - 60] = f[y0:y0 + bh, 60:W - 60] * (1 - band) + np.array(BLUSH, np.float32) / 255 * band
             paste(f, KS[0], 104, y0 + 40, a); paste(f, KS[1], 104, y0 + 136, a)
@@ -217,6 +281,7 @@ def overlays(f, t):
             if p > 0:
                 cw = KS[2].shape[1] + 50; chip = np.zeros((92, cw, 4), np.float32); chip[..., :3] = np.array(MOCHA) / 255; chip[..., 3] = rrect_mask(cw, 92, 46)
                 paste_rgba(chip, KS[2], 25, 4); paste(f, chip, 104, y0 + 200 + int((1 - p) * 20), p * a)
+    draw_subs(f, t)
     # end fade
     e = ease_io((t - (DUR - 0.5)) / 0.5)
     if e > 0: f[:] = f * (1 - e) + np.array(INK, np.float32) / 255 * e
