@@ -65,7 +65,7 @@ def src_of(t, name):
 
 T_S = {b: vstart(b) - 0.08 for b, *_ in VO}
 def R(b, rel): return vstart(b) + rel                                   # a word inside line b (relative time from SUBS)
-T_K = [vend("H") + 0.5 + 1.9 * k for k in range(4)]                     # collages: week front, month front / 3/4 / side
+T_K = [vend("H") + 0.5 + 1.9 * k for k in range(3)]                     # collages: a month after — front / 3/4 / side
 DUR = T_K[-1] + 2.6
 
 # ---------------- fonts & text bitmaps ----------------
@@ -525,7 +525,7 @@ def coll(n):
     im = np.asarray(ImageOps.exif_transpose(Image.open(os.path.join(SRC, f"IMG_{n}.JPG"))).convert("RGB")); s_ = W / im.shape[1]
     r = cv2.resize(im, (W, int(im.shape[0] * s_)), interpolation=cv2.INTER_AREA); out = np.zeros((H, W, 3), np.uint8); y0 = (H - r.shape[0]) // 2
     out[max(0, y0):y0 + r.shape[0]] = r[max(0, -y0):max(0, -y0) + H - max(0, y0)]; return anon_top(out, 70)
-COLL8 = [coll(n) for n in (9332, 9335, 9336, 9337)]
+COLL8 = [coll(n) for n in (9335, 9336, 9337)]
 def s_k(t):
     k = max(i for i, tk in enumerate(T_K) if t >= tk - 1e-6); lt = t - T_K[k]
     fr = full(COLL8[k], 0.5, 0.5, 1 + 0.03 * (1 - eo(lt / 0.35)))
