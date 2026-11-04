@@ -67,8 +67,6 @@ def s1():
     y = lines_draw(lay, [("ОПРОС", mont(30, 600), 70)], MARGIN, 150)
     ImageDraw.Draw(lay).line((MARGIN, y - 22, MARGIN + 70, y - 22), fill=WHITE, width=3)
     y = lines_draw(lay, [("КАКОЙ СТРАХ", hb, 76), ("ОСТАНАВЛИВАЕТ ВАС", hb, 76), ("ОТ ОПЕРАЦИИ?", hb, 104)], MARGIN, y + 6)
-    lines_draw(lay, [("Отметьте ваш самый большой страх.", mont(36, 500), 48),
-                     ("Опрос анонимный.", mont(36, 400), 48)], MARGIN, y)
     save(shadowed(bg, lay), "01_opros.jpg")                 # y 700-1500 left free for the poll sticker
 
 
@@ -81,9 +79,9 @@ def s2():
     hb = ImageFont.truetype(BOLD, 58); b = mont(38, 400)
     lines = [("ВИЖУ, ЧТО СТРАХ", hb, 70), ("АНЕСТЕЗИИ ЛИДИРУЕТ", hb, 96),
              ("Очень хочу показать вам", b, 50), ("эмоции моих пациенток", b, 50), ("после операции", b, 50)]
-    top = H - 150 - sum(s for _, _, s in lines)
+    top = H - 300 - sum(s for _, _, s in lines)
     lines_draw(lay, lines, MARGIN, top)
-    ImageDraw.Draw(lay).text((W - MARGIN, H - 120), ">>>", font=mont(44, 500), fill=WHITE, anchor="rs")
+    ImageDraw.Draw(lay).text((W - MARGIN, H - 270), ">>>", font=mont(44, 500), fill=WHITE, anchor="rs")
     save(shadowed(bg, lay), "02_rezultat_oprosa.jpg")       # y 120 to ~1270 free for the results screenshot
 
 
@@ -93,7 +91,7 @@ def s5():
     hb = ImageFont.truetype(BOLD, 64); b = mont(37, 500)
     lines = [("ВСЁ ПРО НАРКОЗ", hb, 84), ("Как проходит анестезия,", b, 48),
              ("подготовка и пробуждение,", b, 48), ("смотрите в актуальном", b, 48), ("«Наркоз»", mont(37, 700), 0)]
-    top = H - 110 - 84 - 48 * 3 - 34
+    top = H - 260 - 84 - 48 * 3 - 34
     for (t, f, st), yy in zip(lines, np.cumsum([0] + [s for _, _, s in lines[:-1]])):
         d.text((W - MARGIN, top + yy), t, font=f, fill=NAVY + (255,), anchor="ra")
     # a soft white halo instead of a dark haze, so the lapel lines do not cut the letters
