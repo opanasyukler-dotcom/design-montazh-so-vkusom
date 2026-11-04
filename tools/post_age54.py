@@ -177,12 +177,26 @@ VOX /= np.sqrt(np.mean(VOX[np.abs(VOX) > 0.02] ** 2)) + 1e-9; VOX *= 0.16  # spe
 MUS /= np.sqrt(np.mean(MUS ** 2)) + 1e-9
 
 
-def mix_audio(dur, voice=None, at=0.4, music_at=0.0):
+INTERVIEW = os.path.join(SRC, "IMG_1302.MOV")
+_cache = {}
+
+
+def interview_audio():
+    if "iv" not in _cache:
+        tmp = os.path.join(OUT, "_iv.wav")
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", INTERVIEW, "-vn", "-ar", str(SR), "-ac", "1", tmp], check=True)
+        a = read_wav(tmp); os.remove(tmp)
+        a /= np.sqrt(np.mean(a[np.abs(a) > 0.02] ** 2)) + 1e-9; a *= 0.16
+        _cache["iv"] = a
+    return _cache["iv"]
+
+
+def mix_audio(dur, voice=None, at=0.4, music_at=0.0, src=None):
     n = int(dur * SR); out = np.zeros(n, np.float32)
     m = MUS[int(music_at * SR):int(music_at * SR) + n]; m = np.pad(m, (0, n - len(m)))
     gain = np.full(n, 0.075 if voice else 0.11, np.float32)
     if voice:
-        a, b = voice; seg = VOX[int(a * SR):int(b * SR)].copy()
+        a, b = voice; seg = (VOX if src is None else src)[int(a * SR):int(b * SR)].copy()
         f = int(0.03 * SR); seg[:f] *= np.linspace(0, 1, f); seg[-f:] *= np.linspace(1, 0, f)
         s = int(at * SR); seg = seg[:n - s]; out[s:s + len(seg)] += seg
         # duck the music under the voice a bit more
@@ -199,9 +213,9 @@ def mix_audio(dur, voice=None, at=0.4, music_at=0.0):
 MUSIC_POS = [0.0]
 
 
-def render(name, dur, bg, els, voice=None, at=0.4, post=None):
+def render(name, dur, bg, els, voice=None, at=0.4, post=None, src=None):
     path = os.path.join(OUT, name + ".mp4"); wav = os.path.join(OUT, f"_{name}.wav")
-    au = mix_audio(dur, voice, at, MUSIC_POS[0]); MUSIC_POS[0] += dur
+    au = mix_audio(dur, voice, at, MUSIC_POS[0], src); MUSIC_POS[0] += dur
     with wave.open(wav, "wb") as w:
         w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR); w.writeframes((au * 32767).astype(np.int16).tobytes())
     enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS),
@@ -318,7 +332,9 @@ def s6():
         im = layer(); ct.shadow_text(im, (110, 220 + i * 74), ln, f, WHITE, blur=7, a=170); els.append(El(im, t))
     els += [El(text_center(["«НАВЕРНОЕ, УЖЕ ПОЗДНО»"], B(104), 640, box=NAVY), 4.8, "pop", 0.55),
             El(text_center(["Хотя на самом деле вопрос может быть", "совсем не в возрасте."], MI(38), 860, lh=50), 6.3)]
-    render("06_too_late_thought", dur, video_bg("IMG_1302.MOV", 20.0, dur, blur=3, dim=0.58), els)
+    # the patient after surgery: "Ещё не могу пока поверить своему счастью ... не верится, что это я" (94.35 - 101.0 in the interview)
+    render("06_too_late_thought", dur, video_bg("IMG_1302.MOV", 94.35 - 0.6, dur, blur=3, dim=0.58), els,
+           (94.35, 101.05), 0.6, src=interview_audio())
 
 
 def s7():
@@ -333,7 +349,7 @@ def s7():
     els += [El(text_center(t1, f, 270, color=PINK, lh=40), 1.0),
             El(text_center(t2, f, 270 + 40 * len(t1) + 18, lh=40), 1.7)]
     els += ba_labels(cell, 2.4, 4.0, 1.6, size=38)
-    render("07_dont_decide_for_yourself", dur, wipe_bg("IMG_9379.JPG", "IMG_9384.JPG", cell, 4.0, 1.6), els, (41.1, 43.35), 0.5)
+    render("07_dont_decide_for_yourself", dur, wipe_bg("IMG_9379.JPG", "IMG_9384.JPG", cell, 4.0, 1.6), els, (41.0, 44.2), 0.5)
 
 
 def s8():
