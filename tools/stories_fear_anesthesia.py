@@ -94,10 +94,7 @@ def s5():
     top = H - 260 - 84 - 48 * 3 - 34
     for (t, f, st), yy in zip(lines, np.cumsum([0] + [s for _, _, s in lines[:-1]])):
         d.text((W - MARGIN, top + yy), t, font=f, fill=NAVY + (255,), anchor="ra")
-    # a soft white halo instead of a dark haze, so the lapel lines do not cut the letters
-    al = lay.getchannel("A"); halo = Image.new("RGBA", (W, H), WHITE + (0,))
-    halo.putalpha(al.filter(ImageFilter.MaxFilter(9)).filter(ImageFilter.GaussianBlur(10)).point(lambda v: min(255, v * 2) * 150 // 255))
-    save(Image.alpha_composite(Image.alpha_composite(bg.convert("RGBA"), halo), lay), "05_aktualnoe_narkoz.jpg")
+    save(Image.alpha_composite(bg.convert("RGBA"), lay), "05_aktualnoe_narkoz.jpg")
 
 
 for k, f in [(1, s1), (2, s2), (5, s5)]:
