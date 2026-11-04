@@ -234,14 +234,17 @@ if __name__ == "__main__":
         print("DUR", DUR, "clips", len(CLIPS))
         for a, b, tag, o in CLIPS: print(f"{o:6.2f}  {a:7.2f}-{b:7.2f} {tag}")
         sys.exit()
-    audio()
+    if not os.environ.get("VOICE"): audio()
     if MODE == "stills":
         for t in map(float, sys.argv[4].split(",")):
             cv2.imwrite(os.path.join(WK, f"st_{t:05.1f}.jpg"), cv2.cvtColor((render_frame(t) * 255).astype(np.uint8), cv2.COLOR_RGB2BGR))
         sys.exit()
+    # env: VOICE (wav to mux, default voice_edit.wav), CRF (default 18), KEYS ("t1,t2" forced keyframes for lossless splitting), OUT
     enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
-                            "-i", os.path.join(WK, "voice_edit.wav"), "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
-                            "-c:a", "aac", "-b:a", "256k", "-shortest", "-movflags", "+faststart", os.path.join(WK, "out.mp4")], stdin=subprocess.PIPE)
+                            "-i", os.path.join(WK, os.environ.get("VOICE", "voice_edit.wav")), "-c:v", "libx264", "-preset", "slow",
+                            "-crf", os.environ.get("CRF", "18"), "-profile:v", "high", "-pix_fmt", "yuv420p",
+                            *(["-force_key_frames", os.environ["KEYS"]] if os.environ.get("KEYS") else []),
+                            "-c:a", "aac", "-b:a", "320k", "-shortest", "-movflags", "+faststart", os.path.join(WK, os.environ.get("OUT", "out.mp4"))], stdin=subprocess.PIPE)
     n = int(DUR * FPS)
     for k in range(n):
         enc.stdin.write((render_frame(k / FPS) * 255).astype(np.uint8).tobytes())
