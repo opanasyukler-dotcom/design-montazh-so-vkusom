@@ -1,8 +1,9 @@
-"""Daily-update stories: blurred copy of the shot as background, sharp shot on top as a card.
+"""Daily-update stories in a minimal Pinterest-style look.
 
-Photo slides render to JPG, video slides to MP4 (static blurred frame + text, live video card).
-Text: bold lines in Inter Display Bold (Instagram "Classic" look), body in Manrope Light,
-emoji from Noto Color Emoji.
+Every slide is a full-screen shot (photo -> JPG, video -> MP4), gently muted, with small white
+type placed in a free zone away from faces. Each slide gets its own small accent: "• • •" dots,
+a thin vertical bar, a thin rule above the heading, a white note card, a soft highlighter,
+a tinted heading or a serif body. A barely-there dark gradient, stretched far, keeps type legible.
 
 Usage: python3 tools/stories_morkovka.py
 """
@@ -11,10 +12,10 @@ import subprocess
 import sys
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from stories_editorial import BODY, BROWN, H, HEADER, PAPER, ROOT, W, cover_crop, manrope  # noqa: E402
+from stories_editorial import H, ROOT, W, cover_crop, manrope  # noqa: E402
 
 try:
     import pillow_heif
@@ -26,84 +27,115 @@ SRC = os.environ.get("STORIES_SRC", "/tmp/claude-0/-home-user-design-montazh-so-
                      "407108f0-3ce4-585b-bf12-4b6e65a8be4f/scratchpad/drive/Мои сторис")
 OUT = os.path.join(ROOT, "stories_morkovka")
 CLASSIC = os.path.join(ROOT, "fonts", "commercial-safe", "Inter", "InterDisplay-Bold.otf")
+SERIF = os.path.join(ROOT, "fonts", "Forum-Regular.ttf")
 EMOJI = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"
 
 NB = " "
+WHITE = (255, 255, 255)
+CREAM = (246, 234, 204)      # tinted heading, like the pale yellow "ВЧЕРА" reference
+PALE_PINK = (250, 222, 229)
+NOTE_TEXT = (70, 62, 58)
+HIGHLIGHT = (240, 228, 170, 120)  # soft translucent marker
+
+MUTE = (0.86, 0.95)  # saturation, brightness: calm, slightly muted photos
+
+# A slide is a full-screen shot plus one or more text groups.
+# group: anchor ("top"/"bottom", y), x, width, align, blocks [(style, text, options)]
 SLIDES = [
     {
         "video": "IMG_9361.mov", "frame": 5,
-        "layout": "full", "text": "top",  # face sits low, wall above it is free
-        "blocks": [
-            ("bold", f"Ну что, мы наконец-то ввели морковку!{NB}🥕"),
-            ("light", f"Сначала у{NB}дочки была немного странная реакция на{NB}новый вкус, "
-                      f"но в{NB}целом морковка нам понравилась"),
-        ],
+        "groups": [{
+            "anchor": ("top", 300), "x": 100, "width": 800, "align": "left",
+            "blocks": [
+                ("bold", f"ну что, мы наконец-то ввели морковку!{NB}🥕", {}),
+                ("light", f"сначала у{NB}дочки была немного странная реакция на{NB}новый вкус, "
+                          f"но в{NB}целом морковка нам понравилась", {"bar": True}),
+            ],
+        }],
     },
     {
         "video": "IMG_9362.mov", "frame": 9,
-        "layout": "card", "text": "bottom",  # small card up top, text below it
-        "blocks": [
-            ("light", f"Завтра хочу попробовать дать индейку, а{NB}потом уже наконец-то начать "
-                      f"миксовать разные вкусы: индейка, морковка, кабачок. Мне кажется, так "
-                      f"будет уже намного интереснее!"),
-            ("bold", f"А вот цветную капусту я{NB}пока решила вообще не давать."),
-            ("light", f"После нашей весёлой ночки что-то не{NB}хочется к{NB}ней возвращаться"),
+        "groups": [
+            {
+                "anchor": ("top", 330), "x": 100, "width": 820, "align": "left",
+                "blocks": [
+                    ("line", "", {}),
+                    ("bold", f"завтра хочу попробовать дать индейку,", {"size": 46}),
+                    ("light", f"а потом уже наконец-то начать миксовать разные вкусы: индейка, "
+                              f"морковка, кабачок. мне кажется, так будет уже намного интереснее!",
+                     {"size": 32}),
+                ],
+            },
+            {
+                "anchor": ("bottom", 1640), "x": 120, "width": 840, "align": "left",
+                "blocks": [
+                    ("note", f"а вот цветную капусту я{NB}пока решила вообще не давать. после нашей "
+                             f"весёлой ночки что-то не{NB}хочется к{NB}ней возвращаться", {}),
+                ],
+            },
         ],
     },
     {
         "photo": "IMG_9485.HEIC",
-        "layout": "full", "text": "top",  # white type over the dark canopy, face below it
-        "white": True, "wash": "dark", "scale": 0.8, "shadow": 170,
-        "blocks": [
-            ("bold", f"Если спросите, как у{NB}нас дела со{NB}сном, то через одно место!"),
-            ("light", f"От укачиваний мы так и{NB}не смогли уйти. И{NB}я, если честно, вообще "
-                      f"не понимаю, КАК от{NB}них уходят?!"),
-            ("mark", f"Мамы, поделитесь опытом, потому что я{NB}уже не знаю, что делать."),
-        ],
+        "groups": [{
+            "anchor": ("top", 260), "x": 100, "width": 820, "align": "left",
+            "blocks": [
+                ("dots", "", {}),
+                ("bold", f"если спросите, как у{NB}нас дела со{NB}сном, то{NB}через одно место!",
+                 {"size": 46}),
+                ("light", f"от укачиваний мы так и{NB}не смогли уйти. и{NB}я, если честно, вообще "
+                          f"не понимаю, КАК от{NB}них уходят?!", {"size": 32}),
+                ("hl", f"мамы, поделитесь опытом, потому что я{NB}уже не{NB}знаю, что делать", {}),
+            ],
+        }],
     },
     {
         "photo": "E7CA53F1-372D-41B8-AFE2-7AFFC580A2CE.png",
-        "layout": "full", "text": "bottom",  # face on top, text over the pink tee
-        "white": True, "wash": "dark", "scale": 0.72, "width": 620,  # minimal small column
-        "blocks": [
-            ("bold", f"А сегодня маму наконец-то отпускают на{NB}массаж!"),
-            ("light", f"Я начала ходить на{NB}расслабляющий массаж раз в{NB}неделю. Сегодня иду "
-                      f"всего второй раз, но уже могу сказать, что это лучший час в{NB}моей "
-                      f"жизни{NB}😂"),
-        ],
+        "groups": [{
+            "anchor": ("bottom", 1600), "x": 140, "width": 800, "align": "center",
+            "blocks": [
+                ("bold", f"а сегодня маму наконец-то отпускают на{NB}массаж!",
+                 {"color": CREAM, "size": 50}),
+                ("light", f"я начала ходить на{NB}расслабляющий массаж раз в{NB}неделю. сегодня иду "
+                          f"всего второй раз, но уже могу сказать, что это лучший час в{NB}моей "
+                          f"жизни{NB}😂", {"size": 32}),
+            ],
+        }],
     },
     {
         "photo": "0E168C5F-0AAE-4E41-96DE-CF882206C536.png",
-        "layout": "full", "text": "bottom",  # text over the mug, face above stays clear
-        "white": True, "wash": "dark",  # light mug needs a soft dark gradient under white type
-        "blocks": [
-            ("light", f"После родов у{NB}меня до{NB}сих пор безумно напряжено всё тело, поэтому "
-                      f"этот час, когда можно просто лежать, расслабиться и{NB}ни о{NB}чём "
-                      f"не{NB}думать,"),
-            ("pink", f"для меня теперь отдельный вид удовольствия."),
-        ],
+        "groups": [{
+            "anchor": ("bottom", 1620), "x": 100, "width": 820, "align": "left",
+            "blocks": [
+                ("light", f"после родов у{NB}меня до{NB}сих пор безумно напряжено всё тело, поэтому "
+                          f"этот час, когда можно просто лежать, расслабиться и{NB}ни о{NB}чём "
+                          f"не{NB}думать,", {"size": 34}),
+                ("bold", f"для меня теперь отдельный вид удовольствия", {"color": PALE_PINK}),
+            ],
+        }],
     },
     {
         "photo": "0C3CDFFA-4B81-495C-96E2-31C2645E016B.png",
-        "layout": "split", "focus": (0.5, 0.15),  # photo edge to edge on top, paper panel below
-        "blocks": [
-            ("light", f"С домашними тренировками пока всё нестабильно. То занимаюсь, то пропускаю. "
-                      f"Иногда просто лень, а{NB}иногда настолько нет сил, что даже думать "
-                      f"о{NB}тренировке не{NB}хочется."),
-            ("bold", f"В общем, пытаюсь потихоньку возвращать в{NB}свою жизнь что-то для себя. "
-                     f"Пока получается через раз, но хотя бы так!"),
-        ],
+        "groups": [{
+            "anchor": ("bottom", 1620), "x": 100, "width": 830, "align": "left",
+            "blocks": [
+                ("serif", f"с домашними тренировками пока всё нестабильно. то занимаюсь, "
+                          f"то пропускаю. иногда просто лень, а{NB}иногда настолько нет сил, что "
+                          f"даже думать о{NB}тренировке не{NB}хочется.", {}),
+                ("bold", f"в общем, пытаюсь потихоньку возвращать в{NB}свою жизнь что-то для себя. "
+                         f"пока получается через раз, но{NB}хотя бы так!", {"size": 44}),
+            ],
+        }],
     },
 ]
 
-MARGIN, SAFE_TOP, SAFE_BOTTOM = 100, 250, 1640  # clear of Instagram's top bar and reply bar
-STYLES = {  # font maker, size, colour, colour on white-text slides, line step
-    "bold": (lambda n: ImageFont.truetype(CLASSIC, n), 56, BROWN, (255, 255, 255), 70),
-    "mark": (lambda n: ImageFont.truetype(CLASSIC, n), 48, BROWN, BROWN, 64),
-    "pink": (lambda n: ImageFont.truetype(CLASSIC, n), 56, (250, 222, 229), (250, 222, 229), 70),
-    "light": (lambda n: manrope(n, "Light"), 40, BODY, (255, 255, 255), 58),
+FONTS = {  # style: (font file or maker, default size, line spacing factor)
+    "bold": (lambda n: ImageFont.truetype(CLASSIC, n), 50, 1.24),
+    "light": (lambda n: manrope(n, "Light"), 34, 1.42),
+    "serif": (lambda n: ImageFont.truetype(SERIF, n), 40, 1.3),
+    "note": (lambda n: manrope(n, "Regular"), 30, 1.45),
+    "hl": (lambda n: ImageFont.truetype(CLASSIC, n), 36, 1.4),
 }
-PLATES = {"mark": (250, 247, 242, 255)}  # paper marker; "pink" is just pale pink type
 GAP = 26
 
 
@@ -161,247 +193,162 @@ class Rich:
         return self.size * 1.15
 
 
-def text_blocks(d, blocks, width, scale=1.0, white=False):
-    """Wrap every block; return [(rich, lines, colour, step, plate)] and total height."""
-    out, h = [], 0
-    for k, (style, text) in enumerate(blocks):
-        make, size, color, white_color, step = STYLES[style]
-        rich = Rich(make(round(size * scale)))
-        plate = PLATES.get(style)
-        lines = rich.wrap(d, text, width - (60 if plate else 0))
-        step = round(step * scale)
-        out.append((rich, lines, white_color if white else color, step, plate))
-        h += (round(GAP * scale) if k else 0) + len(lines) * step + (30 if plate else 0)
-    return out, h
-
-
-def draw_blocks(img, d, wrapped, x, y, width, scale=1.0):
-    for k, (rich, lines, color, step, plate) in enumerate(wrapped):
+def layout_group(d, group):
+    """Wrap a group's blocks; return the drawable items and the group's height."""
+    items, h = [], 0
+    for k, (style, text, opt) in enumerate(group["blocks"]):
         if k:
-            y += round(GAP * scale)
-        if plate:  # marker plate behind the block
-            line_w = max(rich.length(d, line) for line in lines)
-            h = len(lines) * step + 30
-            d.rounded_rectangle((x - 4, y - 8, x + line_w + 56, y + h - 8), radius=18, fill=plate)
-            y += 12
+            h += GAP
+        if style == "dots":
+            items.append((style, None, [], 0, opt))
+            h += 22
+            continue
+        if style == "line":
+            items.append((style, None, [], 0, opt))
+            h += 6
+            continue
+        make, size, spacing = FONTS[style]
+        rich = Rich(make(opt.get("size", size)))
+        inset = 44 if opt.get("bar") else 64 if style == "note" else 0
+        lines = rich.wrap(d, text, group["width"] - inset)
+        step = round(rich.size * spacing)
+        items.append((style, rich, lines, step, opt))
+        h += len(lines) * step + (56 if style == "note" else 0)
+    return items, h
+
+
+def draw_group(layer, group):
+    d = ImageDraw.Draw(layer)
+    items, h = layout_group(d, group)
+    side, edge = group["anchor"]
+    y = edge if side == "top" else edge - h
+    x0, width, center = group["x"], group["width"], group["align"] == "center"
+
+    def line_x(rich, line, indent=0):
+        return x0 + (width - rich.length(d, line)) / 2 if center else x0 + indent
+
+    for k, (style, rich, lines, step, opt) in enumerate(items):
+        if k:
+            y += GAP
+        if style == "dots":  # "• • •" like a typing bubble
+            for i in range(3):
+                cx = x0 + 8 + i * 30
+                d.ellipse((cx - 7, y + 4, cx + 7, y + 18), fill=WHITE)
+            y += 22
+        elif style == "line":  # thin rule above the heading
+            d.rectangle((x0, y, x0 + 150, y + 4), fill=WHITE)
+            y += 6
+        elif style == "note":  # white note card with small dark text
+            text_w = max(rich.length(d, line) for line in lines)
+            d.rounded_rectangle((x0, y, x0 + text_w + 64, y + len(lines) * step + 56), radius=26,
+                                fill=(255, 255, 255, 240))
+            ty = y + 26
             for line in lines:
-                rich.draw(img, d, (x + 26, y), line, color)
-                y += step
-            y += 18
+                rich.draw(layer, d, (x0 + 32, ty), line, NOTE_TEXT)
+                ty += step
+            y += len(lines) * step + 56
         else:
+            color = opt.get("color", WHITE)
+            indent = 44 if opt.get("bar") else 0
+            if opt.get("bar"):  # thin vertical bar beside the paragraph
+                d.rectangle((x0, y + 6, x0 + 4, y + len(lines) * step - 6), fill=WHITE)
             for line in lines:
-                rich.draw(img, d, (x, y), line, color)
+                lx = line_x(rich, line, indent)
+                if style == "hl":  # soft marker behind each line only
+                    _, t, _, b = d.textbbox((lx, y), line, font=rich.font)
+                    d.rounded_rectangle((lx - 10, t - 8, lx + rich.length(d, line) + 10, b + 8),
+                                        radius=8, fill=HIGHLIGHT)
+                rich.draw(layer, d, (lx, y), line, color)
                 y += step
-    return y
+    return (edge, edge + h) if side == "top" else (edge - h, edge)
 
 
-def with_shadow(layer, strength=120):
-    """Soft dark shadow under white type instead of a wash, so it reads on light photos."""
+def with_shadow(layer, strength=110):
+    """Soft dark shadow under the type so white reads on light spots."""
     alpha = layer.getchannel("A").filter(ImageFilter.GaussianBlur(10)).point(lambda v: v * strength // 255)
-    shadow = Image.new("RGBA", layer.size, (30, 20, 15, 0))
+    shadow = Image.new("RGBA", layer.size, (20, 14, 12, 0))
     shadow.putalpha(alpha)
     shadow.alpha_composite(layer)
     return shadow
+
+
+def dark_veil(spans):
+    """Barely-there darkening around each text group, stretched far so it never shows as a band."""
+    a = np.zeros(H, np.float32)
+    ys = np.arange(H)
+    for top, bottom in spans:
+        dist = np.maximum(np.maximum(top - ys, ys - bottom), 0)
+        a = np.maximum(a, 0.4 * np.clip(1 - dist / 650, 0, 1) ** 1.6)
+    veil = Image.new("RGBA", (W, H), (20, 14, 12, 0))
+    veil.putalpha(Image.fromarray((np.repeat(a[:, None], W, 1) * 255).astype(np.uint8)))
+    return veil
+
+
+def overlay(slide):
+    """Transparent layer: veil + all text groups."""
+    text = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    spans = [draw_group(text, g) for g in slide["groups"]]
+    layer = dark_veil(spans)
+    layer.alpha_composite(with_shadow(text))
+    return layer
 
 
 def load(path):
     return ImageOps.exif_transpose(Image.open(path)).convert("RGB")
 
 
-def video_frame(path, t):
-    tmp = os.path.join(OUT, "_frame.png")
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(t), "-i", path, "-frames:v", "1", tmp],
-                   check=True)
-    im = load(tmp)
-    os.remove(tmp)
-    return im
+def mute(im):
+    im = ImageEnhance.Color(im).enhance(MUTE[0])
+    return ImageEnhance.Brightness(im).enhance(MUTE[1])
 
 
-def cover(im, w, h, focus=(0.5, 0.5)):
+def cover(im, focus=(0.5, 0.5)):
     tmp = os.path.join(OUT, "_cover.png")
     im.save(tmp)
-    out = cover_crop(tmp, w, h, focus)
+    out = cover_crop(tmp, W, H, focus)
     os.remove(tmp)
     return out
 
 
-def blurred_background(im):
-    """Blurred cover of the same shot, washed toward warm paper so brown text reads."""
-    bg = cover(im, W, H).filter(ImageFilter.GaussianBlur(40))
-    return Image.blend(bg, Image.new("RGB", (W, H), PAPER), 0.55)
-
-
-def rounded_mask(w, h, r=34):
-    m = Image.new("L", (w * 4, h * 4), 0)
-    ImageDraw.Draw(m).rounded_rectangle((0, 0, w * 4 - 1, h * 4 - 1), radius=r * 4, fill=255)
-    return m.resize((w, h), Image.LANCZOS)
-
-
-def counter(d, index, total, fill=HEADER):
-    hf = manrope(26, "Regular")
-    label = f"{index}/{total}"
-    d.text((W - MARGIN - d.textlength(label, font=hf), 170), label, font=hf, fill=fill)
-
-
-def wash(start, end, top_side, color=PAPER, strength=0.86):
-    """RGBA gradient (paper by default): solid on the text side, fading out toward the photo."""
-    a = np.zeros((H, 1), np.float32)
-    span = end - start
-    ramp = (np.linspace(1, 0, span) ** 1.3) * strength
-    if top_side:
-        a[:start, 0] = strength
-        a[start:end, 0] = ramp
-    else:
-        a[end:, 0] = strength
-        a[start:end, 0] = ramp[::-1]
-    layer = Image.new("RGBA", (W, H), color + (0,))
-    layer.putalpha(Image.fromarray((np.repeat(a, W, 1) * 255).astype(np.uint8)))
-    return layer
-
-
-def full_overlay(slide, index, total):
-    """Transparent layer for full-screen slides: paper wash + text on the free side."""
-    layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    d = ImageDraw.Draw(layer)
-    scale, white = slide.get("scale", 1.0), slide.get("white", False)
-    width = slide.get("width", W - 2 * MARGIN)
-    wrapped, h = text_blocks(d, slide["blocks"], width, scale, white)
-    y = SAFE_TOP if slide["text"] == "top" else SAFE_BOTTOM - h
-    tone = slide.get("wash", True)
-    if tone == "dark":  # barely-there darkening, stretched far so it never reads as a band
-        dark = {"color": (20, 14, 12), "strength": 0.42}
-        if slide["text"] == "top":
-            layer.alpha_composite(wash(y + h - 120, y + h + 650, True, **dark))
-        else:
-            layer.alpha_composite(wash(y - 750, y + 120, False, **dark))
-    elif tone:
-        if slide["text"] == "top":
-            layer.alpha_composite(wash(y + h - 60, y + h + 170, True))
-        else:
-            layer.alpha_composite(wash(y - 280, y + 60, False))
-    text = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    td = ImageDraw.Draw(text)
-    counter(td, index, total, (255, 255, 255) if white else HEADER)
-    draw_blocks(text, td, wrapped, MARGIN, y, width, scale)
-    layer.alpha_composite(with_shadow(text, slide.get("shadow", 120)) if white else text)
-    return layer
-
-
-def card_base(slide, index, total, first, src_size):
-    """Blurred background, text on one side and a framed card on the other ("distant cover")."""
-    img = blurred_background(first).convert("RGBA")
-    d = ImageDraw.Draw(img)
-    counter(d, index, total)
-    width = W - 2 * MARGIN
-    wrapped, h = text_blocks(d, slide["blocks"], width)
-    if slide["text"] == "top":
-        draw_blocks(img, d, wrapped, MARGIN, SAFE_TOP, width)
-        area = (SAFE_TOP + h + 70, SAFE_BOTTOM)
-    else:
-        draw_blocks(img, d, wrapped, MARGIN, SAFE_BOTTOM - h, width)
-        area = (SAFE_TOP - 20, SAFE_BOTTOM - h - 70)
-
-    max_w, max_h = W - 2 * 110, area[1] - area[0]
-    sw, sh = src_size
-    scale = min(max_w / sw, max_h / sh)
-    cw, ch = int(sw * scale) // 2 * 2, int(sh * scale) // 2 * 2
-    cx, cy = (W - cw) // 2, area[0] + (max_h - ch) // 2
-    return img, (cx, cy, cw, ch)
-
-
-def framed_card(photo, tilt=0, border=12):
-    """Photo with rounded corners in a white frame, optionally tilted; returns RGBA."""
-    cw, ch = photo.size
-    card = Image.new("RGBA", (cw + 2 * border, ch + 2 * border), (0, 0, 0, 0))
-    card.paste((252, 250, 247, 255), (0, 0), rounded_mask(*card.size, 34 + border))
-    card.paste(photo, (border, border), rounded_mask(cw, ch))
-    return card.rotate(tilt, Image.BICUBIC, expand=True) if tilt else card
-
-
-def drop_shadow(img, card, xy):
-    shadow = Image.new("L", img.size, 0)
-    shadow.paste(card.getchannel("A").point(lambda v: v * 90 // 255), (xy[0] + 4, xy[1] + 16))
-    img.alpha_composite(Image.merge("RGBA", (*Image.new("RGB", img.size, (95, 75, 65)).split(),
-                                             shadow.filter(ImageFilter.GaussianBlur(26)))))
-
-
-def render_photo(slide, index, total):
-    im = load(os.path.join(SRC, slide["photo"]))
-    if slide["layout"] == "full":
-        img = cover(im, W, H, slide.get("focus", (0.5, 0.5))).convert("RGBA")
-        img.alpha_composite(full_overlay(slide, index, total))
-    elif slide["layout"] == "split":
-        img = Image.new("RGBA", (W, H), PAPER + (255,))
-        d = ImageDraw.Draw(img)
-        width = W - 2 * MARGIN
-        wrapped, h = text_blocks(d, slide["blocks"], width)
-        panel = SAFE_BOTTOM - h - 90  # photo edge to edge above, paper panel with text below
-        img.paste(cover(im, W, panel, slide.get("focus", (0.5, 0.5))), (0, 0))
-        d.line((MARGIN, panel + 45, MARGIN + 120, panel + 45), fill=BROWN, width=2)
-        draw_blocks(img, d, wrapped, MARGIN, panel + 90, width)
-        counter(d, index, total, (250, 247, 242))
-    else:
-        img, (cx, cy, cw, ch) = card_base(slide, index, total, im, im.size)
-        tilt = slide.get("tilt", 0)
-        if tilt:  # leave room for the rotated corners
-            cw, ch = int(cw * 0.92) // 2 * 2, int(ch * 0.92) // 2 * 2
-            cx, cy = (W - cw) // 2, cy + 20
-        card = framed_card(im.resize((cw, ch), Image.LANCZOS), tilt)
-        xy = (cx + cw // 2 - card.width // 2, cy + ch // 2 - card.height // 2)
-        drop_shadow(img, card, xy)
-        img.alpha_composite(card, xy)
+def render_photo(slide, index):
+    img = mute(cover(load(os.path.join(SRC, slide["photo"])))).convert("RGBA")
+    img.alpha_composite(overlay(slide))
     path = os.path.join(OUT, f"story_{index:02d}.jpg")
     img.convert("RGB").save(path, quality=95)
     return path
 
 
-def ffmpeg(args, path):
-    subprocess.run(["ffmpeg", "-v", "error", "-y", *args, "-map", "[out]", "-map", "0:a?",
-                    "-c:v", "libx264", "-crf", "19", "-preset", "veryfast", "-c:a", "aac",
-                    "-b:a", "160k", "-movflags", "+faststart", path], check=True)
-
-
-def render_video(slide, index, total):
+def render_video(slide, index):
     src = os.path.join(SRC, slide["video"])
-    first = video_frame(src, slide["frame"])
     dur = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
                           "csv=p=0", src], capture_output=True, text=True, check=True).stdout.strip()
+    layer = overlay(slide)
+    layer_p = os.path.join(OUT, "_layer.png")
+    layer.save(layer_p)
     path = os.path.join(OUT, f"story_{index:02d}.mp4")
-    layer_p, mask_p = os.path.join(OUT, "_layer.png"), os.path.join(OUT, "_mask.png")
-    # Still inputs are looped, so every stream is capped at the clip's duration
-    if slide["layout"] == "full":
-        layer = full_overlay(slide, index, total)
-        layer.save(layer_p)
-        graph = (f"[0:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}[v];"
-                 f"[v][1:v]overlay=0:0:shortest=1,fps=30,format=yuv420p[out]")
-        ffmpeg(["-i", src, "-loop", "1", "-t", dur, "-i", layer_p, "-t", dur,
-                "-filter_complex", graph], path)
-        still = cover(first, W, H).convert("RGBA")
-        still.alpha_composite(layer)
-    else:
-        base, (cx, cy, cw, ch) = card_base(slide, index, total, first, first.size)
-        frame = framed_card(Image.new("RGB", (cw, ch)))  # white frame under the live video
-        drop_shadow(base, frame, (cx - 12, cy - 12))
-        base.alpha_composite(frame, (cx - 12, cy - 12))
-        base.convert("RGB").save(layer_p)
-        rounded_mask(cw, ch).save(mask_p)
-        graph = (f"[0:v]scale={cw}:{ch},format=rgba[v];[2:v]format=gray[m];[v][m]alphamerge[vm];"
-                 f"[1:v][vm]overlay={cx}:{cy}:shortest=1,fps=30,format=yuv420p[out]")
-        ffmpeg(["-i", src, "-loop", "1", "-t", dur, "-i", layer_p, "-loop", "1", "-t", dur,
-                "-i", mask_p, "-t", dur, "-filter_complex", graph], path)
-        still = base.copy()
-        still.paste(first.resize((cw, ch), Image.LANCZOS), (cx, cy), rounded_mask(cw, ch))
-        os.remove(mask_p)
-    still.convert("RGB").save(os.path.join(OUT, f"story_{index:02d}_preview.jpg"), quality=90)
+    brightness = MUTE[1] - 1  # eq brightness is additive, roughly matching the photo grade
+    graph = (f"[0:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
+             f"eq=saturation={MUTE[0]}:brightness={brightness / 2:.3f}[v];"
+             f"[v][1:v]overlay=0:0:shortest=1,fps=30,format=yuv420p[out]")
+    # The still input is looped, so it is capped at the clip's duration
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-loop", "1", "-t", dur, "-i", layer_p,
+                    "-t", dur, "-filter_complex", graph, "-map", "[out]", "-map", "0:a?",
+                    "-c:v", "libx264", "-crf", "19", "-preset", "veryfast", "-c:a", "aac",
+                    "-b:a", "160k", "-movflags", "+faststart", path], check=True)
     os.remove(layer_p)
+    # Still preview for the overview sheet
+    frame_p = os.path.join(OUT, "_frame.png")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(slide["frame"]), "-i", path,
+                    "-frames:v", "1", frame_p], check=True)
+    load(frame_p).save(os.path.join(OUT, f"story_{index:02d}_preview.jpg"), quality=90)
+    os.remove(frame_p)
     return path
 
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    total = len(SLIDES)
     for i, slide in enumerate(SLIDES, 1):
-        print(render_video(slide, i, total) if "video" in slide else render_photo(slide, i, total))
+        print(render_video(slide, i) if "video" in slide else render_photo(slide, i))
     previews = [os.path.join(OUT, f"story_{i:02d}" + ("_preview.jpg" if "video" in s else ".jpg"))
                 for i, s in enumerate(SLIDES, 1)]
     ims = [Image.open(p).resize((360, 640)) for p in previews]
