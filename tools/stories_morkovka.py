@@ -53,7 +53,7 @@ SLIDES = [
     {
         "photo": "IMG_9485.HEIC",
         "layout": "full", "text": "top",  # white type over the dark canopy, face below it
-        "white": True, "wash": False, "scale": 0.8, "shadow": 170,
+        "white": True, "wash": "dark", "scale": 0.8, "shadow": 170,
         "blocks": [
             ("bold", f"Если спросите, как у{NB}нас дела со{NB}сном, то через одно место!"),
             ("light", f"От укачиваний мы так и{NB}не смогли уйти. И{NB}я, если честно, вообще "
@@ -64,7 +64,7 @@ SLIDES = [
     {
         "photo": "E7CA53F1-372D-41B8-AFE2-7AFFC580A2CE.png",
         "layout": "full", "text": "bottom",  # face on top, text over the pink tee
-        "white": True, "wash": False, "scale": 0.72, "width": 620,  # minimal small column
+        "white": True, "wash": "dark", "scale": 0.72, "width": 620,  # minimal small column
         "blocks": [
             ("bold", f"А сегодня маму наконец-то отпускают на{NB}массаж!"),
             ("light", f"Я начала ходить на{NB}расслабляющий массаж раз в{NB}неделю. Сегодня иду "
@@ -100,10 +100,10 @@ MARGIN, SAFE_TOP, SAFE_BOTTOM = 100, 250, 1640  # clear of Instagram's top bar a
 STYLES = {  # font maker, size, colour, colour on white-text slides, line step
     "bold": (lambda n: ImageFont.truetype(CLASSIC, n), 56, BROWN, (255, 255, 255), 70),
     "mark": (lambda n: ImageFont.truetype(CLASSIC, n), 48, BROWN, BROWN, 64),
-    "pink": (lambda n: ImageFont.truetype(CLASSIC, n), 56, (255, 255, 255), (255, 255, 255), 70),
+    "pink": (lambda n: ImageFont.truetype(CLASSIC, n), 56, (250, 222, 229), (250, 222, 229), 70),
     "light": (lambda n: manrope(n, "Light"), 40, BODY, (255, 255, 255), 58),
 }
-PLATES = {"mark": (250, 247, 242, 255), "pink": (236, 170, 186, 255)}  # paper / pastel pink
+PLATES = {"mark": (250, 247, 242, 255)}  # paper marker; "pink" is just pale pink type
 GAP = 26
 
 
@@ -268,12 +268,17 @@ def full_overlay(slide, index, total):
     wrapped, h = text_blocks(d, slide["blocks"], width, scale, white)
     y = SAFE_TOP if slide["text"] == "top" else SAFE_BOTTOM - h
     tone = slide.get("wash", True)
-    kw = {"color": (40, 26, 22), "strength": 0.55} if tone == "dark" else {}
-    if tone:
+    if tone == "dark":  # barely-there darkening, stretched far so it never reads as a band
+        dark = {"color": (20, 14, 12), "strength": 0.42}
         if slide["text"] == "top":
-            layer.alpha_composite(wash(y + h - 60, y + h + 170, True, **kw))
+            layer.alpha_composite(wash(y + h - 120, y + h + 650, True, **dark))
         else:
-            layer.alpha_composite(wash(y - 280, y + 60, False, **kw))
+            layer.alpha_composite(wash(y - 750, y + 120, False, **dark))
+    elif tone:
+        if slide["text"] == "top":
+            layer.alpha_composite(wash(y + h - 60, y + h + 170, True))
+        else:
+            layer.alpha_composite(wash(y - 280, y + 60, False))
     text = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     td = ImageDraw.Draw(text)
     counter(td, index, total, (255, 255, 255) if white else HEADER)
