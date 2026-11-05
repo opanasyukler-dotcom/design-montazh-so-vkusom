@@ -563,8 +563,8 @@ def s8(t):
     return fr
 
 # K — collages: ПОСЛЕ on top, ДО below, on black; ПОСЛЕ colour-matched to the ДО of the same angle (skin statistics in Lab)
-ALIGN = {"do_front": (135, 926, 990), "posle_front": (144, 948, 651), "do_34": (198, 908, 845), "posle_34": (215, 1060, 656),
-         "do_side": (144, 1000, 845), "posle_side": (180, 1010, 656)}   # (neck, navel / waist row, body centre x) in photo px
+ALIGN = {"do_front": (135, 926, 990), "posle_front": (127, 958, 725), "do_34": (198, 908, 845), "posle_34": (306, 984, 766),
+         "do_side": (144, 1000, 845), "posle_side": (230, 994, 694)}   # (neck, navel / waist row, body centre x) in photo px
 def skin(rgb):
     hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV); return (hsv[..., 2] > 90) & (hsv[..., 1] > 25) & (hsv[..., 1] < 170) & ((hsv[..., 0] < 25) | (hsv[..., 0] > 165))
 def match_colour(src, ref):
@@ -585,7 +585,10 @@ def panel(im, n, ph=960, neck_at=40, span=470):
     return out
 COLL = []
 for ang in ("front", "34", "side"):
-    d = photo("do_" + ang); a = match_colour(photo("posle_" + ang), d)
+    d = photo("do_" + ang); raw = photo("posle_" + ang); a = match_colour(raw, d)
+    lum = raw.astype(np.float32).mean(2) / 255; k = np.clip((lum - 0.16) / 0.12, 0, 1); k = cv2.GaussianBlur(k * k * (3 - 2 * k), (0, 0), 2)
+    k = np.maximum(k, np.clip((raw[..., 2].astype(np.float32) - raw[..., 0] - 10) / 12, 0, 1))      # navy stickers kept
+    a = (a * k[..., None]).astype(np.uint8)                                   # backdrop judged on the raw photo, before the colour match lifts it
     COLL.append(np.vstack([panel(anon_top(a, ALIGN["posle_" + ang][0] - 40), "posle_" + ang), panel(anon_top(d, ALIGN["do_" + ang][0] - 40), "do_" + ang)]))
 COLL8 = [(np.clip(c, 0, 1) * 255).astype(np.uint8) for c in COLL]
 T_K = [T_END + 1.6 + 2.2 * k for k in range(3)]                          # after the finale and the logo
