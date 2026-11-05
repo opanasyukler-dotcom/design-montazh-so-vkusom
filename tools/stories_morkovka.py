@@ -115,9 +115,9 @@ SLIDES = [
         }],
     },
     {
-        "photo": "0C3CDFFA-4B81-495C-96E2-31C2645E016B.png",
+        "photo": "/root/.claude/uploads/407108f0-3ce4-585b-bf12-4b6e65a8be4f/d5bf97e4-image.jpg",
         "groups": [{
-            "anchor": ("bottom", 1620), "x": 100, "width": 830, "align": "left",
+            "anchor": ("top", 280), "x": 100, "width": 830, "align": "left",  # floor above the ball is free
             "blocks": [
                 ("light", f"с домашними тренировками пока всё нестабильно. то занимаюсь, "
                           f"то пропускаю. иногда просто лень, а{NB}иногда настолько нет сил, что "
