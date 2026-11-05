@@ -36,7 +36,7 @@ SLIDES = [
         "blocks": [
             ("bold", f"Ну что, мы наконец-то ввели морковку!{NB}🥕"),
             ("light", f"Сначала у{NB}дочки была немного странная реакция на{NB}новый вкус, "
-                      f"но в{NB}целом морковка нам понравилась{NB}😂"),
+                      f"но в{NB}целом морковка нам понравилась"),
         ],
     },
     {
@@ -47,12 +47,13 @@ SLIDES = [
                       f"миксовать разные вкусы: индейка, морковка, кабачок. Мне кажется, так "
                       f"будет уже намного интереснее!"),
             ("bold", f"А вот цветную капусту я{NB}пока решила вообще не давать."),
-            ("light", f"После нашей весёлой ночки что-то не{NB}хочется к{NB}ней возвращаться{NB}😂"),
+            ("light", f"После нашей весёлой ночки что-то не{NB}хочется к{NB}ней возвращаться"),
         ],
     },
     {
         "photo": "IMG_9485.HEIC",
-        "layout": "full", "text": "bottom",  # face mid-left, blanket below is free
+        "layout": "full", "text": "top",  # white type over the dark canopy, face below it
+        "white": True, "wash": False, "scale": 0.8, "shadow": 170,
         "blocks": [
             ("bold", f"Если спросите, как у{NB}нас дела со{NB}сном, то через одно место!"),
             ("light", f"От укачиваний мы так и{NB}не смогли уйти. И{NB}я, если честно, вообще "
@@ -63,6 +64,7 @@ SLIDES = [
     {
         "photo": "E7CA53F1-372D-41B8-AFE2-7AFFC580A2CE.png",
         "layout": "full", "text": "bottom",  # face on top, text over the pink tee
+        "white": True, "wash": False, "scale": 0.72, "width": 620,  # minimal small column
         "blocks": [
             ("bold", f"А сегодня маму наконец-то отпускают на{NB}массаж!"),
             ("light", f"Я начала ходить на{NB}расслабляющий массаж раз в{NB}неделю. Сегодня иду "
@@ -72,12 +74,13 @@ SLIDES = [
     },
     {
         "photo": "0E168C5F-0AAE-4E41-96DE-CF882206C536.png",
-        "layout": "card", "text": "top", "tilt": -3,  # close-up face: tilted print below text
+        "layout": "full", "text": "bottom",  # text over the mug, face above stays clear
+        "white": True, "wash": "dark",  # light mug needs a soft dark gradient under white type
         "blocks": [
             ("light", f"После родов у{NB}меня до{NB}сих пор безумно напряжено всё тело, поэтому "
                       f"этот час, когда можно просто лежать, расслабиться и{NB}ни о{NB}чём "
                       f"не{NB}думать,"),
-            ("bold", f"для меня теперь отдельный вид удовольствия."),
+            ("pink", f"для меня теперь отдельный вид удовольствия."),
         ],
     },
     {
@@ -94,11 +97,13 @@ SLIDES = [
 ]
 
 MARGIN, SAFE_TOP, SAFE_BOTTOM = 100, 250, 1640  # clear of Instagram's top bar and reply bar
-STYLES = {  # font, colour, line step
-    "bold": (lambda: ImageFont.truetype(CLASSIC, 56), BROWN, 70),
-    "mark": (lambda: ImageFont.truetype(CLASSIC, 48), BROWN, 64),
-    "light": (lambda: manrope(40, "Light"), BODY, 58),
+STYLES = {  # font maker, size, colour, colour on white-text slides, line step
+    "bold": (lambda n: ImageFont.truetype(CLASSIC, n), 56, BROWN, (255, 255, 255), 70),
+    "mark": (lambda n: ImageFont.truetype(CLASSIC, n), 48, BROWN, BROWN, 64),
+    "pink": (lambda n: ImageFont.truetype(CLASSIC, n), 56, (255, 255, 255), (255, 255, 255), 70),
+    "light": (lambda n: manrope(n, "Light"), 40, BODY, (255, 255, 255), 58),
 }
+PLATES = {"mark": (250, 247, 242, 255), "pink": (236, 170, 186, 255)}  # paper / pastel pink
 GAP = 26
 
 
@@ -156,27 +161,28 @@ class Rich:
         return self.size * 1.15
 
 
-def text_blocks(d, blocks, width):
-    """Wrap every block; return [(style, lines)] and total height."""
+def text_blocks(d, blocks, width, scale=1.0, white=False):
+    """Wrap every block; return [(rich, lines, colour, step, plate)] and total height."""
     out, h = [], 0
     for k, (style, text) in enumerate(blocks):
-        _, _, step = STYLES[style]
-        rich = Rich(STYLES[style][0]())
-        lines = rich.wrap(d, text, width - (60 if style == "mark" else 0))
-        out.append((style, rich, lines))
-        h += (GAP if k else 0) + len(lines) * step + (30 if style == "mark" else 0)
+        make, size, color, white_color, step = STYLES[style]
+        rich = Rich(make(round(size * scale)))
+        plate = PLATES.get(style)
+        lines = rich.wrap(d, text, width - (60 if plate else 0))
+        step = round(step * scale)
+        out.append((rich, lines, white_color if white else color, step, plate))
+        h += (round(GAP * scale) if k else 0) + len(lines) * step + (30 if plate else 0)
     return out, h
 
 
-def draw_blocks(img, d, wrapped, x, y, width):
-    for k, (style, rich, lines) in enumerate(wrapped):
-        _, color, step = STYLES[style]
+def draw_blocks(img, d, wrapped, x, y, width, scale=1.0):
+    for k, (rich, lines, color, step, plate) in enumerate(wrapped):
         if k:
-            y += GAP
-        if style == "mark":  # paper marker plate, like the highlights in the hospital stories
+            y += round(GAP * scale)
+        if plate:  # marker plate behind the block
+            line_w = max(rich.length(d, line) for line in lines)
             h = len(lines) * step + 30
-            d.rounded_rectangle((x - 4, y - 8, x + width + 4, y + h - 8), radius=18,
-                                fill=(250, 247, 242, 255))
+            d.rounded_rectangle((x - 4, y - 8, x + line_w + 56, y + h - 8), radius=18, fill=plate)
             y += 12
             for line in lines:
                 rich.draw(img, d, (x + 26, y), line, color)
@@ -187,6 +193,15 @@ def draw_blocks(img, d, wrapped, x, y, width):
                 rich.draw(img, d, (x, y), line, color)
                 y += step
     return y
+
+
+def with_shadow(layer, strength=120):
+    """Soft dark shadow under white type instead of a wash, so it reads on light photos."""
+    alpha = layer.getchannel("A").filter(ImageFilter.GaussianBlur(10)).point(lambda v: v * strength // 255)
+    shadow = Image.new("RGBA", layer.size, (30, 20, 15, 0))
+    shadow.putalpha(alpha)
+    shadow.alpha_composite(layer)
+    return shadow
 
 
 def load(path):
@@ -228,18 +243,18 @@ def counter(d, index, total, fill=HEADER):
     d.text((W - MARGIN - d.textlength(label, font=hf), 170), label, font=hf, fill=fill)
 
 
-def wash(start, end, top_side):
-    """Paper-coloured RGBA gradient: solid on the text side, fading out toward the photo."""
+def wash(start, end, top_side, color=PAPER, strength=0.86):
+    """RGBA gradient (paper by default): solid on the text side, fading out toward the photo."""
     a = np.zeros((H, 1), np.float32)
     span = end - start
-    ramp = (np.linspace(1, 0, span) ** 1.3) * 0.86
+    ramp = (np.linspace(1, 0, span) ** 1.3) * strength
     if top_side:
-        a[:start, 0] = 0.86
+        a[:start, 0] = strength
         a[start:end, 0] = ramp
     else:
-        a[end:, 0] = 0.86
+        a[end:, 0] = strength
         a[start:end, 0] = ramp[::-1]
-    layer = Image.new("RGBA", (W, H), PAPER + (0,))
+    layer = Image.new("RGBA", (W, H), color + (0,))
     layer.putalpha(Image.fromarray((np.repeat(a, W, 1) * 255).astype(np.uint8)))
     return layer
 
@@ -248,17 +263,22 @@ def full_overlay(slide, index, total):
     """Transparent layer for full-screen slides: paper wash + text on the free side."""
     layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
-    width = W - 2 * MARGIN
-    wrapped, h = text_blocks(d, slide["blocks"], width)
-    if slide["text"] == "top":
-        y = SAFE_TOP
-        layer.alpha_composite(wash(y + h - 60, y + h + 170, True))
-    else:
-        y = SAFE_BOTTOM - h
-        layer.alpha_composite(wash(y - 280, y + 60, False))
-    d = ImageDraw.Draw(layer)
-    counter(d, index, total)
-    draw_blocks(layer, d, wrapped, MARGIN, y, width)
+    scale, white = slide.get("scale", 1.0), slide.get("white", False)
+    width = slide.get("width", W - 2 * MARGIN)
+    wrapped, h = text_blocks(d, slide["blocks"], width, scale, white)
+    y = SAFE_TOP if slide["text"] == "top" else SAFE_BOTTOM - h
+    tone = slide.get("wash", True)
+    kw = {"color": (40, 26, 22), "strength": 0.55} if tone == "dark" else {}
+    if tone:
+        if slide["text"] == "top":
+            layer.alpha_composite(wash(y + h - 60, y + h + 170, True, **kw))
+        else:
+            layer.alpha_composite(wash(y - 280, y + 60, False, **kw))
+    text = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    td = ImageDraw.Draw(text)
+    counter(td, index, total, (255, 255, 255) if white else HEADER)
+    draw_blocks(text, td, wrapped, MARGIN, y, width, scale)
+    layer.alpha_composite(with_shadow(text, slide.get("shadow", 120)) if white else text)
     return layer
 
 
