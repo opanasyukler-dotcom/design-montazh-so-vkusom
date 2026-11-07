@@ -485,22 +485,20 @@ def s_or(t):
     fr = full(V["IMG_7244"].at(0.6 + (t - T_OR)), 0.5, 0.5, lerp(1.12, 1.04, eo((t - T_OR) / 2.4)))
     shade(fr, VIG); ST_OR.draw(fr, t, T_OR + 0.05, 1.9); return fr
 # DRESSING (2/2) — on the table in the compression garment; the forearm tattoo is hidden
-_K9 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (31, 31))
-def no_tattoo(f, y0=1380):
-    """find dark ink strokes on the skin in the lower part of the frame (black-hat), widen them and blur them away"""
-    low = f[y0:]; g = cv2.cvtColor(low, cv2.COLOR_RGB2GRAY); hsv = cv2.cvtColor(low, cv2.COLOR_RGB2HSV)
-    skin = ((hsv[..., 0] < 25) | (hsv[..., 0] > 165)) & (hsv[..., 1] > 30) & (hsv[..., 2] > 70)
-    skin = cv2.dilate(skin.astype(np.uint8), _K9, iterations=2) > 0
-    ink = (cv2.morphologyEx(g, cv2.MORPH_BLACKHAT, _K9) > 14) & skin
-    m = cv2.dilate(ink.astype(np.uint8) * 255, _K9, iterations=3); m = cv2.GaussianBlur(m, (0, 0), 14).astype(np.float32)[..., None] / 255
-    m = np.clip(m * 1.6, 0, 1)
-    sm = cv2.resize(low, (low.shape[1] // 4, low.shape[0] // 4), interpolation=cv2.INTER_AREA)            # paint the ink over with the skin around it
-    hole = cv2.resize((m[..., 0] > 0.15).astype(np.uint8) * 255, (sm.shape[1], sm.shape[0]), interpolation=cv2.INTER_NEAREST)
-    fill = cv2.inpaint(sm, hole, 9, cv2.INPAINT_TELEA); fill = cv2.GaussianBlur(fill, (0, 0), 3)
-    bl = cv2.resize(fill, (low.shape[1], low.shape[0]), interpolation=cv2.INTER_LINEAR)
-    out = f.copy(); out[y0:] = (low * (1 - m) + bl * m).astype(np.uint8); return out
+_KT = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (25, 25))
+TAT = np.array(json.load(open(os.path.join(WORK, "IMG_7277_tattoo.json"))))   # tattoo box per frame (smoothed)
+def no_tattoo(f, src_t):
+    """mosaic over the forearm tattoo, the box tracked and smoothed over frames: steady, no flicker"""
+    i = min(max(int(round(src_t * FPS)), 0), len(TAT) - 1); x0, y0, x1, y1 = TAT[i]; p = 40
+    x0, y0, x1, y1 = int(max(0, x0 - p)), int(max(0, y0 - p)), int(min(W, x1 + p)), int(min(H, y1 + p))
+    reg = f[y0:y1, x0:x1]; bs = 64
+    g = cv2.cvtColor(reg, cv2.COLOR_RGB2GRAY); ink = cv2.dilate(((cv2.morphologyEx(g, cv2.MORPH_BLACKHAT, _KT) > 12) * 255).astype(np.uint8), _KT)
+    clean = cv2.inpaint(reg, ink, 7, cv2.INPAINT_TELEA)                     # ink out first, so the blocks carry only skin tone
+    mos = cv2.resize(cv2.resize(clean, (max(1, reg.shape[1] // bs), max(1, reg.shape[0] // bs)), interpolation=cv2.INTER_AREA), (reg.shape[1], reg.shape[0]), interpolation=cv2.INTER_NEAREST)
+    m = np.zeros(reg.shape[:2], np.float32); e = 18; m[e:-e, e:-e] = 1; m = cv2.GaussianBlur(m, (0, 0), 8)[..., None]
+    out = f.copy(); out[y0:y1, x0:x1] = (reg * (1 - m) + mos * m).astype(np.uint8); return out
 def s_dr(t):
-    fr = full(no_tattoo(V["IMG_7277"].at(2.0 + (t - T_DR))), 0.5, 0.5, lerp(1.1, 1.02, eo((t - T_DR) / 2.0))); shade(fr, VIG)
+    fr = full(no_tattoo(V["IMG_7277"].at(2.0 + (t - T_DR)), 2.0 + (t - T_DR)), 0.5, 0.5, lerp(1.1, 1.02, eo((t - T_DR) / 2.0))); shade(fr, VIG)
     ST_DR.draw(fr, t, T_AFT + 0.05, 4.3); return fr
 # DRESSING (1/2) — lying, the next day
 def s_aft(t):
