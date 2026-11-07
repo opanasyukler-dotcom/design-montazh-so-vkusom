@@ -624,10 +624,12 @@ def build_audio(path):
     mus = track(n) * ((G_GAP - (G_GAP - G_VO) * np.clip(dd, 0, 1)) * fade)[:, None]
     sfx = np.zeros(n + 2 * SR)
     def put(x, t, g): i = int(max(0, t) * SR); seg = sfx[i:i + len(x)]; seg += x[:len(seg)] * g
-    for k in range(4): put(click(), T_DO + k * T_BURST, 0.7)                                                    # ДО burst
+    w_ = wave.open(os.path.join(SRC, "shutter_client.wav")); SHOT = np.frombuffer(w_.readframes(w_.getnframes()), np.int16).astype(np.float64) / 32768
+    SHOT = SHOT / (np.abs(SHOT).max() + 1e-9)                                                                   # the client's shutter sound (0.46 s)
+    for k in range(4): put(SHOT, T_DO + k * T_BURST, 0.55)                                                     # ДО burst
     put(swell(0.8), T_OR - 0.4, 0.05); put(felt(110, 0.25), T_OR, 0.2)
     for k in range(3): put(pop(1300, 600, 0.08), R("R3", 0.04) + 0.3 * k, 0.07)
-    for tk in T_K: put(click(), tk, 0.8)
+    for tk in T_K: put(SHOT, tk, 0.55)
     put(glass(1174.7), T_Z + 0.2, 0.12)
     sfx[:n] *= 1 - 0.8 * np.clip(dd, 0, 1)
     mix = vo[:, None] + mus + sfx[:n, None] * np.float64([[0.92, 1.0]])
