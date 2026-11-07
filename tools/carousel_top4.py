@@ -93,12 +93,12 @@ def lifted(src, up):
         bg.paste(m, (0, end - 60), mask)
     return bg
 
-def item_slide(src, num, head, paras, out, n, total, where="bottom", fy=0.5, size=30, strength=0.72, y=None, up=None):
+def item_slide(src, num, head, paras, out, n, total, where="bottom", fy=0.5, size=30, strength=0, y=None, up=None, x=M, width=W - 2 * M):
     im = (lifted(src, up) if up else crop(ImageOps.exif_transpose(Image.open(src)).convert("RGB"), 0.5, fy)).convert("RGBA")
-    t = Text(paras, W - 2 * M, size, num=num, head=head)
+    t = Text(paras, width, size, num=num, head=head)
     ty = y if y is not None else (M if where == "top" else H - 96 - t.h)
-    haze(im, (-120, ty - 70, W + 120, ty + t.h + 60), CREAM, strength)
-    t.draw(im, M, ty, INK, BROWN); footer(im, n, total, MAUVE)
+    if strength: haze(im, (-120, ty - 70, W + 120, ty + t.h + 60), (12, 8, 6), strength)
+    t.draw(im, x, ty, INK, BROWN); footer(im, n, total, MAUVE)
     im.convert("RGB").save(out, quality=95); print(out, "text", ty, ty + t.h)
 
 def paper_slide(paras, out, n, total, kicker=None, head=None, extra=None, size=32):
@@ -121,23 +121,23 @@ ITEMS = [
         ("Обожаю его за вместительность!", "i"),
         ("Я вообще не понимаю стерилизаторы, в которые помещаются всего 1–2 бутылочки. Мне хочется за один раз загрузить всё, что накопилось, а не стоять и стерилизовать по очереди.", "b"),
         ("В Mubo я пихаю буквально всё подряд 😂 Бутылочки, соски и остальные мелочи. Для меня это одна из самых удобных покупок!", "b")],
-     dict(where="bottom", fy=0.0)),
+     dict(where="bottom", fy=1.0, x=300, width=700, size=28)),
     ("warmer.png", "02", "ПОДОГРЕВАТЕЛЬ БУТЫЛОЧЕК", [
         ("Вот здесь я бы точно выбрала другую модель.", "i"),
         ("У меня сейчас достаточно бюджетный вариант, и, как оказалось, он больше подходит для поддержания температуры, чем для полноценного подогрева воды.", "b"),
         ("Поэтому во второй раз я бы не экономила и сразу взяла подогреватель, который действительно быстро и хорошо справляется со своей задачей.", "b")],
-     dict(where="top", fy=1.0)),
+     dict(where="top", fy=1.0, size=28)),
     ("noise.jpg", "03", "БЕЛЫЙ ШУМ", [
         ("Вот это просто МАСТХЕВ с первых дней!", "i"),
         ("Я начала включать белый шум ещё в роддоме и пользуюсь им до сих пор.", "b"),
         ("Для нас это одна из самых незаменимых вещей во время сна. Даже не представляю, как бы мы без него обходились!", "b")],
-     dict(where="bottom", up=330, size=29, strength=0.8)),
-    ("machine.png", "04", "МАШИНКА ДЛЯ ПРИГОТОВЛЕНИЯ СМЕСИ", [
+     dict(where="bottom", up=380, size=28, x=270, width=730)),
+    ("machine_clean.png", "04", "МАШИНКА ДЛЯ ПРИГОТОВЛЕНИЯ СМЕСИ", [
         ("Девочки, если вы на ИВ, я бы советовала в первую очередь присмотреться именно к этой покупке!", "i"),
         ("Мы пользуемся ей буквально с первых дней, и это просто лучшее, что можно было придумать для родителей на искусственном вскармливании.", "b"),
         ("Особенно ночью, когда ты сонная, ребёнок хочет есть, а тебе нужно быстро приготовить бутылочку.", "b"),
         ("Мы без неё вообще никуда! Для меня это покупка века 😂", "b")],
-     dict(where="bottom", fy=0.0, strength=0.86)),
+     dict(where="bottom", fy=0.0, size=28)),  # the bottle logo retouched out (cv2 inpaint) beforehand
 ]
 
 def contents(im, y):
