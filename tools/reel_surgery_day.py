@@ -2,7 +2,7 @@
 """Reels «День операции» — one patient's day, told in the order of the reference reel the client sent: the reveal in the
 mirror as the hook, a burst of ДО photos, then the day by stages (перед операцией · разметка · операция · после
 операции), back to the reveal with her own words, and the ДО/ПОСЛЕ collages in a card over the dimmed operating room,
-logo last. Live sound only (no music yet), whole sentences, one-word subtitles; the brand's navy / powder pink and
+logo last. Live sound with the client's music under it, whole sentences, one-word subtitles; the brand's navy / powder pink and
 Bebas Neue + thin Montserrat as in the other reels. Анна Тваури.
 
 usage:
@@ -599,8 +599,14 @@ def click():
     x = x * e / 2; k = felt(160, 0.08); x[:len(k)] += k * 0.4; return x
 PENTA = [587.3, 659.3, 740.0, 880.0, 987.8, 1174.7]                    # D major pentatonic, matches the music
 
-G_VO, G_GAP = 0.0, 0.0
-def track(n): return np.zeros((n, 2))                       # no music in this version
+MUSIC = os.path.join(SRC, "song4.wav")                                 # the client's track (audio of the screen recording, 48 kHz stereo)
+M0 = 3.0                                                               # the recording is silent for its first 3 s; the track outlasts the reel
+G_VO, G_GAP = 0.022, 0.075
+def track(n):
+    w = wave.open(MUSIC); x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64).reshape(-1, w.getnchannels()) / 32768
+    if x.shape[1] == 1: x = np.repeat(x, 2, 1)
+    seg = x[int(M0 * SR):int(M0 * SR) + n]; seg = seg / np.sqrt(np.mean(seg.mean(1) ** 2))
+    return np.pad(seg, ((0, n - len(seg)), (0, 0)))
 
 def build_audio(path):
     n = int(DUR * SR); vo = np.zeros(n); act = np.zeros(n); srcs = {}
