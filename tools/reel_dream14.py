@@ -515,7 +515,7 @@ def s_f(t):
 HF = lift(Drop(["НЕ МОГУ НА СЕБЯ", "*НАСМОТРЕТЬСЯ*"], 120, 70, 0, maxw=860), 1290)
 from PIL import ImageOps
 COLL = [np.asarray(ImageOps.exif_transpose(Image.open(os.path.join(SRC, n))).convert("RGB")).copy() for n in ("IMG_9706.JPG", "IMG_9707.JPG")]
-BIG_STK = {0: [(412, 1390, 48), (679, 1398, 48)]}   # front ДО only: in profile the sticker overhangs the breast tip, so it stays as shot
+BIG_STK = {}                                                                   # the clinic's stickers kept as shot: under them the breast edge itself is hidden   # front ДО only: in profile the sticker overhangs the breast tip, so it stays as shot
 def refill(img, x, y, r):
     """take a sticker off without eating the breast: rebuild the body outline over the hole (closing of the skin mask),
     fill inside it from skin only, keep the black backdrop outside"""
