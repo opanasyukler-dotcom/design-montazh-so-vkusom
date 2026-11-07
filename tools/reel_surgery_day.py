@@ -70,7 +70,7 @@ def src_of(t, name):
 T_S = {b: vstart(b) - 0.08 for b, *_ in VO}
 def R(b, rel): return vstart(b) + rel
 T_DO = vend("H1") + 0.35                                  # ДО burst
-T_OR = vend("S3") + 0.5; T_OR2 = T_OR + 2.4; T_AFT = T_OR2 + 2.0   # operation (two shots) · after the operation
+T_OR = vend("S3") + 0.5; T_AFT = T_OR + 2.4; T_DR = T_AFT + 2.4   # operation · after the operation · dressing the next day
 T_K = [vend("R5") + 0.4 + 1.8 * k for k in range(3)]      # ДО/ПОСЛЕ collages in a card
 T_Z = T_K[-1] + 1.8; DUR = T_Z + 2.4
 
@@ -294,7 +294,7 @@ SUBS = {
     'R4': [('Мама', 0.04, 0.44), ('говорит:', 0.44, 0.66), ('Ким', 0.7, 0.94), ('Кардашьян.', 0.94, 1.6), ('Нет,', 1.66, 1.82), ('всё', 2.06, 2.08), ('очень', 2.08, 2.4), ('красиво,', 2.4, 3.02), ('правда.', 3.18, 3.26)],
     'R5': [('Я', 0.04, 0.26), ('мечтала,', 0.26, 0.74), ('у', 1.22, 1.24), ('меня', 1.24, 1.26), ('вот', 1.26, 1.34), ('этот', 1.34, 1.64), ('живот,', 1.64, 1.98), ('я', 2.28, 2.32), ('и', 2.32, 2.58), ('худела,', 2.58, 3.14), ('и', 3.32, 3.46), ('спорт,', 3.46, 3.86), ('и', 4.08, 4.2), ('таблетки,', 4.2, 4.6), ('что', 4.62, 4.8), ('только', 4.8, 5.02), ('не', 5.02, 5.16), ('пробовала', 5.16, 5.6), ('в', 5.6, 5.7), ('своей', 5.7, 5.72), ('жизни,', 5.72, 5.96), ('ничего', 6.32, 6.34), ('не', 6.34, 6.56), ('помогало.', 6.56, 7.06)],
 }
-SUB_Y = 1420                                                           # Instagram Reels safe zone: x <= 940, y 250-1500
+SUB_Y = 1042                                                           # mid-frame: the plate covers the interview's burned-in captions (safe zone x <= 940, y 250-1500)
 def _sub_words():
     """one word at a time: each stays until the next one starts (or a beat after it ends)"""
     out = [(w.strip(",."), t0 + a, t0 + e) for b, s_, parts, t0, d in SEG for w, a, e in SUBS[b]]
@@ -448,20 +448,20 @@ def photo_png(n): return cv2.imread(os.path.join(WORK, n + ".png"))[..., ::-1].c
 
 # stage label, as in the reference: a small pink line over a bold caption, shown when the stage begins
 class Stage:
-    def __init__(s, small, big, y=880): s.a = Track([small], 30, 540, 0, 500, col=PINK, center=True); s.b = Drop([big], 104, 0, y + 50, maxw=880); s.y = y
+    def __init__(s, small, big, y=700): s.a = Track([small], 30, 540, 0, 500, col=PINK, center=True); s.b = Drop([big], 104, 0, y + 50, maxw=880); s.y = y
     def draw(s, fr, t, t0, dur=2.6):
         if not (t0 <= t <= t0 + dur + 0.4): return
         s.b.x = 540 - max(r[1] for r in s.b.rows) / 2
         op = 1 - cl((t - t0 - dur) / 0.35); shade(fr, (np.exp(-((yy[:, :1] - s.y - 70) / 170) ** 2) * 0.55 * op)[..., None].astype(np.float32) if False else (np.exp(-((yy[:, :1] - s.y - 70) / 170) ** 2)[..., None] * 0.55 * op).astype(np.float32))
         s.a.y = s.y + s.a.top; s.a.draw(fr, t, t0, t0 + dur); s.b.draw(fr, t, t0 + 0.15, t0 + dur)
 ST_DO = Stage("было", "ДО ОПЕРАЦИИ"); ST_P = Stage("утро · палата", "ПЕРЕД ОПЕРАЦИЕЙ"); ST_S = Stage("с хирургом", "РАЗМЕТКА И ПЛАН")
-ST_OR = Stage("операционная", "ОПЕРАЦИЯ"); ST_AF = Stage("через несколько часов", "ПОСЛЕ ОПЕРАЦИИ"); ST_R = Stage("первый раз в зеркале", "РЕЗУЛЬТАТ")
+ST_OR = Stage("операционная", "ОПЕРАЦИЯ"); ST_DR = Stage("на следующий день", "ПЕРЕВЯЗКА"); ST_AF = Stage("через несколько часов", "ПОСЛЕ ОПЕРАЦИИ"); ST_R = Stage("первый раз в зеркале", "РЕЗУЛЬТАТ")
 
 # HOOK — the reveal in the mirror, title over it
-HH = Drop(["ДЕНЬ ОПЕРАЦИИ"], 128, 0, 980, maxw=880); TH = Track(["[ глазами пациентки ]"], 34, 540, 0, 400, center=True)
+HH = Drop(["ДЕНЬ ОПЕРАЦИИ"], 128, 0, 720, maxw=880); TH = Track(["[ глазами пациентки ]"], 34, 540, 0, 400, center=True)
 def s_hook(t):
     fr = full(frame("IMG_8166", t), 0.5, 0.45, lerp(1.08, 1.0, eo(t / 5.0))); shade(fr, VIG)
-    shade(fr, (np.exp(-((yy[:, :1] - 1040) / 210) ** 2)[..., None] * 0.5).astype(np.float32))
+    shade(fr, (np.exp(-((yy[:, :1] - 790) / 210) ** 2)[..., None] * 0.5).astype(np.float32))
     HH.x = 540 - max(r[1] for r in HH.rows) / 2; HH.draw(fr, t, 0.1, vend("H1") - 0.2); TH.y = HH.y + HH.h + 40 + TH.top; TH.draw(fr, t, 0.7, vend("H1") - 0.2)
     return fr
 
@@ -482,13 +482,16 @@ def s_mark(t):
     ST_S.draw(fr, t, T_S["S1"] + 0.05); return fr
 # OR — two silent shots of the operating room
 def s_or(t):
-    if t < T_OR2: fr = full(V["IMG_7244"].at(0.6 + (t - T_OR)), 0.5, 0.5, lerp(1.12, 1.04, eo((t - T_OR) / 2.4)))
-    else: fr = full(V["IMG_7277"].at(2.0 + (t - T_OR2)), 0.5, 0.5, lerp(1.1, 1.02, eo((t - T_OR2) / 2.0)))
-    shade(fr, VIG); ST_OR.draw(fr, t, T_OR + 0.05, 3.9); return fr
+    fr = full(V["IMG_7244"].at(0.6 + (t - T_OR)), 0.5, 0.5, lerp(1.12, 1.04, eo((t - T_OR) / 2.4)))
+    shade(fr, VIG); ST_OR.draw(fr, t, T_OR + 0.05, 1.9); return fr
+# DRESSING — the next day, on the table in the compression garment
+def s_dr(t):
+    fr = full(V["IMG_7277"].at(2.0 + (t - T_DR)), 0.5, 0.5, lerp(1.1, 1.02, eo((t - T_DR) / 2.0))); shade(fr, VIG)
+    ST_DR.draw(fr, t, T_DR + 0.05, 1.6); return fr
 # AFTER — lying after the operation
 def s_aft(t):
     fr = full(V["IMG_7892"].at(0.5 + (t - T_AFT) * 0.8), 0.5, 0.5, lerp(1.1, 1.0, eo((t - T_AFT) / 2.4))); shade(fr, VIG)
-    ST_AF.draw(fr, t, T_AFT + 0.05, 2.0); return fr
+    ST_AF.draw(fr, t, T_AFT + 0.05, 1.9); return fr
 # REVEAL — back to the mirror, her words
 def s_rev(t):
     fr = full(frame("IMG_8166", t), 0.5, 0.45, pull(t, T_S["R1"], 1.08, 1.0, 2.0)); shade(fr, VIG)
@@ -504,21 +507,17 @@ def card_bg(t):
     fr = cv2.resize(b, (W, H)).astype(np.float32) / 255; fr *= 0.35; fr += 0.65 * DEEP * 0.9; return fr
 CW, CH_ = 760, 1161                                        # the collage (1320x2346) scaled DOWN into the card
 def s_end(t):
-    fr = card_bg(t)
-    if t < T_Z:
-        k = min(2, max(0, int((t - T_K[0]) / 1.8))); lt = t - T_K[k]; s_ = 1 + 0.04 * (1 - eo(lt / 0.35))
-        im = cv2.resize(COLL[k], (int(CW * s_), int(CH_ * s_)), interpolation=cv2.INTER_AREA).astype(np.float32) / 255
-        x0, y0 = 540 - im.shape[1] // 2, 260 + (CH_ - im.shape[0]) // 2
-        m = rrect(x0, y0, x0 + im.shape[1], y0 + im.shape[0], 28)[y0:y0 + im.shape[0], x0:x0 + im.shape[1], None]
-        reg = fr[y0:y0 + im.shape[0], x0:x0 + im.shape[1]]; reg[:] = reg * (1 - m) + im * m
-        rrect_line(fr, x0, y0, x0 + im.shape[1], y0 + im.shape[0], 28, PINK, 3)
+    if t < T_Z:                                                           # the collages full screen (1320x2346 is 9:16: a down-scale)
+        k = min(2, max(0, int((t - T_K[0]) / 1.8))); lt = t - T_K[k]
+        fr = full(COLL[k], 0.5, 0.5, 1 + 0.03 * (1 - eo(lt / 0.35)))
         if k: f = 1 - eo(lt / 0.15); fr = fr * (1 - f) + f
         return fr
+    fr = card_bg(t)
     lt = t - T_Z; blend(fr, logo_alpha(420), 540 - 210, 820, PINK, eo(lt / 0.5))
     tr = Track(["пластический хирург"], 34, 540, 0, 400, center=True); tr.y = 1000 + tr.top; tr.draw(fr, t, T_Z + 0.4); return fr
 
-SCENES = [(0, s_hook), (T_DO, s_do), (T_S["P1"], s_pre), (T_S["S1"], s_mark), (T_OR, s_or), (T_AFT, s_aft), (T_S["R1"], s_rev), (T_K[0], s_end)]
-TRANS = {T_DO: ("flash", 0.15), T_S["P1"]: ("zoom", 0.35), T_S["S1"]: ("zoom", 0.35), T_OR: ("flash", 0.2), T_AFT: ("zoom", 0.35), T_S["R1"]: ("iris", 0.5), T_K[0]: ("zoom", 0.4)}
+SCENES = [(0, s_hook), (T_DO, s_do), (T_S["P1"], s_pre), (T_S["S1"], s_mark), (T_OR, s_or), (T_AFT, s_aft), (T_DR, s_dr), (T_S["R1"], s_rev), (T_K[0], s_end)]
+TRANS = {T_DO: ("flash", 0.15), T_S["P1"]: ("zoom", 0.35), T_S["S1"]: ("zoom", 0.35), T_OR: ("flash", 0.2), T_AFT: ("zoom", 0.35), T_DR: ("flash", 0.2), T_S["R1"]: ("iris", 0.5), T_K[0]: ("zoom", 0.4)}
 def push(old, new, p):
     e = eio(p); x = int(W * e); fr = np.empty_like(old); fr[:, :W - x] = old[:, x:]; fr[:, W - x:] = new[:, :x]
     if 0 < x < W: fr[:, max(0, W - x - 2):W - x + 2] = PINK
