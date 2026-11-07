@@ -487,11 +487,11 @@ def s_or(t):
 # DRESSING — the next day, on the table in the compression garment
 def s_dr(t):
     fr = full(V["IMG_7277"].at(2.0 + (t - T_DR)), 0.5, 0.5, lerp(1.1, 1.02, eo((t - T_DR) / 2.0))); shade(fr, VIG)
-    ST_DR.draw(fr, t, T_DR + 0.05, 1.6); return fr
-# AFTER — lying after the operation
+    ST_DR.draw(fr, t, T_AFT + 0.05, 4.3); return fr
+# DRESSING (1/2) — lying, the next day
 def s_aft(t):
     fr = full(V["IMG_7892"].at(0.5 + (t - T_AFT) * 0.8), 0.5, 0.5, lerp(1.1, 1.0, eo((t - T_AFT) / 2.4))); shade(fr, VIG)
-    ST_AF.draw(fr, t, T_AFT + 0.05, 1.9); return fr
+    ST_DR.draw(fr, t, T_AFT + 0.05, 4.3); return fr                         # both black-garment shots are the next-day dressing
 # REVEAL — back to the mirror, her words
 def s_rev(t):
     fr = full(frame("IMG_8166", t), 0.5, 0.45, pull(t, T_S["R1"], 1.08, 1.0, 2.0)); shade(fr, VIG)
@@ -517,7 +517,7 @@ def s_end(t):
     tr = Track(["пластический хирург"], 34, 540, 0, 400, center=True); tr.y = 1000 + tr.top; tr.draw(fr, t, T_Z + 0.4); return fr
 
 SCENES = [(0, s_hook), (T_DO, s_do), (T_S["P1"], s_pre), (T_S["S1"], s_mark), (T_OR, s_or), (T_AFT, s_aft), (T_DR, s_dr), (T_S["R1"], s_rev), (T_K[0], s_end)]
-TRANS = {T_DO: ("flash", 0.15), T_S["P1"]: ("zoom", 0.35), T_S["S1"]: ("zoom", 0.35), T_OR: ("flash", 0.2), T_AFT: ("zoom", 0.35), T_DR: ("flash", 0.2), T_S["R1"]: ("iris", 0.5), T_K[0]: ("zoom", 0.4)}
+TRANS = {T_DO: ("flash", 0.15), T_S["P1"]: ("zoom", 0.35), T_S["S1"]: ("zoom", 0.35), T_OR: ("flash", 0.2), T_AFT: ("zoom", 0.35), T_DR: ("zoom", 0.35), T_S["R1"]: ("iris", 0.5), T_K[0]: ("zoom", 0.4)}
 def push(old, new, p):
     e = eio(p); x = int(W * e); fr = np.empty_like(old); fr[:, :W - x] = old[:, x:]; fr[:, W - x:] = new[:, :x]
     if 0 < x < W: fr[:, max(0, W - x - 2):W - x + 2] = PINK
