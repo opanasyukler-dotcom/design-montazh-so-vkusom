@@ -108,6 +108,14 @@ def paper_slide(paras, out, n, total, kicker=None, head=None, extra=None, size=3
     if extra: extra[0](im, ty + t.h)
     footer(im, n, total, MAUVE); im.convert("RGB").save(out, quality=95); print(out, "text", ty, ty + t.h + eh)
 
+def cover_dark(src, out):
+    """her on the brown backdrop: the title in thin cream CAPS on the empty brown above her head"""
+    im = crop(ImageOps.exif_transpose(Image.open(src)).convert("RGB"), 0.5, 0.0).convert("RGBA"); d = ImageDraw.Draw(im)
+    f = font(46, 250); y = 140
+    for l in ["4 ВЕЩИ, КОТОРЫЕ", "Я БЫ 100% КУПИЛА СНОВА"]: d.text((W / 2, y), l, font=f, fill=CREAM, anchor="ms"); y += 60
+    d.text((W / 2, y + 2), "если бы стала мамой во второй раз!", font=font(30, 300, True), fill=BLUSH, anchor="ms")
+    im.convert("RGB").save(out, quality=95); print(out)
+
 def cover(src, out):
     im = crop(ImageOps.exif_transpose(Image.open(src)).convert("RGB"), 0.5, 1.0).convert("RGBA"); d = ImageDraw.Draw(im)
     lines = ["4 ВЕЩИ, КОТОРЫЕ", "Я БЫ 100% КУПИЛА", "СНОВА"]; f = font(46, 250); cx = 572
@@ -144,7 +152,7 @@ def contents(im, y):
 
 if __name__ == "__main__":
     src, out = sys.argv[1], sys.argv[2]; os.makedirs(out, exist_ok=True); total = len(ITEMS) + 2
-    cover(os.path.join(src, "me.jpg"), os.path.join(out, "slide_01.jpg"))
+    cover_dark(os.path.join(src, "cover_belly.jpg"), os.path.join(out, "slide_01.jpg"))
     for k, (p, num, head, paras, o) in enumerate(ITEMS):
         item_slide(os.path.join(src, p), num, head, paras, os.path.join(out, f"slide_{k + 2:02d}.jpg"), k + 2, total, **o)
     paper_slide([("Конечно, у всех разные потребности, но лично мне эти четыре вещи очень облегчили первые месяцы материнства.", "b"),
