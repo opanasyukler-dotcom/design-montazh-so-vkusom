@@ -73,9 +73,19 @@ def crop(im, fx=0.5, fy=0.5):
     s = max(W / im.width, H / im.height); im = im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
     x = int((im.width - W) * fx); y = int((im.height - H) * fy); return im.crop((x, y, x + W, y + H))
 
+def arrow(canvas, xr, y, col, length=74):
+    """thin swipe arrow → ending at xr, drawn 4x and scaled down for smooth hairlines"""
+    k = 4; L = Image.new("L", ((length + 10) * k, 30 * k), 0); d = ImageDraw.Draw(L); cy = 15 * k; x1 = length * k + 2 * k
+    d.line((2 * k, cy, x1, cy), fill=255, width=int(2.2 * k))
+    for dy in (-1, 1): d.line((x1 - 12 * k, cy + dy * 10 * k, x1, cy), fill=255, width=int(2.2 * k))
+    L = L.resize((length + 10, 30), Image.LANCZOS); a = Image.new("RGBA", L.size, col + (0,)); a.putalpha(L)
+    canvas.alpha_composite(a, (int(xr - length - 4), int(y - 15)))
+
 def footer(canvas, n, total, col):
     d = ImageDraw.Draw(canvas); f = font(18, 350)
-    d.text((M, H - 44), "@mcg.va", font=f, fill=col, anchor="ls"); d.text((W - M, H - 44), f"{n:02d} / {total:02d}", font=f, fill=col, anchor="rs")
+    d.text((M, H - 44), "@mcg.va", font=f, fill=col, anchor="ls")
+    if n < total: arrow(canvas, W - M, H - 50, col); d.text((W - M - 96, H - 44), f"{n:02d} / {total:02d}", font=f, fill=col, anchor="rs")
+    else: d.text((W - M, H - 44), f"{n:02d} / {total:02d}", font=f, fill=col, anchor="rs")
 
 def haze(canvas, box, colour, strength):
     """soft haze only under the text: a feathered rounded patch"""
@@ -114,6 +124,7 @@ def cover_dark(src, out):
     f = font(46, 250); y = 140
     for l in ["4 ВЕЩИ, КОТОРЫЕ", "Я БЫ 100% КУПИЛА СНОВА"]: d.text((W / 2, y), l, font=f, fill=CREAM, anchor="ms"); y += 60
     d.text((W / 2, y + 2), "если бы стала мамой во второй раз!", font=font(30, 300, True), fill=BLUSH, anchor="ms")
+    d.text((W - M - 104, H - 62), "листай", font=font(24, 300, True), fill=CREAM, anchor="rs"); arrow(im, W - M, H - 70, CREAM, 84)
     im.convert("RGB").save(out, quality=95); print(out)
 
 def cover(src, out):
