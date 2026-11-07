@@ -1,2 +1,5 @@
 .DS_Store
 __pycache__/
+
+# rendered reels: heavy, delivered via chat, not committed (LFS budget)
+reels/*.mp4
