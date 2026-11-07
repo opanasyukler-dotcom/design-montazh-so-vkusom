@@ -596,8 +596,8 @@ def click():
     x = x * e / 2; k = felt(160, 0.08); x[:len(k)] += k * 0.4; return x
 PENTA = [587.3, 659.3, 740.0, 880.0, 987.8, 1174.7]                    # D major pentatonic, matches the music
 
-MUSIC = os.path.join(SRC, "song4.wav")                                 # the track chosen for the previous reel
-M0 = 3.0
+MUSIC = os.path.join(SRC, "song5.wav")                                 # the client's track for this reel (audio of the screen recording)
+M0 = 0.5
 G_VO, G_GAP = 0.022, 0.075
 def track(n):
     w = wave.open(MUSIC); x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64).reshape(-1, w.getnchannels()) / 32768
