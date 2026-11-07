@@ -2,7 +2,8 @@
 Voice-over over her clips; every phrase is shown: typewriter subtitles, key words on plaques / huge translucent thin caps,
 cream «paper» sheets with a window-in-window, chat bubbles, polaroids, her cut-outs, hand-drawn arrow, price tag, progress bar,
 whip-blur and zoom-blur transitions, night / b&w treatments.
-  python3 sdvg_materinstvo.py MATERIALS_DIR CUTOUTS_DIR WORDS.json OUT.mp4 [--preview T1,T2,...]
+  python3 sdvg_materinstvo.py MATERIALS_DIR CUTOUTS_DIR WORDS.json OUT.mp4 --music TRACK START_S [--preview T1,T2,...]
+(the voice is tightened: pauses cut, studio chain; sound effects synthesized in sdvg_audio.py)
 """
 import json, math, os, subprocess, sys
 import numpy as np, cv2
@@ -17,6 +18,50 @@ CREAM, INK, BROWN, MAUVE, BLUSH, WHITE = (243, 236, 228), (43, 31, 26), (107, 74
 CX = 505                                                  # text centre: middle of the Reels safe zone (x 60–950)
 SEGS = [(1.25, 19.70), (20.80, 45.80), (46.85, 55.00)]    # voice kept (two long pauses shortened, «спасибо» dropped)
 END = 53.0
+
+# speech runs of the voice (orig seconds, energy > −45 dB, gaps < 0.14 s merged); everything between them is cut:
+# sentence pauses become 0.14 s, the rest 0.05 s. The montage is laid out on the old timeline (SEGS) and remapped.
+RUNS = [[1.87, 5.06], [5.31, 6.8], [6.95, 7.43], [8.21, 8.57], [9.82, 14.64], [15.11, 19.22], [21.06, 23.81], [23.97, 27.48],
+        [28.0, 29.05], [29.27, 31.85], [32.05, 32.97], [34.13, 36.51], [36.96, 40.47], [40.91, 42.49], [42.73, 43.98],
+        [44.46, 45.16], [47.37, 49.86], [50.0, 50.07], [50.35, 53.24], [53.52, 54.55]]
+PAD = (0.05, 0.10)
+NRUNS = [[a - PAD[0], b + PAD[1]] for a, b in RUNS]
+GAPS = [(0.14 if NRUNS[k + 1][0] - NRUNS[k][1] >= 0.35 else 0.05) for k in range(len(NRUNS) - 1)] + [0.0]
+NSTART = list(np.cumsum([0.0] + [b - a + g for (a, b), g in zip(NRUNS, GAPS)])[:-1])
+TAIL = 1.4                                                 # hold after the last word (bar fills, fade)
+
+def old_of_orig(o):
+    acc = 0.0
+    for a, b in SEGS:
+        if o <= b: return acc + max(o - a, 0)
+        acc += b - a
+    return acc
+
+def orig_of_old(x):
+    acc = 0.0
+    for a, b in SEGS:
+        if x <= acc + (b - a): return a + (x - acc)
+        acc += b - a
+    return SEGS[-1][1]
+
+def new_of_orig(o):
+    for k, (a, b) in enumerate(NRUNS):
+        if o < a: return NSTART[k]
+        if o <= b: return NSTART[k] + (o - a)
+    return NSTART[-1] + NRUNS[-1][1] - NRUNS[-1][0] + (o - NRUNS[-1][1])
+
+NEW_END = NSTART[-1] + NRUNS[-1][1] - NRUNS[-1][0] + TAIL
+
+def old_of_new(t):
+    """the montage time (old timeline) shown at time t of the tightened reel"""
+    for k, (a, b) in enumerate(NRUNS):
+        n0, n1 = NSTART[k], NSTART[k] + (b - a)
+        if t <= n1: return old_of_orig(a + max(t - n0, 0))
+        if k + 1 < len(NRUNS) and t < NSTART[k + 1]:               # inside a shortened gap: run through the cut pause
+            u = (t - n1) / (NSTART[k + 1] - n1); return old_of_orig(b) + u * (old_of_orig(NRUNS[k + 1][0]) - old_of_orig(b))
+    x0 = old_of_orig(NRUNS[-1][1]); return min(x0 + (t - (NEW_END - TAIL)) * (END - x0) / TAIL, END - 1e-3)
+
+new_of_old = lambda x: new_of_orig(orig_of_old(x))
 
 _fc = {}
 def font(size, wght=300, it=False):
@@ -39,7 +84,7 @@ def vt(o):
 PHRASES = ["мне никто не говорил, что материнство — это не про ребёнка,", "оно про мою гордыню, лень и эго.", "ночь.",
            "Агата плачет,", "мне не хочется вставать, а я встаю,", "всё бесит, а выбора нет.", "хочется сказать «не буду, не хочу»,",
            "а сказать это просто некому.", "и так каждый день я боролась с собой,", "пока в какой-то момент просто не расслабилась",
-           "и не приняла себя, свою новую жизнь", "и маленького человечка, которому я теперь служу безвозмездно.",
+           "и не приняла себя новую, свою новую жизнь", "и маленького человечка, которому я теперь служу безвозмездно.",
            "материнство — это пипец какой учитель жизни.", "оно закаляет, делает взрослее, серьёзнее, сильнее,",
            "потому что ради своего ребёнка ты теперь можешь всё,", "даже убить.", "у материнства нет выходных, нет отпусков,",
            "и единственное, чему оно по-настоящему учит, —", "это принятие."]
@@ -50,7 +95,9 @@ def load_words(path):
         w = w.strip()
         if w.startswith("-") and ws: ws[-1][0] += w; ws[-1][2] = b; continue
         ws.append([w, a, b])
-    ws = [w for w in ws if not (w[0] == "в" and 26.3 < w[1] < 26.6) and not w[0].startswith("Спасибо")]
+    ws = [w for w in ws if not w[0].startswith("Спасибо")]
+    k = next(i for i, w in enumerate(ws) if w[0] == "в" and 26.3 < w[1] < 26.6)       # «приняла себя… новую, свою новую жизнь»
+    ws[k:k + 3] = [["себя", 26.42, 26.9], ["новую", 27.05, 27.48], ["свою", 28.0, 28.26]]
     cues, i = [], 0
     for p in PHRASES:
         toks = [t for t in p.split() if any(c.isalnum() for c in t)]; tw = []
@@ -432,7 +479,7 @@ def whip(a, t):
 
 def render(M, C, words, out, preview=None):
     cues = load_words(words); sc, el = build(M, C)
-    times = preview if preview else [i / FPS for i in range(int(END * FPS))]
+    times = [old_of_new(x) for x in (preview if preview else [i / FPS for i in range(int(NEW_END * FPS))])]
     enc = None if preview else subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}",
                                                  "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-preset", "medium", "-crf", "17",
                                                  "-pix_fmt", "yuv420p", out + ".video.mp4"], stdin=subprocess.PIPE)
@@ -457,10 +504,38 @@ def render(M, C, words, out, preview=None):
         for i, im in enumerate(shots): sheet.paste(im.resize((360, 640)), (i * 360, 0))
         sheet.save(out); return
     enc.stdin.close(); enc.wait()
-    voice(os.path.join(M, "Новая запись 9.m4a"), out + ".voice.wav")
+    sound(M, out + ".voice.wav", MUSIC)
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", out + ".video.mp4", "-i", out + ".voice.wav", "-map", "0:v", "-map", "1:a",
                     "-c:v", "copy", "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", out], check=True)
     os.remove(out + ".video.mp4"); os.remove(out + ".voice.wav")
+
+def sfx_events():
+    """(old-timeline time, sound) for every visual event"""
+    import sdvg_audio as A
+    ev = []
+    for t in WHIPS: ev.append((t - 0.16, A.whoosh(0.34, gain=0.42)))
+    for t in (18.6, 23.4, 26.75, 29.2): ev.append((t - 0.1, A.whoosh(0.3, 400, 3000, 0.22)))
+    ev.append((31.85, A.whoosh(0.5, 200, 2500, 0.45)))                              # zoom-blur
+    for t in (3.30, 4.69, 5.49, 5.97, 8.71, 10.95, 12.71, 20.03, 23.39, 34.63, 35.79, 36.87, 37.55, 44.64, 45.60):
+        ev.append((t, A.pop()))
+    for t in (2.00, 11.85, 17.45, 25.91, 29.73, 33.27, 41.25, 50.38): ev.append((t, A.swell()))
+    ev += [(7.05, A.boom(0.45)), (42.13, A.boom(0.75)), (7.30, A.tick(0.2, 1600))]
+    for t0, text, step in ((9.70, "не хочется", 0.05), (10.30, "вставать", 0.05), (17.39, "некому", 0.06), (24.73, "свою", 0.05),
+                           (27.55, "маленький человечек", 0.04), (38.75, "ради своего ребёнка", 0.04)):
+        ev += [(t0 + i * step, A.key()) for i, c in enumerate(text) if c != " "]
+    ev += [(14.59, A.bloop()), (15.31, A.bloop()), (17.6, A.error()), (26.73, A.shutter()), (27.55, A.shutter()),
+           (13.50, A.whoosh(0.45, 200, 1800, 0.3)), (29.40, A.whoosh(0.45, 200, 1800, 0.3)), (30.60, A.ding()), (22.47, A.shimmer(0.1, 1.4))]
+    ev += [(18.6 + i * 0.2, A.tick(0.16, 1800 + i * 90)) for i in range(7)]
+    ev += [(50.5 + i * 0.14, A.tick(0.1, 1500 + i * 120)) for i in range(10)] + [(51.9, A.shimmer(0.14, 1.3))]
+    return ev
+
+MUSIC = None
+
+def sound(M, out, music):
+    import sdvg_audio as A
+    v = out + ".v.wav"; A.studio_voice(os.path.join(M, "Новая запись 9.m4a"), NRUNS, GAPS, NEW_END, v)
+    ev = [(new_of_old(t), x) for t, x in sfx_events()]
+    A.mix(v, music[0], music[1], ev, NEW_END, out); os.remove(v)
 
 def voice(src, out):
     parts = "".join(f"[0:a]atrim={a}:{b},asetpts=PTS-STARTPTS,afade=t=in:d=0.03,afade=t=out:st={b - a - 0.06:.3f}:d=0.06[a{i}];"
@@ -470,4 +545,5 @@ def voice(src, out):
 
 if __name__ == "__main__":
     a = sys.argv; pv = [float(x) for x in a[a.index("--preview") + 1].split(",")] if "--preview" in a else None
+    if "--music" in a: MUSIC = (a[a.index("--music") + 1], float(a[a.index("--music") + 2]))
     render(a[1], a[2], a[3], a[4], pv)
