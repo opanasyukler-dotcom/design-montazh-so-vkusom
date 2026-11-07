@@ -455,7 +455,7 @@ def hearts(fr, t, t0, pts=((820, 560, 0.0), (260, 640, 0.35), (700, 420, 0.7))):
 # A — the hook: ДО, her voice; a «life» line runs under the quote on «всю жизнь»
 HA = lift(Drop(["Я МЕЧТАЛА ОБ ЭТОМ", "*ПРАКТИЧЕСКИ ВСЮ ЖИЗНЬ*"], 100, 70, 0, maxw=860), 1290)
 def s_a(t):
-    fr = full(frame("IMG_9531", t, 60), 0.5, 0.45, pull(t, 0, 1.16, 1.02, 3.0)); shade(fr, VIG); shade(fr, GBOT)
+    fr = full(frame("IMG_9531", t, 60), 0.5, 0.45, pull(t, 0, 1.16, 1.02, 3.0))
     chip(fr, "ДО", 40, 290); HA.draw(fr, t, 0.05)
     p = eio((t - R("A", 4.8)) / 0.9)
     if p > 0:
@@ -469,8 +469,8 @@ def s_a(t):
 HB = Drop(["ПОСЛЕ РОЖДЕНИЯ РЕБЁНКА", "ЭТА МЫСЛЬ *НИКУДА НЕ УШЛА*"], 80, 70, 1150, maxw=880)
 PINS = [("грудь", 690, 620, 0.5), ("живот", 640, 940, 0.9), ("талия", 140, 900, 1.3)]
 def s_b(t):
-    lt = t - T_B; fr = full(V["IMG_9532"].at(0.3 + lt), 0.5, 0.45, lerp(1.0, 1.05, eio(lt / 3.4))); shade(fr, VIG)
-    shade(fr, (ramp(1050, 1250) * 0.85).astype(np.float32)); chip(fr, "ДО", 40, 290)
+    lt = t - T_B; fr = full(V["IMG_9532"].at(0.3 + lt), 0.5, 0.45, lerp(1.0, 1.05, eio(lt / 3.4)))
+    chip(fr, "ДО", 40, 290)
     for lab, x, y, d in PINS:
         tk = T_B + d; u = t - tk
         if u < 0: continue
@@ -483,13 +483,13 @@ def s_b(t):
 HC = lift(Drop(["В ИТОГЕ РЕШИЛИСЬ НА", "*КОМПЛЕКСНУЮ КОРРЕКЦИЮ*"], 86, 70, 0, maxw=880), 1010)
 PLAN = [("АБДОМИНОПЛАСТИКА", R("C", 2.24)), ("+ ПОДТЯЖКА ГРУДИ", R("C", 3.98)), ("+ ЛИПОФИЛИНГ", R("C", 5.46))]
 def s_c(t):
-    fr = full(frame("IMG_9533", t, 40), 0.5, 0.45, pull(t, T_S["C"], 1.12, 1.0, 2.0)); shade(fr, VIG); shade(fr, (ramp(780, 1050) * 0.8).astype(np.float32))
+    fr = full(frame("IMG_9533", t, 40), 0.5, 0.45, pull(t, T_S["C"], 1.12, 1.0, 2.0))
     chip(fr, "ДО", 40, 290); HC.draw(fr, t, T_S["C"] + 0.1); tick_list(fr, t, PLAN, y0=1060); return fr
 
 # D — ПОСЛЕ: «лет 14 этой мечте», the counter runs to 14
 HD = lift(Drop(["ЭТО БЫЛА МОЯ МЕЧТА", "*ЛЕТ 14*"], 110, 70, 0, maxw=860), 1290)
 def s_d(t):
-    fr = full(frame("IMG_9536", t), 0.5, 0.45, pull(t, T_S["D"], 1.14, 1.02, 2.4)); shade(fr, VIG); shade(fr, GBOT)
+    fr = full(frame("IMG_9536", t), 0.5, 0.45, pull(t, T_S["D"], 1.14, 1.02, 2.4))
     chip(fr, "ПОСЛЕ", 40, 290)
     tn = R("D", 3.61)
     if t > tn - 1.0:
@@ -502,13 +502,13 @@ def s_d(t):
 HE = lift(Drop(["ТО, ЧТО ОНА ХОТЕЛА ВИДЕТЬ", "*В ЗЕРКАЛЕ МНОГО ЛЕТ*"], 82, 70, 0, maxw=880), 1010)
 GOT = [("ГРУДЬ", R("E", 0.04)), ("ПЛОСКИЙ ЖИВОТ", R("E", 1.68)), ("ТАЛИЯ", R("E", 3.52))]
 def s_e(t):
-    fr = full(frame("IMG_9536", t), 0.5, 0.45, pull(t, T_S["E"], 1.12, 1.0, 2.0)); shade(fr, VIG); shade(fr, (ramp(780, 1050) * 0.8).astype(np.float32))
+    fr = full(frame("IMG_9536", t), 0.5, 0.45, pull(t, T_S["E"], 1.12, 1.0, 2.0))
     chip(fr, "ПОСЛЕ", 40, 290); HE.draw(fr, t, T_S["E"] + 0.1); tick_list(fr, t, GOT, y0=1060)
     return fr
 
 # F — the closing line over ПОСЛЕ (standing, the part of the take between her lines), hearts
 def s_f(t):
-    lt = t - T_S["F"]; fr = full(V["IMG_9536"].at(7.0 + lt * 0.9), 0.5, 0.45, lerp(1.14, 1.02, eo(lt / 2.6))); shade(fr, VIG); shade(fr, GBOT)
+    lt = t - T_S["F"]; fr = full(V["IMG_9536"].at(7.0 + lt * 0.9), 0.5, 0.45, lerp(1.14, 1.02, eo(lt / 2.6)))
     chip(fr, "ПОСЛЕ", 40, 290); HF.draw(fr, t, R("F", 2.14)); hearts(fr, t, R("F", 0.28))
     return fr
 # K — the clinic's ПОСЛЕ/ДО collages full screen, shutter on each
@@ -535,8 +535,11 @@ for k_, lst in BIG_STK.items():
     for x, y, r in lst: put_sticker(COLL[k_], x, y, 25)                         # then a smaller sticker, the size of the ПОСЛЕ ones
 def s_k(t):
     k = 0 if t < T_K[1] else 1; lt = t - T_K[k]
-    fr = full(COLL[k], 0.5, 0.5, 1 + 0.03 * (1 - eo(lt / 0.35))); fr[957:963] = PINK
-    chip(fr, "ПОСЛЕ", 40, 290); chip(fr, "ДО", 40, 1000)
+    ch, cw = 1420, int(1420 * 1080 / 1920); s_ = 1 + 0.02 * (1 - eo(lt / 0.35))       # the whole collage below Instagram's top bar
+    im = cv2.resize(COLL[k], (int(cw * s_), int(ch * s_)), interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+    fr = np.zeros((H, W, 3), np.float32); x0, y0 = (W - im.shape[1]) // 2, 260 + (ch - im.shape[0]) // 2; fr[y0:y0 + im.shape[0], x0:x0 + im.shape[1]] = im
+    ym = 260 + ch // 2; fr[ym - 2:ym + 2, x0:x0 + im.shape[1]] = PINK
+    chip(fr, "ПОСЛЕ", x0 + 20, 280); chip(fr, "ДО", x0 + 20, ym + 20)
     f = 1 - eo(lt / 0.18) if k else 0; return fr * (1 - f) + f
 
 # Z — the closing card
