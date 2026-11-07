@@ -389,7 +389,8 @@ def pillx(fr, txt, x, y, p, tick_p=0.0, size=30):
     f = mont(size, 600); a = alpha_img(txt, f); s = eback(p); w, h = a.shape[1] + 86, 64
     blend(fr, rrect(x, y, x + w * s, y + h * s, 32 * s), 0, 0, NAVY, 0.9 * min(1, p * 2))
     rrect_line(fr, x, y, x + w * s, y + h * s, 32 * s, PINK, 2, min(1, p * 2))
-    if s > 0.9: blend(fr, a, x + 64, y + h / 2 - a.shape[0] / 2 + 2, WHITE, cl((p - 0.5) * 2)); path_draw(fr, [(x + 22, y + 33), (x + 32, y + 43), (x + 48, y + 22)], tick_p, PINK, 5)
+    if s > 0.9: blend(fr, a, x + (64 if tick_p > 0 else 43), y + h / 2 - a.shape[0] / 2 + 2, WHITE, cl((p - 0.5) * 2))
+    if s > 0.9 and tick_p > 0: path_draw(fr, [(x + 22, y + 33), (x + 32, y + 43), (x + 48, y + 22)], tick_p, PINK, 5)
 def arrow(fr, p0, p1, p, col=PINK, th=6):
     if p <= 0: return
     x0, y0 = p0; x1, y1 = p1; xe, ye = lerp(x0, x1, p), lerp(y0, y1, p); path_draw(fr, [(x0, y0), (xe, ye)], 1, col, th)
@@ -417,17 +418,35 @@ def src_t(k, t):
             acc += o - a
         best = (parts[-1][1], t0 + d)
     return best[0] + t - best[1]
+_STK = None
+def sticker_rgba(r):
+    global _STK
+    if _STK is None:
+        im = cv2.imread(os.path.join(SRC, "sticker.png"), cv2.IMREAD_UNCHANGED); _STK = np.dstack([im[..., 2::-1], im[..., 3]]).astype(np.float32) / 255
+    sz = 2 * int(r) + 2; return cv2.resize(_STK, (sz, sz), interpolation=cv2.INTER_AREA)
+def put_sticker(img, cx, cy, r):
+    s_ = sticker_rgba(r); h, w = s_.shape[:2]; x0, y0 = int(cx - w / 2), int(cy - h / 2)
+    xa, ya, xb, yb = max(0, x0), max(0, y0), min(img.shape[1], x0 + w), min(img.shape[0], y0 + h)
+    if xb <= xa or yb <= ya: return
+    a = s_[ya - y0:yb - y0, xa - x0:xb - x0, 3:4]; c = s_[ya - y0:yb - y0, xa - x0:xb - x0, :3]
+    reg = img[ya:yb, xa:xb].astype(np.float32) / 255; img[ya:yb, xa:xb] = ((reg * (1 - a) + c * a) * 255 + 0.5).astype(np.uint8)
+LSTK = np.array(json.load(open(os.path.join(WORK, "IMG_9531_left_sticker.json"))))   # tracked left sticker (cx, cy, r) per frame
+NIP31 = [(8, 884, 712), (12, 893, 705), (15, 900, 698), (18, 1010, 708), (22, 1040, 708), (26, 1062, 700), (28, 1040, 715)]   # IMG_9531 frame → right nipple
 def frame(k, t, top=0):
+    if k == "IMG_9531":
+        st = src_t(k, t); i = st * FPS; f = V[k].at(max(0.0, st)).copy(); fs = [p[0] for p in NIP31]
+        if fs[0] <= i <= fs[-1]: put_sticker(f, np.interp(i, fs, [p[1] for p in NIP31]), np.interp(i, fs, [p[2] for p in NIP31]), 66)   # covers the drifting sticker and the nipple
+        j = min(max(int(round(i)), 0), len(LSTK) - 1); cx, cy, r = LSTK[j]
+        put_sticker(f, cx + 3, cy - 0.25 * r, 1.3 * r)                          # left: the source sticker sits low, ours covers it and the areola above
+        return anon_top(f, top) if top else f
     f = V[k].at(max(0.0, src_t(k, t))); return anon_top(f, top) if top else f
 def tick_list(fr, t, items, x=80, y0=1080, dy=82, size=62):
     for k, (lab, t0) in enumerate(items):
         lt = t - t0
         if lt < 0: continue
-        y = y0 + k * dy; s_ = eback(lt / 0.3); b = 22 * s_
-        path_draw(fr, [(x + 22 - b, y + 22 - b), (x + 22 + b, y + 22 - b), (x + 22 + b, y + 22 + b), (x + 22 - b, y + 22 + b)], 1, PINK, 4, True)
-        path_draw(fr, [(x + 10, y + 23), (x + 19, y + 33), (x + 36, y + 10)], eio((lt - 0.15) / 0.3), PINK, 5)
-        a = alpha_img(lab, bebas(fit_size(lab, 760, size))); p = eo((lt - 0.1) / 0.35); a2 = a.copy(); a2[:, int(a.shape[1] * p):] = 0
-        blend(fr, a2, x + 64, y + 22 - a.shape[0] / 2 + 5, WHITE)
+        y = y0 + k * dy                                                   # each line pops in on the word (no tick marks)
+        a = alpha_img(lab, bebas(fit_size(lab, 860, size))); s_ = 0.85 + 0.15 * eback(lt / 0.3); a2 = scaled(a, s_)
+        blend(fr, a2, x, y + 22 - a2.shape[0] / 2 + 5, WHITE, min(1, lt / 0.12))
 def hearts(fr, t, t0, pts=((820, 560, 0.0), (260, 640, 0.35), (700, 420, 0.7))):
     for x, y, d in pts:
         u = t - t0 - d
@@ -444,7 +463,6 @@ def s_a(t):
         for k, x in enumerate((80, 490, 900)):
             if p * 820 + 80 >= x - 1:
                 m = np.zeros((H, W), np.uint8); cv2.circle(m, (x, int(y)), 11, 255, -1, cv2.LINE_AA); blend(fr, m.astype(np.float32) / 255, 0, 0, PINK)
-    for k, (x, y) in enumerate([(820, 420), (250, 520), (860, 640)]): sparkle(fr, x, y, 26, t, R("A", 2.42) + 0.2 * k)
     return fr
 
 # B — after the baby the thought stayed: the three zones pinned on the ДО (silent)
@@ -458,7 +476,7 @@ def s_b(t):
         if u < 0: continue
         m = np.zeros((H, W), np.uint8); cv2.circle(m, (x, y), int(14 * eback(u / 0.3)), 255, -1, cv2.LINE_AA); blend(fr, m.astype(np.float32) / 255, 0, 0, PINK)
         uu = (u * 1.1) % 1; ring(fr, x, y, 22 + 24 * uu, 1 - uu, 3)
-        pillx(fr, lab, x + 34 if x < 600 else x - 250, y - 32, eo((u - 0.1) / 0.3), eio((u - 0.3) / 0.3), 28)
+        pillx(fr, lab, x + 34 if x < 600 else x - 250, y - 32, eo((u - 0.1) / 0.3), 0.0, 28)
     HB.draw(fr, t, T_B + 0.1); return fr
 
 # C — the plan ticks as the surgeon names it
@@ -486,19 +504,23 @@ GOT = [("ГРУДЬ", R("E", 0.04)), ("ПЛОСКИЙ ЖИВОТ", R("E", 1.68))
 def s_e(t):
     fr = full(frame("IMG_9536", t), 0.5, 0.45, pull(t, T_S["E"], 1.12, 1.0, 2.0)); shade(fr, VIG); shade(fr, (ramp(780, 1050) * 0.8).astype(np.float32))
     chip(fr, "ПОСЛЕ", 40, 290); HE.draw(fr, t, T_S["E"] + 0.1); tick_list(fr, t, GOT, y0=1060)
-    for k, (x, y) in enumerate([(300, 560), (820, 520), (560, 420)]): sparkle(fr, x, y, 26, t, R("E", 4.6) + 0.18 * k)
     return fr
 
 # F — the closing line over ПОСЛЕ (standing, the part of the take between her lines), hearts
 def s_f(t):
     lt = t - T_S["F"]; fr = full(V["IMG_9536"].at(7.0 + lt * 0.9), 0.5, 0.45, lerp(1.14, 1.02, eo(lt / 2.6))); shade(fr, VIG); shade(fr, GBOT)
     chip(fr, "ПОСЛЕ", 40, 290); HF.draw(fr, t, R("F", 2.14)); hearts(fr, t, R("F", 0.28))
-    for k, (x, y) in enumerate([(300, 560), (820, 520)]): sparkle(fr, x, y, 26, t, R("F", 3.2) + 0.2 * k)
     return fr
 # K — the clinic's ПОСЛЕ/ДО collages full screen, shutter on each
 HF = lift(Drop(["НЕ МОГУ НА СЕБЯ", "*НАСМОТРЕТЬСЯ*"], 120, 70, 0, maxw=860), 1290)
 from PIL import ImageOps
-COLL = [np.asarray(ImageOps.exif_transpose(Image.open(os.path.join(SRC, n))).convert("RGB")) for n in ("IMG_9706.JPG", "IMG_9707.JPG")]
+COLL = [np.asarray(ImageOps.exif_transpose(Image.open(os.path.join(SRC, n))).convert("RGB")).copy() for n in ("IMG_9706.JPG", "IMG_9707.JPG")]
+BIG_STK = {0: [(412, 1390, 48), (679, 1398, 48)], 1: [(724, 1315, 42)]}         # the clinic's large stickers on the ДО halves
+for k_, lst in BIG_STK.items():
+    hole = np.zeros(COLL[k_].shape[:2], np.uint8)
+    for x, y, r in lst: cv2.circle(hole, (x, y), r + 6, 255, -1)
+    COLL[k_] = cv2.inpaint(COLL[k_], hole, 9, cv2.INPAINT_TELEA)                 # skin back first
+    for x, y, r in lst: put_sticker(COLL[k_], x, y, 25)                         # then a smaller sticker, the size of the ПОСЛЕ ones
 def s_k(t):
     k = 0 if t < T_K[1] else 1; lt = t - T_K[k]
     fr = full(COLL[k], 0.5, 0.5, 1 + 0.03 * (1 - eo(lt / 0.35))); fr[957:963] = PINK
@@ -629,12 +651,23 @@ def build_audio(path):
     def put(x, t, g): i = int(max(0, t) * SR); seg = sfx[i:i + len(x)]; seg += x[:len(seg)] * g
     w_ = wave.open(os.path.join(SRC, "shutter_client.wav")); SHOT = np.frombuffer(w_.readframes(w_.getnframes()), np.int16).astype(np.float64) / 32768
     SHOT = SHOT / (np.abs(SHOT).max() + 1e-9)
-    put(swell(1.0), R("A", 4.5), 0.06); put(marimba(PENTA[4], 0.5), R("A", 5.6), 0.16)
-    for k, (_, _, _, d) in enumerate(PINS): put(water(500 + 120 * k, 1400 + 120 * k), T_B + d, 0.2)
-    for k, (_, t0) in enumerate(PLAN): put(marimba(PENTA[k + 2], 0.45), t0, 0.2)
+    def load(fn):
+        w_ = wave.open(fn); x_ = np.frombuffer(w_.readframes(w_.getnframes()), np.int16).astype(np.float64) / 32768
+        if w_.getnchannels() == 2: x_ = x_.reshape(-1, 2).mean(1)
+        if w_.getframerate() != SR: x_ = np.interp(np.arange(int(len(x_) * SR / w_.getframerate())) * w_.getframerate() / SR, np.arange(len(x_)), x_)
+        return x_ / (np.abs(x_).max() + 1e-9)
+    kd = os.path.join(SRC, "keyboard.wav")                                     # the client's keyboard sound if present, else the keypress pack
+    KEYS = [load(kd)] if os.path.exists(kd) else [load(os.path.join(SRC, "keys", f"k{i:03d}.wav")) for i in range(1, 9)]
+    td = os.path.join(SRC, "tick.wav"); TICK = load(td) if os.path.exists(td) else click()
+    n_ch = sum(len(g) for g, _ in HA.rows)
+    if len(KEYS) == 1: put(KEYS[0], 0.05, 0.35)
+    else:
+        for j in range(n_ch): put(KEYS[j % len(KEYS)], 0.05 + j * HA.stag, 0.32)                  # typing under the title, letter by letter
+    for k, (_, _, _, d) in enumerate(PINS): put(TICK, T_B + d + 0.1, 0.6)
+    for _, t0 in PLAN: put(TICK, t0, 0.6)
     for j in range(10): put(tick(), R("D", 3.61) - 1.0 + 0.1 * j, 0.22)
     put(marimba(PENTA[5], 0.6), R("D", 3.61), 0.2)
-    for k, (_, t0) in enumerate(GOT): put(marimba(PENTA[k + 2], 0.45), t0, 0.2)
+    for _, t0 in GOT: put(TICK, t0, 0.6)
     for tk in T_K: put(SHOT, tk, 0.5)
     for k in range(3): put(pop(1300, 600, 0.08), R("F", 0.28) + 0.35 * k, 0.07)
     put(glass(1174.7), T_Z + 0.2, 0.14)
