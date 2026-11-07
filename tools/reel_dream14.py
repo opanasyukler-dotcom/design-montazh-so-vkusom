@@ -515,11 +515,23 @@ def s_f(t):
 HF = lift(Drop(["НЕ МОГУ НА СЕБЯ", "*НАСМОТРЕТЬСЯ*"], 120, 70, 0, maxw=860), 1290)
 from PIL import ImageOps
 COLL = [np.asarray(ImageOps.exif_transpose(Image.open(os.path.join(SRC, n))).convert("RGB")).copy() for n in ("IMG_9706.JPG", "IMG_9707.JPG")]
-BIG_STK = {0: [(412, 1390, 48), (679, 1398, 48)], 1: [(724, 1315, 42)]}         # the clinic's large stickers on the ДО halves
+BIG_STK = {0: [(412, 1390, 48), (679, 1398, 48)]}   # front ДО only: in profile the sticker overhangs the breast tip, so it stays as shot
+def refill(img, x, y, r):
+    """take a sticker off without eating the breast: rebuild the body outline over the hole (closing of the skin mask),
+    fill inside it from skin only, keep the black backdrop outside"""
+    H_, W_ = img.shape[:2]; hole = np.zeros((H_, W_), np.uint8); cv2.circle(hole, (x, y), r + 6, 255, -1)
+    skin = ((img.max(2) > 45) & (hole == 0)).astype(np.uint8) * 255
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (int(2.4 * r) | 1, int(2.4 * r) | 1))
+    body = cv2.morphologyEx(skin | 0, cv2.MORPH_CLOSE, k) > 0                    # the outline continued across the hole
+    zone = np.zeros((H_, W_), np.uint8); cv2.circle(zone, (x, y), int(2.6 * r), 255, -1)
+    work = img.copy(); bg = (zone > 0) & ~body                                   # backdrop near the hole is not a source
+    mask = ((hole > 0) | bg).astype(np.uint8) * 255
+    filled = cv2.inpaint(work, mask, 11, cv2.INPAINT_TELEA)
+    out = img.copy(); fill_here = (hole > 0) & body; out[fill_here] = filled[fill_here]
+    out[(hole > 0) & ~body] = np.median(img[bg], 0) if bg.any() else 0
+    return out
 for k_, lst in BIG_STK.items():
-    hole = np.zeros(COLL[k_].shape[:2], np.uint8)
-    for x, y, r in lst: cv2.circle(hole, (x, y), r + 6, 255, -1)
-    COLL[k_] = cv2.inpaint(COLL[k_], hole, 9, cv2.INPAINT_TELEA)                 # skin back first
+    for x, y, r in lst: COLL[k_] = refill(COLL[k_], x, y, r)                   # skin back first, outline kept
     for x, y, r in lst: put_sticker(COLL[k_], x, y, 25)                         # then a smaller sticker, the size of the ПОСЛЕ ones
 def s_k(t):
     k = 0 if t < T_K[1] else 1; lt = t - T_K[k]
