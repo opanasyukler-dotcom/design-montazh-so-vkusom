@@ -105,7 +105,8 @@ def studio_voice(src, runs, gaps, total, out):
 def mix(voice_wav, music_src, music_ss, sfx, total, out_wav, music_db=-21.0):
     """voice + music (ducked under the voice, faded in/out) + sound effects"""
     v = read(voice_wav); n = len(v)
-    m = read(music_src, music_ss, total + 1)[:n]; m = np.pad(m, ((0, n - len(m)), (0, 0)))
+    if music_src: m = read(music_src, music_ss, total + 1)[:n]; m = np.pad(m, ((0, n - len(m)), (0, 0)))
+    else: m = np.zeros_like(v)
     g = 10 ** (music_db / 20)
     e = np.abs(v).mean(1); w = int(0.05 * SR); e = np.convolve(e, np.ones(w) / w, "same")       # voice envelope → ducking
     duck = 1 - 0.45 * np.clip(e / 0.05, 0, 1); k = int(0.25 * SR); duck = np.convolve(duck, np.ones(k) / k, "same")
