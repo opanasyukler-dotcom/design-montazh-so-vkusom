@@ -441,10 +441,27 @@ def match_colour(src, ref):
 def blackdrop(im):
     lum = im.astype(np.float32).mean(2) / 255; k = np.clip((lum - 0.16) / 0.12, 0, 1); k = cv2.GaussianBlur(k * k * (3 - 2 * k), (0, 0), 2)
     k = np.maximum(k, np.clip((im[..., 2].astype(np.float32) - im[..., 0] - 10) / 12, 0, 1)); return k[..., None]
+WARM = (2.5, 7.0)                                                       # Lab a/b lift (OpenCV units): a touch pinker, clearly warmer
+def skin_stats(rgb):
+    lab = cv2.cvtColor(rgb, cv2.COLOR_RGB2LAB).astype(np.float32); m = skin(rgb)
+    return np.float32([[lab[..., c][m].mean(), lab[..., c][m].std()] for c in range(3)])
+def grade(rgb, st, tgt):
+    """one grade for all six photos: skin statistics moved to the common target; the black backdrop stays black"""
+    lab = cv2.cvtColor(rgb, cv2.COLOR_RGB2LAB).astype(np.float32)
+    for c in range(3):
+        k = float(np.clip(tgt[c, 1] / (st[c, 1] + 1e-3), 0.75, 1.35)); lab[..., c] = (lab[..., c] - st[c, 0]) * k + tgt[c, 0]
+    out = cv2.cvtColor(np.clip(lab, 0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB).astype(np.float32)
+    w = blackdrop(rgb); return np.clip(out * w + rgb.astype(np.float32) * (1 - w) * (rgb.max(2, keepdims=True) > 70), 0, 255).astype(np.uint8)
+PAIRS = (("front", "IMG_9958", "IMG_2448"), ("34", "IMG_9959", "IMG_2450"), ("side", "IMG_9960", "IMG_2453"))
+RAW = {}
+for ang, dn, pn in PAIRS: RAW["do_" + ang] = photo(dn); RAW["posle_" + ang] = photo(pn)
+STATS = {k: skin_stats(v) for k, v in RAW.items()}
+TGT = np.mean([v for v in STATS.values()], 0); TGT[1, 0] += WARM[0]; TGT[2, 0] += WARM[1]
 PH = {}
-for ang, dn, pn in (("front", "IMG_9958", "IMG_2448"), ("34", "IMG_9959", "IMG_2450"), ("side", "IMG_9960", "IMG_2453")):
-    d = photo(dn); raw = photo(pn); a = match_colour(raw, d); a = (a * blackdrop(raw)).astype(np.uint8)
-    PH["do_" + ang] = anon_top(d, ALIGN["do_" + ang][0] - 40); PH["posle_" + ang] = anon_top(a, ALIGN["posle_" + ang][0] - 40)
+for k, v in RAW.items():
+    g_ = grade(v, STATS[k], TGT); st2 = skin_stats(g_); st2[:, 1] = TGT[:, 1]; g_ = grade(g_, st2, TGT)   # second pass, means only: the photos land on the same skin tone
+    if k.startswith("posle"): g_ = (g_ * blackdrop(v)).astype(np.uint8)       # the ПОСЛЕ studio backdrop → pure black, judged on the raw photo
+    PH[k] = anon_top(g_, ALIGN[k][0] - 40)
 def panel(im, n, pw, ph, neck_at=30, span=360):
     neck, navel, cx = ALIGN[n]; s_ = span / (navel - neck); r = cv2.resize(im, None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
     out = np.zeros((ph, pw, 3), np.float32); ox, oy = int(cx * s_ - pw / 2), int(neck * s_ - neck_at)
