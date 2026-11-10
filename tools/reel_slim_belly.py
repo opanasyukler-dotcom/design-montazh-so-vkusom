@@ -7,7 +7,7 @@ the ДО photo, the next-day «как в молодости» with a clock windi
 with the closing thought and the ПОСЛЕ/ДО grid. ADHD-friendly animation, one-word subtitles, whole sentences.
 
 usage:
-  REEL_SRC=<folder with IMG_6213/6215/6217/6218, IMG_9958-9960 (ДО), IMG_2448/2450/2453 (ПОСЛЕ), logo.png, shutter_client.wav, keys/> \
+  REEL_SRC=<folder with IMG_6213/6215/6217/6218, IMG_9958-9960 (ДО), IMG_2448/2450/2453 (ПОСЛЕ), logo.png, shutter_client.wav, song6.wav, keys/> \
   python3 tools/reel_slim_belly.py [--preview t1,t2 | --cover | --audio-only]
 Prepared in $REEL_SRC/_work: <name>.mp4 (1080x1920, 30 fps), <name>.wav (48 kHz mono), photos as <name>.png.
 """
@@ -718,6 +718,15 @@ def click():
     e = np.exp(-t / 0.004) + 0.7 * np.exp(-np.clip(t - 0.045, 0, None) / 0.005) * (t > 0.045)
     x = x * e / 2; k = felt(160, 0.08); x[:len(k)] += k * 0.4; return x
 
+MUSIC = os.path.join(SRC, "song6.wav")                                 # the client's track for this reel (audio of the screen recording)
+M0 = 13.0                                                              # the quiet bridge (28-34 s) falls under the lines, the full part under the ending
+G_VO, G_GAP = 0.022, 0.075
+def track(n):
+    w = wave.open(MUSIC); x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64).reshape(-1, w.getnchannels()) / 32768
+    if x.shape[1] == 1: x = np.repeat(x, 2, 1)
+    seg = x[int(M0 * SR):int(M0 * SR) + n]; seg = seg / np.sqrt(np.mean(seg.mean(1) ** 2))
+    return np.pad(seg, ((0, n - len(seg)), (0, 0)))
+
 def build_audio(path):
     n = int(DUR * SR); vo = np.zeros(n); act = np.zeros(n); srcs = {}
     ir_t = np.arange(int(0.45 * SR)) / SR; IR = rng.standard_normal(len(ir_t)) * np.exp(-ir_t / 0.11); IR = lp(IR, 3500); IR /= np.sqrt(np.sum(IR ** 2))
@@ -764,9 +773,9 @@ def build_audio(path):
     for _, _, t0 in ZONES: put(TICK, t0, 0.6)
     put(SHOT, T_K, 0.5); put(glass(1318.5), T_K + 1.6, 0.1)
     sfx[:n] *= 1 - 0.6 * np.clip(dd, 0, 1)
-    tt = np.arange(n) / SR; fade = np.clip((DUR - tt) / 1.0, 0, 1) * np.minimum(1, tt / 0.05)
-    mix = (vo + sfx[:n]) * fade
-    mix = np.stack([mix * 0.97, mix], 1)
+    tt = np.arange(n) / SR; fade = np.clip((DUR - tt) / 1.8, 0, 1) ** 1.5 * np.minimum(1, tt / 0.15)
+    mus = track(n) * ((G_GAP - (G_GAP - G_VO) * np.clip(dd, 0, 1)) * fade)[:, None]      # the music ducks under every line
+    mix = vo[:, None] + mus + (sfx[:n] * np.clip((DUR - tt) / 1.0, 0, 1))[:, None] * np.float64([[0.92, 1.0]])
     mix *= 10 ** (1.5 / 20); mix /= max(1, np.abs(mix).max() / 0.95)
     with wave.open(path, "wb") as w:
         w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR); w.writeframes((mix * 32767).astype(np.int16).tobytes())
