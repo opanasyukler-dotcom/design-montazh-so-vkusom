@@ -62,7 +62,7 @@ def src_of(t, name):
 T_S = {b: vstart(b) - 0.08 for b, *_ in VO}
 def R(b, rel): return vstart(b) + rel
 T_B = vend("A") + 0.35                                    # ДО zones (silent, over IMG_9532)
-T_K = [vend("F") + 0.4, vend("F") + 2.3]                 # collages: front, side
+T_K = [vend("F") + 3.6, vend("F") + 5.5]   # the surgeon-on-the-belly shot runs on after her line                 # collages: front, side
 T_Z = T_K[1] + 2.2; DUR = T_Z + 3.0
 
 # ---------------- fonts & text bitmaps ----------------
@@ -506,9 +506,9 @@ def s_e(t):
     chip(fr, "ПОСЛЕ", 40, 290); HE.draw(fr, t, T_S["E"] + 0.1); tick_list(fr, t, GOT, y0=1060)
     return fr
 
-# F — the closing line over ПОСЛЕ (standing, the part of the take between her lines), hearts
+# F — the closing line over the surgeon checking the belly (held a little longer before the collages), hearts
 def s_f(t):
-    lt = t - T_S["F"]; fr = full(V["IMG_9536"].at(7.0 + lt * 0.9), 0.5, 0.45, lerp(1.14, 1.02, eo(lt / 2.6)))
+    lt = t - T_S["F"]; fr = full(V["IMG_9536"].at(16.9 + lt * 0.96), 0.5, 0.45, lerp(1.1, 1.0, eo(lt / 4.0)))   # the surgeon checks the belly (source 16.9–24.8)
     chip(fr, "ПОСЛЕ", 40, 290); HF.draw(fr, t, R("F", 2.14)); hearts(fr, t, R("F", 0.28))
     return fr
 # K — the clinic's ПОСЛЕ/ДО collages full screen, shutter on each
