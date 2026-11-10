@@ -2,7 +2,8 @@
 Her voice, cleaned and tightened (pauses and the false start cut, studio chain), synthesized sound effects, no music.
 Built from the primitives of sdvg_materinstvo.py; every time below is written in seconds of the ORIGINAL voice recording
 and converted to the tightened reel with N().
-  python3 sdvg_protivorechiya.py MATERIALS_DIR CUTOUTS_DIR STILLS_DIR WORDS.json OUT.mp4 [--preview O1,O2,...]   (preview times: original seconds)
+  python3 sdvg_protivorechiya.py MATERIALS_DIR CUTOUTS_DIR STILLS_DIR WORDS.json OUT.mp4 [--music LOOP.wav] [--preview O1,O2,...]
+(preview times: original seconds; the track «Freedom» was looped with a 3 s crossfade: ffmpeg acrossfade of the 1.0–81.6 s segment)
 """
 import json, math, os, subprocess, sys
 import numpy as np, cv2
@@ -340,11 +341,15 @@ def render(M, C, ST, words, out, preview=None):
         sheet.save(out); return
     enc.stdin.close(); enc.wait()
     v = out + ".v.wav"; AU.studio_voice(os.path.join(M, VOICE), T.runs, T.gaps, T.end, v)
-    AU.mix(v, None, 0, sounds(sfx, whips), T.end, out + ".a.wav"); os.remove(v)
+    AU.mix(v, MUSIC, 0.0, sounds(sfx, whips), T.end, out + ".a.wav", music_db=-14.0); os.remove(v)
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", out + ".video.mp4", "-i", out + ".a.wav", "-map", "0:v", "-map", "1:a", "-c:v", "copy",
                     "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", out], check=True)
     os.remove(out + ".video.mp4"); os.remove(out + ".a.wav")
 
+MUSIC = None          # a music wav (looped to the reel's length beforehand), or None
+
 if __name__ == "__main__":
-    a = sys.argv; pv = [float(x) for x in a[a.index("--preview") + 1].split(",")] if "--preview" in a else None
+    a = sys.argv
+    if "--music" in a: MUSIC = a[a.index("--music") + 1]
+    pv = [float(x) for x in a[a.index("--preview") + 1].split(",")] if "--preview" in a else None
     render(a[1], a[2], a[3], a[4], a[5], pv)
