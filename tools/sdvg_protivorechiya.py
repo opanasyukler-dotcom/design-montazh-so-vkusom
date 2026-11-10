@@ -14,7 +14,7 @@ from sdvg_materinstvo import (W, H, FPS, CX, CREAM, INK, BROWN, MAUVE, BLUSH, WH
 import sdvg_audio as AU
 
 VOICE = "Новая запись.m4a"
-DROP = [(73.6, 75.2), (108.02, 108.9)]                     # false start «И отдельная моя люб…»; unfinished «…обсуждать это с…»
+DROP = [(73.6, 75.2), (108.47, 108.95)]                     # false start «И отдельная моя люб…»; unfinished «…обсуждать это с…»
 PAD, TAIL = (0.03, 0.08), 1.8
 
 # ── timeline: speech runs of the voice, pauses cut ──────────────────────────────────────────────────────────────────
