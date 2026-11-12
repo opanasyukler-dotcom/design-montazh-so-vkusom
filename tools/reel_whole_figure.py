@@ -406,8 +406,8 @@ def R(b, rel): return vstart(b) + rel
 T_S = {b: vstart(b) - 0.08 for b, *_ in VO}
 T_ARM = R("C", 5.78)                                          # «руки» — the arm photo
 T_G = vend("F") + 0.5                                         # ПОСЛЕ, angle after angle
-T_K = T_G + 3.9                                               # ПОСЛЕ / ДО grid
-DUR = T_K + 3.0
+T_K = T_G + 3.9                                               # ПОСЛЕ / ДО collages, one per angle
+DUR = T_K + 4 * 1.6
 
 V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ["IMG_0610", "IMG_0611", "IMG_0612"]}
 def consult(t):
@@ -522,59 +522,74 @@ def pills_row(fr, t, items, x0, y0, maxw=940, size=28, gap=14, dy=74):
         pillx(fr, lab, x, y, eo((t - t0) / 0.3), 0.0, size); x += w + gap
 def pip_on(t, t_in, t_out): return eo((t - t_in) / 0.35) * (1 - eio((t - t_out + 0.3) / 0.3))
 
-# A — the hook over the whole ДО figure (the shot pulls back); the six zones pop as a list; «сегодня у нас комплексная операция»
-HA = top(Drop(["МОЖНО ЛИ ЗА ОДНУ ОПЕРАЦИЮ", "*ИЗМЕНИТЬ СРАЗУ ВСЮ ФИГУРУ?*"], 90, 70, 0, maxw=920), 320)
+# Instagram's safe zone for this client (her template): text and animation stay inside x 72-1018, y 234-1600, and out of the
+# bottom-right notch (x > 864 below y 1347). The footage is pulled back where a headline would otherwise lie on the body.
+SX0, SX1, SY0, SY1, NX, NY = 72, 1018, 234, 1600, 864, 1347
+LX = 80                                                               # left edge for headlines, pills and chips
+INS = 0.78                                                            # «отдалить»: the shot shrinks to 78 % and sits at the bottom
+def inset(fr, s=INS, black=False):
+    """the whole frame scaled down, bottom-centred; around it a soft blur of the same frame (black for the studio photos)"""
+    h, w = int(H * s), int(W * s); fg = cv2.resize(fr, (w, h), interpolation=cv2.INTER_AREA)
+    if black: out = np.zeros_like(fr)
+    else: out = cv2.resize(cv2.GaussianBlur(cv2.resize(fr, (W // 8, H // 8), interpolation=cv2.INTER_AREA), (0, 0), 6), (W, H))
+    x0, y0 = (W - w) // 2, H - h; out[y0:, x0:x0 + w] = fg; return out
+def ip(x, y, s=INS): return (W - W * s) / 2 + x * s, H - H * s + y * s
+HSZ = 84                                                              # headline size: two lines end above y 430
+
+# A — the hook over the whole ДО figure (pulled back); the six zones pop under it; the surgeon in a circle says «сегодня у нас комплексная операция»
+HA = top(Drop(["МОЖНО ЛИ ЗА ОДНУ ОПЕРАЦИЮ", "*ИЗМЕНИТЬ СРАЗУ ВСЮ ФИГУРУ?*"], HSZ, LX, 0, maxw=920), 270)
 ZA = ["живот", "талия", "спина", "руки", "грудь", "ягодицы"]
 def s_a(t):
-    fr = full(anon_top(V["IMG_0610"].at(0.2 + t * 0.5), 330), 0.5, 0.55, pull(t, 0, 1.3, 1.0, 3.5))
-    HA.draw(fr, t, 0.05); y = under(HA, 30)
-    pills_row(fr, t, [(z, 1.3 + 0.22 * k) for k, z in enumerate(ZA)], 70, y)
-    pip(fr, consult(t), 860, 1180, 150, pip_on(t, vstart("A1") - 0.2, T_S["B"] + 0.4), 0.3, 0.5, 1.0)
+    fr = inset(full(anon_top(V["IMG_0610"].at(0.2 + t * 0.5), 330), 0.5, 0.55, pull(t, 0, 1.3, 1.0, 3.5)))
+    HA.draw(fr, t, 0.05)
+    pills_row(fr, t, [(z, 1.3 + 0.22 * k) for k, z in enumerate(ZA)], LX, under(HA, 24), maxw=900)
+    pip(fr, consult(t), 870, 1150, 130, pip_on(t, vstart("A1") - 0.2, T_S["B"] + 0.4), 0.3, 0.5, 1.0)
     return fr
 
-# B — the belly: stretch marks drawn where she pinches; «спортом … не уберётся» → the dumbbell gets crossed out
-HB = top(Drop(["ЖИВОТ И", "*РАСТЯНУТАЯ КОЖА*"], 104, 70, 0, maxw=900), 320)
-TB = Track(["это уже не всегда решается спортом"], 34, 72, 0, 400)
+# B — the belly: stretch marks drawn on the lower belly; «спортом … не уберётся» → the dumbbell gets crossed out
+HB = top(Drop(["ЖИВОТ И", "*РАСТЯНУТАЯ КОЖА*"], HSZ, LX, 0, maxw=900), 270)
+TB = Track(["это уже не всегда решается спортом"], 32, LX, 0, 400)
 STRIAE = [(-170, 0), (-90, 30), (60, 26), (150, -6), (-130, 70), (110, 70)]
 def s_b(t):
-    lt = t - T_S["B"]; fr = full(anon_top(V["IMG_0611"].at(0.4 + lt * 1.0), 220), 0.5, 0.5, pull(t, T_S["B"], 1.15, 1.0, 2.0))
-    HB.draw(fr, t, T_S["B"] + 0.05); TB.y = under(HB, 28) + TB.top; TB.draw(fr, t, R("B", 5.38))
-    tr = R("B", 4.58)                                                   # «растяжек»: little waves appear on the lower belly
+    lt = t - T_S["B"]; fr = inset(full(anon_top(V["IMG_0611"].at(0.4 + lt * 1.0), 220), 0.5, 0.5, pull(t, T_S["B"], 1.15, 1.0, 2.0)))
+    HB.draw(fr, t, T_S["B"] + 0.05); TB.y = under(HB, 24) + TB.top; TB.draw(fr, t, R("B", 5.38))
+    tr = R("B", 4.58)
     for k, (dx, dy) in enumerate(STRIAE):
         u = t - tr - 0.08 * k
-        if u > 0: path_draw(fr, [(540 + dx + 70 * i / 16, 1000 + dy + 6 * np.sin(i * 1.3)) for i in range(17)], eo(u / 0.35), PINK, 4)
-    ts = R("B", 6.08)                                                   # «спортом» → the dumbbell, crossed out on «не уберётся»
+        if u > 0: path_draw(fr, [ip(540 + dx + 70 * i / 16, 1000 + dy + 6 * np.sin(i * 1.3)) for i in range(17)], eo(u / 0.35), PINK, 4)
+    ts = R("B", 6.08)
     if t > ts:
-        u = t - ts; card(fr, "dumbbell", 830, 760, 0.8 * eback(u / 0.35), min(1, u / 0.2), eo(u / 0.5))
+        u = t - ts; card(fr, "dumbbell", 910, 350, 0.62 * eback(u / 0.35), min(1, u / 0.2), eo(u / 0.5))
         xm = R("B", 7.28)
-        if t > xm: xmark(fr, 830, 760, 74, eo((t - xm) / 0.35), PINK, 12)
-    pip(fr, consult(t), 860, 1180, 150, pip_on(t, T_S["B"] - 1, T_S["C"] + 0.4), 0.3, 0.5, 1.0)
+        if t > xm: xmark(fr, 910, 350, 58, eo((t - xm) / 0.35), PINK, 10)
     return fr
 
-# C — liposuction 360: she turns all the way round (sped up) inside an orbit with a 0→360 counter; the zones pop; then the arm
-HC = top(Drop(["*ЛИПОСАКЦИЯ 360*"], 120, 70, 0, maxw=900), 320)
+# C — liposuction 360: she turns all the way round (sped up) inside an orbit with a 0→360 counter; the zones pop; then the arm (text off the arm)
+HC = top(Drop(["*ЛИПОСАКЦИЯ 360*"], 110, LX, 0, maxw=900), 270)
+HC2 = Drop(["*ЛИПОСАКЦИЯ 360*"], 96, LX, 1262, maxw=700)
 ZC = [("живот", R("C", 2.0)), ("бока", R("C", 2.4)), ("спина", R("C", 3.38)), ("руки", R("C", 5.86)), ("внутренняя поверхность бёдер", R("C", 6.4))]
 def s_c(t):
     lt = t - T_S["C"]
     if t < T_ARM:
-        st = min(36.8, 0.2 + max(0, lt - 0.3) * 6.6); fr = full(anon_top(V["IMG_0610"].at(st), 330), 0.5, 0.55, 1.06)
-        p = cl((lt - 0.3) / (T_ARM - T_S["C"] - 0.4))                 # orbit around the waist, the dot runs once round
-        cx, cy, rx, ry = 540, 950, 360, 80
+        st = min(36.8, 0.2 + max(0, lt - 0.3) * 6.6); fr = inset(full(anon_top(V["IMG_0610"].at(st), 330), 0.5, 0.55, 1.06))
+        p = cl((lt - 0.3) / (T_ARM - T_S["C"] - 0.4))
+        cx, cy = ip(540, 950); rx, ry = 360 * INS, 80 * INS
         dashed(fr, ellipse_pts(cx, cy, rx, ry, 0, np.pi, 2 * np.pi), 1, WHITE, 3, 14, 0.6)
         path_draw(fr, ellipse_pts(cx, cy, rx, ry, 0, -np.pi / 2, -np.pi / 2 + 2 * np.pi * eio(p)), 1, PINK, 6)
-        a = -np.pi / 2 + 2 * np.pi * eio(p); dot(fr, cx + rx * np.cos(a), cy + ry * np.sin(a), 13)
+        a = -np.pi / 2 + 2 * np.pi * eio(p); dot(fr, cx + rx * np.cos(a), cy + ry * np.sin(a), 12)
         HC.draw(fr, t, T_S["C"] + 0.05)
-        v = int(round(360 * eio(p))); text_c(fr, f"{v}", 870, 760, bebas(130), PINK); ring(fr, 870, 760, 105, 0.9, 4)
+        v = int(round(360 * eio(p))); text_c(fr, f"{v}", 900, 310, bebas(96), PINK); ring(fr, 900, 330, 78, 0.9, 4)
+        pills_row(fr, t, ZC[:3], LX, under(HC, 24), maxw=900)
     else:
-        u = t - T_ARM; fr, mp = onphoto(ARM, 0.5, 0.55, 1.0, t, T_ARM, 1.15, 1.5)
+        u = t - T_ARM; fr, mp = onphoto(ARM, 0.5, 0.45, 1.0, t, T_ARM, 1.12, 1.5)
         cx, cy = mp(1550, 3060); s_ = mp(1, 0)[0] - mp(0, 0)[0]
         dashed(fr, ellipse_pts(cx, cy, 1000 * s_, 270 * s_, -0.06), eo(u / 0.6), PINK, 5, 16)
-        HC.draw(fr, t, T_S["C"] + 0.05)
-    pills_row(fr, t, ZC, 70, 1180 - 74, maxw=880)
+        HC2.draw(fr, t, T_ARM)                                          # below the arm, on the dark backdrop
+        pills_row(fr, t, ZC[3:], LX, 1470, maxw=760)
     return fr
 
-# D — the fat is not thrown away: on the side ДО photo drops travel from the belly and the back to the buttock and to the breast
-HD = top(Drop(["ЖИР НЕ ПРОСТО УБИРАЕМ", "*ЕГО ИСПОЛЬЗУЕМ*", "*ДЛЯ ГРУДИ И ЯГОДИЦ*"], 88, 70, 0, maxw=920), 300)
+# D — the fat is not thrown away: on the side ДО photo (pulled back) drops travel from the belly and the back to the buttock and the breast
+HD = top(Drop(["ЖИР НЕ ПРОСТО УБИРАЕМ", "*ЕГО ИСПОЛЬЗУЕМ*", "*ДЛЯ ГРУДИ И ЯГОДИЦ*"], 78, LX, 0, maxw=920), 270)
 D_SRC = [(1480, 1900), (650, 1680)]; D_DST = [(616, 2440), (1460, 1240)]           # belly, back → buttock, breast (photo px)
 def flow(fr, t, t0, a, b, bend, k):
     (x0, y0), (x1, y1) = a, b
@@ -584,98 +599,94 @@ def flow(fr, t, t0, a, b, bend, k):
         u = (t - t0 - 0.22 * j - 0.1 * k) / 1.0
         if 0 < u < 1.25:
             q = eio(min(1, u)); bx = lerp(x0, x1, q) + bend * np.sin(np.pi * q); by = lerp(y0, y1, q)
-            fill_poly(fr, drop_pts(bx, by, 12 * (1 - 0.25 * q)), PINK, 1 - cl((u - 1) / 0.25))
+            fill_poly(fr, drop_pts(bx, by, 11 * (1 - 0.25 * q)), PINK, 1 - cl((u - 1) / 0.25))
 def s_d(t):
-    fr, mp = onphoto(PH["do_side"], 0.5, 0.5, 1.0, t, T_S["D"], 1.12, 2.0); chip(fr, "ДО", 70, 1040)
-    S_ = [mp(*p) for p in D_SRC]; D_ = [mp(*p) for p in D_DST]
-    for (x, y) in S_:                                                  # where it's taken: pulsing rings from the start
+    fr, mp = onphoto(PH["do_side"], 0.5, 0.5, 1.0, t, T_S["D"], 1.12, 2.0); fr = inset(fr, 0.8, True)
+    m2 = lambda x, y: ip(*mp(x, y), s=0.8)
+    S_ = [m2(*p) for p in D_SRC]; D_ = [m2(*p) for p in D_DST]
+    for (x, y) in S_:
         u = t - T_S["D"] - 0.2
-        if u > 0: uu = (u * 1.2) % 1; ring(fr, x, y, 30 + 36 * uu, (1 - uu) * 0.9, 4); dot(fr, x, y, 13 * eback(u / 0.3))
-    flow(fr, t, R("D", 1.13), S_[0], D_[0], -160, 0); flow(fr, t, R("D", 1.35), S_[1], D_[0], -80, 1)    # «пересадим в область ягодиц»
-    flow(fr, t, R("D", 3.97), S_[0], D_[1], 120, 0); flow(fr, t, R("D", 4.15), S_[1], D_[1], 60, 1)      # «и в область груди»
+        if u > 0: uu = (u * 1.2) % 1; ring(fr, x, y, 26 + 30 * uu, (1 - uu) * 0.9, 4); dot(fr, x, y, 11 * eback(u / 0.3))
+    flow(fr, t, R("D", 1.13), S_[0], D_[0], -130, 0); flow(fr, t, R("D", 1.35), S_[1], D_[0], -65, 1)
+    flow(fr, t, R("D", 3.97), S_[0], D_[1], 100, 0); flow(fr, t, R("D", 4.15), S_[1], D_[1], 50, 1)
     for (x, y), tb in zip(D_, (R("D", 3.13), R("D", 4.51))):
         u = t - tb
-        if u > 0: ring(fr, x, y, lerp(30, 80, eo(u / 0.5)), 1 - 0.5 * eo(u / 1.0), 5)
-    HD.draw(fr, t, T_S["D"] + 0.05)
-    pip(fr, consult(t), 860, 1180, 140, pip_on(t, T_S["D"] + 0.2, T_S["E"] + 0.4), 0.3, 0.5, 1.0)
+        if u > 0: ring(fr, x, y, lerp(26, 66, eo(u / 0.5)), 1 - 0.5 * eo(u / 1.0), 5)
+    HD.draw(fr, t, T_S["D"] + 0.05); chip(fr, "ДО", LX, under(HD, 22))
     return fr
 
-# E — the breast with her own fat: no lift, no implants; the outline grows by «a size, a size and a half»
-HE = top(Drop(["ГРУДЬ УВЕЛИЧИВАЕМ", "*СОБСТВЕННЫМ ЖИРОМ*"], 100, 70, 0, maxw=900), 320)
+# E — the breast with her own fat: the text stays above and below the breast, never on it
+HE = top(Drop(["ГРУДЬ УВЕЛИЧИВАЕМ", "*СОБСТВЕННЫМ ЖИРОМ*"], HSZ, LX, 0, maxw=900), 270)
 BR = [(778, 960), (1428, 960)]
 def s_e(t):
-    fr, mp = onphoto(PH["do_front"], 0.5, 0.27, 1.75, t, T_S["E"], 2.0, 2.5); chip(fr, "ДО", 70, 1040)
-    s_ = mp(1, 0)[0] - mp(0, 0)[0]; tg = R("E", 2.76)                  # «увеличивает» → the outline swells
-    g = 1 + 0.22 * eio((t - tg) / 1.2)
+    fr, mp = onphoto(PH["do_front"], 0.5, 0.23, 1.6, t, T_S["E"], 1.85, 2.5)
+    s_ = mp(1, 0)[0] - mp(0, 0)[0]; tg = R("E", 2.76)
+    g = 1 + 0.2 * eio((t - tg) / 1.2)
     for bx, by in BR:
         x, y = mp(bx, by)
-        if t > tg - 0.3: path_draw(fr, ellipse_pts(x, y - 20 * s_, 230 * s_ * g, 200 * s_ * g, 0, 0.05 * np.pi, 0.95 * np.pi), eo((t - tg + 0.3) / 0.5), PINK, 6)
-    if t > R("E", 3.62):                                               # «на размер, на полтора»
-        u = t - R("E", 3.62); text_c(fr, "+1", 880, 1180, bebas(int(130 * eback(u / 0.3))), PINK)
-        if t > R("E", 4.2): u2 = t - R("E", 4.2); text_c(fr, "1,5", 880, 1290, bebas(int(80 * eback(u2 / 0.3))), WHITE); ring(fr, 880, 1225, 120, 0.8, 4)
-    pills_row(fr, t, [("без подтяжки", R("E", 1.26)), ("без имплантов", R("E", 3.0))], 70, 1180 - 74, maxw=880)
+        if t > tg - 0.3: path_draw(fr, ellipse_pts(x, y - 20 * s_, 220 * s_ * g, 190 * s_ * g, 0, 0.08 * np.pi, 0.92 * np.pi), eo((t - tg + 0.3) / 0.5), PINK, 6)
+    yb = max(mp(0, 960 + 260)[1], 1130)                                # under the breasts
+    pills_row(fr, t, [("без подтяжки", R("E", 1.26)), ("без имплантов", R("E", 3.0))], LX, yb, maxw=900)
+    chip(fr, "ДО", LX, under(HE, 22))
+    if t > R("E", 3.62):
+        u = t - R("E", 3.62); text_c(fr, "+1", 790, yb + 120, bebas(int(110 * eback(u / 0.3))), PINK)
+        if t > R("E", 4.2): u2 = t - R("E", 4.2); text_c(fr, "1,5", 790, yb + 205, bebas(int(70 * eback(u2 / 0.3))), WHITE)
     HE.draw(fr, t, T_S["E"] + 0.05)
     return fr
 
-# F — more volume where it is missing: the hips widen, a round contour, the projection
-HF = top(Drop(["ДОБАВЛЯЕМ ОБЪЁМ", "*ТАМ, ГДЕ ЕГО НЕ ХВАТАЕТ*"], 96, 70, 0, maxw=920), 320)
+# F — more volume where it is missing: the back photo pulled back; the hips widen, a round contour, the projection
+HF = top(Drop(["ДОБАВЛЯЕМ ОБЪЁМ", "*ТАМ, ГДЕ ЕГО НЕ ХВАТАЕТ*"], HSZ, LX, 0, maxw=920), 270)
 def projection(fr, cx, cy, s, op, p):
-    hw = 120 * s; blend(fr, rrect(cx - hw, cy - hw, cx + hw, cy + hw, 30 * s), 0, 0, NAVY, 0.9 * op)
-    rrect_line(fr, cx - hw, cy - hw, cx + hw, cy + hw, 30 * s, PINK, 3, op)
+    hw = 110 * s; blend(fr, rrect(cx - hw, cy - hw, cx + hw, cy + hw, 28 * s), 0, 0, NAVY, 0.9 * op)
+    rrect_line(fr, cx - hw, cy - hw, cx + hw, cy + hw, 28 * s, PINK, 3, op)
     if op < 0.95: return
     k = eio(p); prof = lambda b: [(cx - 40 * s + (30 + b) * s * np.sin(np.pi * i / 20) ** 1.2, cy - 80 * s + 160 * s * i / 20) for i in range(21)]
     path_draw(fr, [(cx - 40 * s, cy - 90 * s), (cx - 40 * s, cy + 90 * s)], 1, WHITE, 3, op=0.5)
     path_draw(fr, prof(0), 1, WHITE, 3, op=0.4); path_draw(fr, prof(40 * k), 1, PINK, 6)
-    arrow(fr, (cx + 10 * s, cy), (cx + 85 * s, cy), k, PINK, 5)
+    arrow(fr, (cx + 10 * s, cy), (cx + 80 * s, cy), k, PINK, 5)
 def s_f(t):
-    fr, mp = onphoto(PH["do_back"], 0.5, 0.52, 1.0, t, T_S["F"], 1.2, 2.5); chip(fr, "ДО", 70, 1040)
-    s_ = mp(1, 0)[0] - mp(0, 0)[0]
-    th = R("F", 0.58)                                                  # «расширим бёдра»: the hip line bows outward, arrows out
+    fr, mp = onphoto(PH["do_back"], 0.5, 0.52, 1.0, t, T_S["F"], 1.12, 2.5); fr = inset(fr, 0.8, True)
+    m2 = lambda x, y: ip(*mp(x, y), s=0.8); s_ = (m2(1, 0)[0] - m2(0, 0)[0])
+    th = R("F", 0.58)
     for sg, hx in ((-1, 605), (1, 1527)):
-        x, y = mp(hx, 2074); u = t - th
+        x, y = m2(hx, 2074); u = t - th
         if u > 0:
             b = 60 * eio(u / 0.8) * s_
-            pts = [(x + sg * (b * np.sin(np.pi * i / 20)) , y - 330 * s_ + 660 * s_ * i / 20) for i in range(21)]
-            path_draw(fr, pts, eo(u / 0.4), PINK, 6); arrow(fr, (x, y), (x + sg * 90, y), eo((u - 0.3) / 0.35), PINK, 5)
-    tc = R("F", 4.56)                                                  # «округлый контур»
+            pts = [(x + sg * (b * np.sin(np.pi * i / 20)), y - 330 * s_ + 660 * s_ * i / 20) for i in range(21)]
+            path_draw(fr, pts, eo(u / 0.4), PINK, 6); arrow(fr, (x, y), (x + sg * 80, y), eo((u - 0.3) / 0.35), PINK, 5)
+    tc = R("F", 4.56)
     for bx in (853, 1296):
-        x, y = mp(bx, 2304); u = t - tc
+        x, y = m2(bx, 2304); u = t - tc
         if u > 0: path_draw(fr, ellipse_pts(x, y, 220 * s_, 230 * s_, 0, -0.1 * np.pi, 1.1 * np.pi), eo(u / 0.6), WHITE, 4)
-    tp = R("F", 7.22)                                                  # «проекцию» — side scheme
-    if t > tp - 0.3: u = t - tp + 0.3; projection(fr, 850, 760, 0.8 * eback(u / 0.35), min(1, u / 0.2), eo((u - 0.3) / 0.7))
-    HF.draw(fr, t, T_S["F"] + 0.05)
-    pip(fr, consult(t), 860, 1180, 140, pip_on(t, T_S["F"] + 0.2, T_G + 0.3), 0.35, 0.55, 1.0)
+    tp = R("F", 7.22)
+    if t > tp - 0.3: u = t - tp + 0.3; projection(fr, 890, 640, 0.75 * eback(u / 0.35), min(1, u / 0.2), eo((u - 0.3) / 0.7))
+    HF.draw(fr, t, T_S["F"] + 0.05); chip(fr, "ДО", LX, under(HF, 22))
     return fr
 
 # G — ПОСЛЕ, angle after angle (a flash and a shutter on each), the closing thought
-HG = Drop(["ОДНА ОПЕРАЦИЯ", "*И РАБОТА С ПРОПОРЦИЯМИ*", "*ВСЕГО ТЕЛА*"], 92, 70, 0, maxw=920)
-TG = Track(["результат ещё ранний,", "ткани продолжают восстанавливаться"], 30, 72, 0, 400)
+HG = Drop(["ОДНА ОПЕРАЦИЯ", "*И РАБОТА С ПРОПОРЦИЯМИ*", "*ВСЕГО ТЕЛА*"], 88, LX, 0, maxw=900)
+TG = Track(["результат ещё ранний,", "ткани продолжают восстанавливаться"], 30, LX, 0, 400)
 G_SEQ = ["posle_front", "posle_34", "posle_side", "posle_back"]; G_D = 0.95
 def s_g(t):
     lt = t - T_G; k = min(3, int(lt / G_D)); u = lt - k * G_D; n = G_SEQ[k]
     fr, _ = onphoto(PH[n], 0.5, 0.42 if n != "posle_back" else 0.35, 1.0, t, T_G + k * G_D, 1.06, G_D)
-    chip(fr, "ПОСЛЕ", 70, 290)
+    chip(fr, "ПОСЛЕ", LX, 260)
     f = 1 - eo(u / 0.18) if (k or lt > 0.5) else 0; fr = fr * (1 - f * 0.85) + f * 0.85
-    HG.y = 1440 - HG.h - 120; HG.draw(fr, t, T_G + 0.3); TG.y = HG.y + HG.h + 40 + TG.top; TG.draw(fr, t, T_G + 1.4)
+    HG.y = 1300 - HG.h; HG.draw(fr, t, T_G + 0.3); TG.y = HG.y + HG.h + 36 + TG.top; TG.draw(fr, t, T_G + 1.4)
     return fr
 
-# K — ПОСЛЕ over ДО, four angles, then the logo
-KPW, KPH = 270, 690
-COLL = np.zeros((2 * KPH, W, 3), np.float32)
-for i, ang in enumerate(("front", "34", "side", "back")):
-    COLL[:KPH, i * KPW:(i + 1) * KPW] = panel(PH["posle_" + ang], "posle_" + ang, KPW, KPH)
-    COLL[KPH:, i * KPW:(i + 1) * KPW] = panel(PH["do_" + ang], "do_" + ang, KPW, KPH)
+# K — the clinic-style collages, each angle on its own: ПОСЛЕ on top, ДО below (colour graded alike), a shutter on each, then the logo
+K_ANG = ("front", "34", "side", "back"); K_D = 1.6; KH = 680; KY = 240           # the halves: y 240-920 and 920-1600
+COLLS = [np.vstack([panel(PH["posle_" + a], "posle_" + a, W, KH, neck_at=40, span=300), panel(PH["do_" + a], "do_" + a, W, KH, neck_at=40, span=300)]) for a in K_ANG]
 def s_k(t):
-    lt = t - T_K; fr = np.zeros((H, W, 3), np.float32); y0 = 250
-    for i in range(4):
-        p = eo((lt - 0.1 * i) / 0.4)
-        if p <= 0: continue
-        dy = int((1 - p) * 60); ya = y0 + dy; fr[ya:ya + 2 * KPH, i * KPW:(i + 1) * KPW] = COLL[:min(2 * KPH, H - ya), i * KPW:(i + 1) * KPW] * p
-    fr[y0 + KPH - 2:y0 + KPH + 2] = PINK
-    for i in (1, 2, 3): fr[y0:y0 + 2 * KPH, i * KPW - 1:i * KPW + 1] = DEEP
-    chip(fr, "ПОСЛЕ", 16, y0 + 16); chip(fr, "ДО", 16, y0 + KPH + 16)
-    f = 1 - eo(lt / 0.18); fr = fr * (1 - f) + f * 0.9
-    if lt > 1.3: blend(fr, logo_alpha(260), 540 - 130, y0 + 2 * KPH + 30, PINK, eo((lt - 1.3) / 0.5))
+    lt = t - T_K; k = min(3, int(lt / K_D)); u = lt - k * K_D
+    fr = np.zeros((H, W, 3), np.float32); s_ = 1 + 0.02 * (1 - eo(u / 0.35)); c = COLLS[k]
+    if s_ > 1.001:
+        c = cv2.resize(c, (int(W * s_), int(2 * KH * s_)), interpolation=cv2.INTER_LINEAR); ox, oy = (c.shape[1] - W) // 2, (c.shape[0] - 2 * KH) // 2; c = c[oy:oy + 2 * KH, ox:ox + W]
+    fr[KY:KY + 2 * KH] = c; fr[KY + KH - 2:KY + KH + 2] = PINK
+    chip(fr, "ПОСЛЕ", LX, KY + 20); chip(fr, "ДО", LX, KY + KH + 20)
+    f = 1 - eo(u / 0.18); fr = fr * (1 - f) + f * 0.9
+    if k == 3 and u > 0.5: blend(fr, logo_alpha(220), 540 - 110, 1530, PINK, eo((u - 0.5) / 0.4))
     return fr
 
 SCENES = [(0, s_a), (T_S["B"], s_b), (T_S["C"], s_c), (T_S["D"], s_d), (T_S["E"], s_e), (T_S["F"], s_f), (T_G, s_g), (T_K, s_k)]
@@ -773,7 +784,8 @@ def build_audio(path):
     put(TICK, R("E", 1.26), 0.55); put(TICK, R("E", 3.0), 0.55); put(glass(1174.7), R("E", 3.62), 0.1)
     put(TICK, R("F", 0.58), 0.55); put(TICK, R("F", 4.56), 0.55); put(TICK, R("F", 7.22), 0.55)
     for k in range(4): put(SHOT, T_G + k * G_D, 0.45)
-    put(SHOT, T_K, 0.5); put(glass(1318.5), T_K + 1.3, 0.1)
+    for k in range(4): put(SHOT, T_K + 1.6 * k, 0.5)
+    put(glass(1318.5), T_K + 3 * 1.6 + 0.5, 0.1)
     sfx[:n] *= 1 - 0.6 * np.clip(dd, 0, 1)
     tt = np.arange(n) / SR; fade = np.clip((DUR - tt) / 1.8, 0, 1) ** 1.5 * np.minimum(1, tt / 0.15)
     mus = track(n) * ((G_GAP - (G_GAP - G_VO) * np.clip(dd, 0, 1)) * fade)[:, None]
