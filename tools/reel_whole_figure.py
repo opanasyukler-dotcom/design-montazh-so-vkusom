@@ -737,13 +737,16 @@ def click():
     e = np.exp(-t / 0.004) + 0.7 * np.exp(-np.clip(t - 0.045, 0, None) / 0.005) * (t > 0.045)
     x = x * e / 2; k = felt(160, 0.08); x[:len(k)] += k * 0.4; return x
 
-MUSIC = os.path.join(SRC, "music.wav"); M0 = 0.0                       # the client's track for this reel, if given
+MUSIC = os.path.join(SRC, "music.wav"); M0 = 0.24                      # the client's track for this reel: its drop (14.0 s) lands on the cut to «липосакция 360»
 G_VO, G_GAP = 0.022, 0.075
 def track(n):
     if not os.path.exists(MUSIC): return np.zeros((n, 2))
     w = wave.open(MUSIC); x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64).reshape(-1, w.getnchannels()) / 32768
     if x.shape[1] == 1: x = np.repeat(x, 2, 1)
     seg = x[int(M0 * SR):int(M0 * SR) + n]; seg = seg / np.sqrt(np.mean(seg.mean(1) ** 2))
+    hop = SR // 10; e = np.sqrt(np.convolve(np.pad(seg.mean(1) ** 2, (0, hop - len(seg) % hop))[:len(seg) // hop * hop + hop].reshape(-1, hop).mean(1), np.ones(25) / 25, "same")) + 1e-6
+    g = np.clip(1.15 / e, 1.0, 5.0)                                       # the track's quiet passages (intro, bridge under the ending) lifted, up to +14 dB, slowly
+    g = np.interp(np.arange(len(seg)), np.arange(len(g)) * hop + hop / 2, g); seg = seg * g[:, None]
     return np.pad(seg, ((0, n - len(seg)), (0, 0)))
 
 def build_audio(path):
