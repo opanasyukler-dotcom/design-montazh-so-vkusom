@@ -549,7 +549,6 @@ def s_a(t):
     fr = inset(full(anon_top(V["IMG_0610"].at(0.2 + t * 0.5), 330), 0.5, 0.55, pull(t, 0, 1.3, 1.0, 3.5)))
     HA.draw(fr, t, 0.05)
     pills_row(fr, t, [(z, 1.3 + 0.22 * k) for k, z in enumerate(ZA)], LX, 1200, maxw=700)            # on the thighs, the breast stays clear
-    pip(fr, consult(t), 900, 1000, 110, pip_on(t, vstart("A1") - 0.2, T_S["B"] + 0.4), 0.3, 0.5, 1.0)
     return fr
 
 # B — the belly: stretch marks drawn on the lower belly; «спортом … не уберётся» → the dumbbell gets crossed out
