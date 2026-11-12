@@ -1,0 +1,288 @@
+<title>Календарь @mcg.va</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Forum&family=Manrope:wght@400;500;700;800&display=swap">
+<style>
+/* Layout: one phone-first column; date strip on top, the chosen day below as a checklist; scripts open in a bottom sheet. */
+:root{
+  --bg:#FBF7F6; --surface:#FFFFFF; --ink:#2A2730; --muted:#736B74; --line:#EADFE1;
+  --rose:#B9566F; --rose-soft:#F6E5E9; --sage:#4F7A65; --sage-soft:#E5EFE8; --amber:#A8742A;
+  --display:'Forum', Georgia, serif; --body:'Manrope', 'Segoe UI', Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#1C1A1F; --surface:#26232A; --ink:#F1EBEE; --muted:#ADA3AB; --line:#3A3540;
+  --rose:#E48DA2; --rose-soft:#3A2830; --sage:#8CC2A6; --sage-soft:#22332B; --amber:#E0B46E; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1C1A1F; --surface:#26232A; --ink:#F1EBEE; --muted:#ADA3AB; --line:#3A3540;
+  --rose:#E48DA2; --rose-soft:#3A2830; --sage:#8CC2A6; --sage-soft:#22332B; --amber:#E0B46E; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45}
+.wrap{max-width:760px;margin:0 auto;padding-block:20px 60px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+header{display:flex;align-items:center;gap:16px;justify-content:space-between}
+.eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:var(--rose)}
+h1{font-family:var(--display);font-weight:400;font-size:38px;line-height:1;margin:4px 0 2px;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px;margin:0}
+.ring{position:relative;width:76px;height:76px;flex:0 0 76px}
+.ring svg{transform:rotate(-90deg)}
+.ring .trk{stroke:var(--line)} .ring .val{stroke:var(--rose);transition:stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1)}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:17px;font-weight:800;font-variant-numeric:tabular-nums}
+.quick{display:flex;gap:8px;margin:18px 0 12px;flex-wrap:wrap}
+.quick button{font:inherit;font-weight:700;font-size:13px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 14px;cursor:pointer;transition:background .2s,border-color .2s}
+.quick button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.strip{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.chip{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:7px 2px 8px;cursor:pointer;position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0;animation:pop .45s both;animation-delay:calc(var(--i)*35ms)}
+.chip .fill{position:absolute;left:0;right:0;bottom:0;background:var(--sage-soft);height:var(--p,0%);transition:height .6s ease;z-index:0}
+.chip>*:not(.fill){position:relative;z-index:1}
+.chip .wd{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase}
+.chip .dn{font-family:var(--display);font-size:22px;line-height:1.05}
+.chip .dots{display:flex;gap:3px;height:6px}
+.chip .dots i{width:6px;height:6px;border-radius:50%;background:var(--rose)}
+.chip .dots i.c{background:var(--amber)}
+.chip.sel{border-color:var(--rose);box-shadow:0 0 0 2px var(--rose) inset}
+.chip.today::after{content:"сегодня";position:absolute;top:2px;right:0;left:0;text-align:center;font-size:8px;font-weight:800;color:var(--rose);letter-spacing:.04em;z-index:1}
+.chip.today .wd{opacity:0}
+.chip.done .dn{color:var(--sage)}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin:8px 2px 18px;flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:8px;height:8px;border-radius:50%;background:var(--rose);display:inline-block}
+.legend i.c{background:var(--amber)} .legend i.g{background:var(--sage-soft);border:1px solid var(--sage);border-radius:2px}
+.day{background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.day.enter{animation:slide .45s cubic-bezier(.2,.8,.2,1)}
+.dhead{padding:16px 18px 14px;background:var(--rose-soft);display:flex;gap:14px;align-items:flex-end}
+.dhead .big{font-family:var(--display);font-size:46px;line-height:.9}
+.dhead .meta{flex:1;min-width:0}
+.dhead .rel{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--rose)}
+.dhead h2{font-size:18px;margin:2px 0 0;text-wrap:balance}
+.dhead .cnt{font-size:13px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.groups{padding:6px 18px 16px}
+.g{padding-top:12px}
+.gl{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:var(--muted);display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.gl::after{content:"";flex:1;height:1px;background:var(--line)}
+.g.post .gl{color:var(--rose)} .g.shoot .gl{color:var(--sage)}
+.task{display:flex;gap:12px;align-items:flex-start;padding:8px 2px;cursor:pointer;border-radius:10px;animation:rise .4s both;animation-delay:calc(var(--i)*40ms)}
+.task input{position:absolute;opacity:0;pointer-events:none}
+.box{flex:0 0 24px;height:24px;border:2px solid var(--muted);border-radius:7px;display:grid;place-items:center;transition:background .25s,border-color .25s,transform .25s}
+.box svg{width:15px;height:15px;stroke:var(--surface);stroke-width:3;fill:none;stroke-dasharray:22;stroke-dashoffset:22;transition:stroke-dashoffset .35s ease .05s}
+.task input:checked + .box{background:var(--sage);border-color:var(--sage);transform:scale(1.08)}
+.task input:checked + .box svg{stroke-dashoffset:0}
+.task input:focus-visible + .box{outline:3px solid var(--rose);outline-offset:2px}
+.task .tx{flex:1;min-width:0;transition:color .3s}
+.task input:checked ~ .tx{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.ref{font:inherit;font-size:12px;font-weight:800;border:0;background:var(--rose);color:var(--surface);border-radius:999px;padding:1px 8px;margin-right:4px;cursor:pointer;vertical-align:1px}
+.ref.c{background:var(--amber)}
+.celebrate{display:none;margin:0 18px 16px;padding:12px 14px;border-radius:12px;background:var(--sage-soft);color:var(--sage);font-weight:700;animation:pop .5s both}
+.day.complete .celebrate{display:block}
+.nav{display:flex;justify-content:space-between;margin-top:14px;gap:8px}
+.nav button{font:inherit;font-weight:700;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:10px 16px;cursor:pointer}
+.nav button:disabled{opacity:.4;cursor:default}
+.status{font-size:12px;color:var(--muted);margin-top:18px;text-align:center}
+.rules{margin-top:22px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.rules div{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;font-size:13px;min-width:0}
+.rules b{display:block;font-size:13px;margin-bottom:2px}
+.sheet{position:fixed;inset:0;background:rgba(20,16,22,.45);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding-top:env(safe-area-inset-top,0px)}
+.sheet[hidden]{display:none!important}
+.panel{background:var(--surface);width:100%;max-width:640px;max-height:86%;overflow:auto;border-radius:20px 20px 0 0;padding:20px max(20px, env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(20px, env(safe-area-inset-left,0px));animation:up .35s cubic-bezier(.2,.8,.2,1)}
+.panel h3{font-family:var(--display);font-weight:400;font-size:28px;line-height:1.1;margin:6px 0 4px;text-wrap:balance}
+.panel .goal{color:var(--sage);font-weight:700;font-size:13px;margin:0 0 10px}
+.kv{border-top:1px solid var(--line);padding:9px 0}
+.kv b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:2px}
+.kv.warn{color:var(--rose);font-weight:700}
+.panel ol,.panel ul{margin:0;padding-left:20px}
+.close{float:right;font:inherit;font-weight:700;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:6px 14px;cursor:pointer}
+@keyframes pop{from{opacity:0;transform:scale(.9)}}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}}
+@keyframes slide{from{opacity:0;transform:translateX(18px)}}
+@keyframes up{from{transform:translateY(40px);opacity:0}}
+@keyframes burst{0%{transform:scale(1)}40%{transform:scale(1.25)}100%{transform:scale(1)}}
+.box.burst{animation:burst .4s}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:420px){h1{font-size:32px}.chip .dn{font-size:19px}.dhead .big{font-size:38px}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">План на 13–26 ноября</div>
+      <h1>Календарь @mcg.va</h1>
+      <p class="sub">Снять · смонтировать · выложить · сторис. Отмечай галочки по ходу дня.</p>
+    </div>
+    <div class="ring" aria-label="Выполнено за 14 дней">
+      <svg width="76" height="76" viewBox="0 0 76 76"><circle class="trk" cx="38" cy="38" r="32" fill="none" stroke-width="8"/><circle class="val" id="ringVal" cx="38" cy="38" r="32" fill="none" stroke-width="8" stroke-linecap="round" stroke-dasharray="201.06" stroke-dashoffset="201.06"/></svg>
+      <b id="ringTxt">0%</b>
+    </div>
+  </header>
+
+  <div class="quick" role="group" aria-label="Быстрый переход">
+    <button id="qToday" type="button">Сегодня</button>
+    <button id="qTomorrow" type="button">Завтра</button>
+    <button id="qAfter" type="button">Послезавтра</button>
+  </div>
+
+  <div class="strip" id="strip"></div>
+  <div class="legend"><span><i></i>Reels</span><span><i class="c"></i>Карусель</span><span><i class="g"></i>Зелёная заливка = сколько сделано</span></div>
+
+  <div id="dayHost"></div>
+  <div class="nav"><button id="prev" type="button">← Предыдущий день</button><button id="next" type="button">Следующий день →</button></div>
+
+  <div class="rules">
+    <div><b>Каждый день, 30 минут</b>Ответить на все комментарии в первый час после публикации и на весь директ.</div>
+    <div><b>Хук = первые 2 секунды</b>Цифра или конкретная ситуация + предмет в кадре. Без «Привет, девочки».</div>
+    <div><b>Время публикации</b>12:00 и 19:00 по Москве чередуем, чтобы понять, когда твоя аудитория активнее.</div>
+    <div><b>Нажми на R1, C1…</b>Откроется сценарий: хук, первый кадр, структура и призыв.</div>
+  </div>
+  <p class="status" id="status">Отметки сохраняются на этом устройстве.</p>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="shTitle">
+    <button class="close" id="shClose" type="button">Закрыть</button>
+    <div class="eyebrow" id="shTag"></div>
+    <h3 id="shTitle"></h3>
+    <div id="shBody"></div>
+  </div>
+</div>
+
+<script>
+const PLAN = {"reels": {"R1": {"title": "Бутылочки: что у нас осталось через 2 месяца", "goal": "Сохранения и репосты. Это продолжение твоего хита (16 764 просмотра, 107 сохранений)", "hook": "«2 месяца назад я сравнивала бутылочки. Вот какая у нас осталась одна»", "frame": "все бутылочки на столе, рука убирает лишние", "plan": ["0–2 с: все бутылочки в кадре, текст-хук крупно", "2–15 с: каждая бутылочка, одна фраза: почему она у нас «ушла»", "15–25 с: победительница крупно и 2 причины", "25–30 с: вопрос «а у вас какая?»"], "cta": "Сохрани, чтобы не переплатить. Напиши свою бутылочку в комментариях, и я соберу топ от подписчиц", "len": "25–35 с"}, "R2": {"title": "Регресс сна, часть 2: что нам реально помогло", "goal": "Сохранения, поиск. Продолжение ролика про регресс (6 296 просмотров, 34 репоста)", "hook": "«Месяц назад мы въехали в регресс сна. Вот что сработало, а что нет»", "frame": "тёмная детская, ночник, время на телефоне", "plan": ["0–2 с: ночь, хук текстом", "2–20 с: 3 действия с плашками «сработало» / «не сработало»", "20–25 с: оговорка «у каждого ребёнка по-своему, это наш опыт»", "25–30 с: вопрос аудитории"], "cta": "Сохрани на бессонную ночь. Что помогло вам? Пиши, соберу в следующий ролик", "len": "25–35 с"}, "R3": {"title": "Покупки до родов: 3 стоят своих денег, 3 зря", "goal": "Охват и репосты. Формат «распаковка» дал тебе 6 790, 4 062 и 4 032 просмотра", "hook": "«Эти 3 вещи я бы второй раз не купила»", "frame": "«бесполезная» вещь крупно в руке", "plan": ["0–2 с: вещь в кадре и хук", "2–12 с: 3 «зря», по 3 секунды и причине на каждую", "12–24 с: 3 «стоят», по 4 секунды", "24–30 с: кому «зря»-вещи всё же подойдут"], "cta": "Отправь подруге, которая сейчас собирает приданое", "len": "30 с"}, "R4": {"title": "Я мама 5 месяцев: 5 вещей, о которых мне никто не сказал", "goal": "Репосты и подписки. Продолжение «Я мама всего три месяца» (17 851 просмотр, 147 репостов)", "hook": "«Я мама 5 месяцев. Вот 5 вещей, о которых мне никто не сказал»", "frame": "ты в кадре и говоришь, дочка на руках или рядом", "plan": ["0–2 с: хук в камеру", "2–25 с: 5 пунктов, по 4–5 с, текст на экране + бытовые перебивки", "25–30 с: тёплый финал одной фразой"], "cta": "Какой пункт про вас? Напишите цифру в комментариях", "len": "30–40 с"}, "R5": {"title": "Я кормлю смесью и не оправдываюсь", "goal": "Обсуждение, лояльность, подписка своих людей", "hook": "«Я не кормлю грудью. И решила это ещё до родов»", "frame": "ты готовишь смесь, смотришь в камеру", "plan": ["0–3 с: хук", "3–15 с: как пришла к решению (1–2 фразы)", "15–25 с: что это дало семье: ночные смены с мужем, сон, спокойствие", "25–30 с: граница «здесь без осуждения»"], "cta": "Подпишись, если тебе близко материнство без осуждения", "len": "30 с", "note": "Тема острая: удаляй хейт, закрепи добрый комментарий, на споры не отвечай"}, "R6": {"title": "Ручной ребёнок: мой реальный день за 30 секунд", "goal": "Узнаваемость и репосты «это про меня»", "hook": "«Как я живу с ребёнком, который не слезает с рук»", "frame": "ты с дочкой на руках пытаешься налить чай", "plan": ["Снимай весь день короткими кусками по 3–5 с", "Монтаж: 8–10 кадров по 2–3 с, на каждом время и 3–4 слова", "Финал: «и всё равно я её обожаю»"], "cta": "У вас тоже ручной? Ставь 🤍 в комментариях", "len": "25–30 с"}, "R7": {"title": "Беременным: 5 вещей, которые я бы сделала иначе", "goal": "Большой охват. Беременность дала тебе главный хит (104 572 просмотра)", "hook": "«Если вы беременны, вот что я бы сделала иначе. Сохраните»", "frame": "твоё фото или видео с животиком из архива и сразу ты сейчас", "plan": ["0–2 с: архив беременности + хук", "2–27 с: 5 пунктов, по 5 с, без медицинских советов, только твой опыт", "27–30 с: «а что бы изменили вы?»"], "cta": "Отправь беременной подруге", "len": "30–35 с"}}, "posts": {"C1": {"title": "Карусель «Давайте знакомиться» (закрепить)", "slides": ["Обложка: ты с дочкой + «Я [имя], мама 5-месячной дочки»", "О чём этот блог: честно о материнстве без идеальной картинки", "Рубрики: Честные обзоры · Сон · ИВ без осуждения · Беременность и роды", "3 факта о тебе", "Ролик, который посмотрели 100 000+ раз, и о чём он", "Что будет дальше в блоге", "«Подпишись и напиши, о чём снять следующий ролик»"]}, "C2": {"title": "Карусель «Шпаргалка по бутылочкам»", "slides": ["Обложка: «Какую бутылочку выбрать: шпаргалка от мамы на ИВ»", "4 критерия: колики, соска, мытьё, цена", "Бутылочка 1: плюсы и минусы", "Бутылочка 2: плюсы и минусы", "Бутылочка 3: плюсы и минусы", "Моя ошибка при выборе", "Итог + «сохрани, пригодится»"]}, "C3": {"title": "Карусель «Сумка в роддом: что пригодилось, а что нет»", "slides": ["Обложка: фото собранной сумки + заголовок", "Для мамы: пригодилось", "Для мамы: зря взяла", "Для малыша: пригодилось", "Для малыша: зря взяла", "Что забыла и о чём пожалела", "«Отправь той, кто скоро рожает»"]}}, "days": [{"date": "2026-11-13", "wd": "Пт", "theme": "Старт: упаковка профиля и первая съёмка", "shoot": ["R1: бутылочки (все бутылочки, руки, кормление крупно)", "R2: вечерние кадры для ролика про сон (ночник, ритуал, кроватка)"], "edit": [], "post": [], "stories": ["Утро как есть, без макияжа и постановки", "«Обновляю профиль. Вот что здесь будет»: 4 рубрики", "Опрос: «О чём снять первым? Сон / Прикорм / Покупки / ИВ»", "Окошко вопросов: «Что спросить у мамы 5-месячной?»"], "extra": ["Новая шапка профиля (текст в PDF, раздел «Упаковка профиля»)", "Закрепить 3 лучших ролика: 104 572 / 17 851 / 16 764", "Сделать обложки актуальных: Бутылочки, Сон, ИВ, Роды, Покупки, Прикорм"]}, {"date": "2026-11-14", "wd": "Сб", "theme": "Первый полезный Reels", "shoot": [], "edit": ["R1: монтаж 25–35 с, субтитры, обложка с крупным текстом"], "post": ["R1 в 12:00: «Бутылочки: что осталось через 2 месяца»"], "stories": ["Анонс R1 + стикер-ссылка на ролик", "Викторина «Какая бутылочка у нас №1?»", "Ответы на вопросы из окошка (2–3 штуки)"], "extra": ["Первый час после публикации: отвечать на все комментарии"]}, {"date": "2026-11-15", "wd": "Вс", "theme": "Знакомство с новыми людьми", "shoot": ["Фото для карусели C1: ты с дочкой, 3–4 кадра у окна"], "edit": ["R2: монтаж ролика про сон"], "post": ["C1 в 12:00: «Давайте знакомиться», сразу закрепить"], "stories": ["Воскресенье с дочкой без постановки", "«Я выложила пост-знакомство» + ссылка", "Опрос: «Как кормите: ГВ / ИВ / смешанное?» (мягко, без оценок)"], "extra": []}, {"date": "2026-11-16", "wd": "Пн", "theme": "Сон: продолжение хита", "shoot": [], "edit": ["Обложка для R2"], "post": ["R2 в 19:00: «Регресс сна, часть 2: что помогло»"], "stories": ["Реальное утро понедельника", "Анонс R2 + ссылка", "Окошко: «Что вас удивило в материнстве?» (ответы пойдут в R4)"], "extra": ["Записать в таблицу статистику R1 за 48 часов"]}, {"date": "2026-11-17", "wd": "Вт", "theme": "Съёмочный день №2", "shoot": ["R3: 6 вещей «стоят / зря», каждая крупно в руке", "R4: говорящая голова «5 вещей», 5 дублей по пункту + бытовые перебивки"], "edit": [], "post": [], "stories": ["Закулисье съёмки: «снимаю для вас про покупки»", "Опрос: «Самая бесполезная покупка для малыша?»", "Наш дневник сна за вчера: 1 кадр, честно"], "extra": ["Ответить на все комментарии и директ"]}, {"date": "2026-11-18", "wd": "Ср", "theme": "Покупки: стоит / зря", "shoot": [], "edit": ["R3: монтаж 30 с, плашки «СТОИТ» / «ЗРЯ»"], "post": ["R3 в 12:00: «Покупки до родов: 3 стоят, 3 зря»"], "stories": ["Анонс R3 + ссылка", "Результаты вчерашнего опроса: топ бесполезных покупок от подписчиц", "«Ожидание / реальность»: одна вещь"], "extra": []}, {"date": "2026-11-19", "wd": "Чт", "theme": "Сохраняемый пост", "shoot": [], "edit": ["R4: монтаж, текст пунктов на экране, 3 смены планов", "C2: сверстать шпаргалку по бутылочкам (7 слайдов)"], "post": ["C2 в 19:00: «Шпаргалка по бутылочкам»"], "stories": ["Прикорм: «готовимся, вот что купила» (опыт, без советов)", "Анонс C2 + ссылка", "Вопрос: «С чего вы начинали прикорм?»"], "extra": []}, {"date": "2026-11-20", "wd": "Пт", "theme": "Личный Reels + аудит недели", "shoot": [], "edit": [], "post": ["R4 в 19:00: «Я мама 5 месяцев: 5 вещей, о которых мне не сказали»"], "stories": ["Анонс R4 + ссылка", "Ответы подписчиц на «что вас удивило»: 3 лучших", "Пятничный вечер как есть"], "extra": ["Аудит недели (30 мин): топ-3 по охвату и топ-3 по сохранениям, выписать работающие хуки"]}, {"date": "2026-11-21", "wd": "Сб", "theme": "Большой съёмочный день №3", "shoot": ["R5: ИВ без оправданий (говорящая голова + приготовление смеси)", "R6: весь день снимать кусочки по 3–5 с с временем на часах", "R7: ты сейчас + отобрать архивные видео беременности"], "edit": [], "post": [], "stories": ["Суббота с дочкой без постановки", "Закулисье: «снимаю 3 ролика за день»", "Опрос: «Хотите ролик про ИВ без осуждения?»"], "extra": []}, {"date": "2026-11-22", "wd": "Вс", "theme": "Честный разговор", "shoot": [], "edit": ["R5: монтаж 30 с, мягкая музыка, субтитры"], "post": ["R5 в 12:00: «Я кормлю смесью и не оправдываюсь»"], "stories": ["Анонс R5 + ссылка", "Анонимное окошко «вопрос про ИВ», ответы вечером", "Наша смесь: как готовлю ночью (без рекламы)"], "extra": ["Модерация: убрать хейт, закрепить добрый комментарий"]}, {"date": "2026-11-23", "wd": "Пн", "theme": "Роддом: польза", "shoot": ["Фото сумки и вещей для C3 (сверху, на светлом фоне)"], "edit": ["C3: сверстать «Сумка в роддом» (7 слайдов)", "R6: монтаж дня за 30 с"], "post": ["C3 в 19:00: «Сумка в роддом: что пригодилось, а что нет»"], "stories": ["Анонс C3 + ссылка", "Вопрос: «Что вы забыли взять в роддом?»", "Артикулы вещей из C3: ссылка на тг"], "extra": []}, {"date": "2026-11-24", "wd": "Вт", "theme": "День ручного ребёнка", "shoot": [], "edit": ["R7: монтаж, архив беременности + сейчас"], "post": ["R6 в 19:00: «Ручной ребёнок: мой день за 30 секунд»"], "stories": ["Анонс R6 + ссылка", "Опрос: «У вас ручной ребёнок? Да / Нет / Был»", "Один лайфхак, как я успеваю поесть"], "extra": []}, {"date": "2026-11-25", "wd": "Ср", "theme": "Без публикации: вопросы и план", "shoot": ["2 запасных хука на следующую неделю: просто наговорить в камеру"], "edit": [], "post": [], "stories": ["День вопросов: «Спроси меня что угодно про 5 месяцев»", "Ответы на 8–10 вопросов: видео или текстом", "Голосование за темы следующего цикла"], "extra": ["Выписать темы для следующих 2 недель из вопросов и комментариев"]}, {"date": "2026-11-26", "wd": "Чт", "theme": "Финал цикла и итоги", "shoot": [], "edit": [], "post": ["R7 в 12:00: «Беременным: 5 вещей, которые я бы сделала иначе»"], "stories": ["Анонс R7 + ссылка", "«2 недели в блоге: что было, что дальше»", "Спасибо новым подписчицам + опрос «какой ролик был самым полезным?»"], "extra": ["Итоговый аудит 14 дней: подписчики, охват, сохранения, репосты (сравнить с 165 подписчиками на старте)"]}]};
+const GROUPS = [["shoot","Снять"],["edit","Монтаж"],["post","Выложить"],["stories","Сторис"],["extra","Ещё"]];
+const $ = s => document.querySelector(s);
+const days = PLAN.days;
+let checks = {};
+let sel = 0;
+let db = null, docRef = null, writing = Promise.resolve();
+
+try { checks = JSON.parse(localStorage.getItem("mcg-checks") || "{}") || {}; } catch (e) { checks = {}; }
+
+const ids = d => GROUPS.flatMap(([k]) => (d[k] || []).map((_, i) => `${d.date}|${k}|${i}`));
+const allIds = days.flatMap(ids);
+const isoToday = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`; };
+function todayIdx(){ const t = isoToday(); if (t < days[0].date) return 0; if (t > days[days.length-1].date) return days.length-1; return days.findIndex(d => d.date === t); }
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function linkify(t){
+  return esc(t).replace(/\b([RC][1-7])(:|\b)/g, (m, k, colon) => {
+    if (!PLAN.reels[k] && !PLAN.posts[k]) return m;
+    return `<button type="button" class="ref ${k[0]==="C"?"c":""}" data-ref="${k}">${k}</button>`;
+  });
+}
+const pct = list => list.length ? Math.round(100 * list.filter(id => checks[id]).length / list.length) : 0;
+
+function renderStrip(){
+  const ti = isoToday();
+  $("#strip").innerHTML = days.map((d, i) => {
+    const posts = d.post.map(p => `<i class="${p.startsWith("C")?"c":""}"></i>`).join("");
+    const p = pct(ids(d));
+    return `<button type="button" class="chip ${i===sel?"sel":""} ${d.date===ti?"today":""} ${p===100?"done":""}" style="--i:${i};--p:${p}%" data-i="${i}" aria-label="${d.date.slice(8)}.${d.date.slice(5,7)}, ${d.theme}, выполнено ${p}%"><span class="fill"></span><span class="wd">${d.wd}</span><span class="dn">${+d.date.slice(8)}</span><span class="dots">${posts}</span></button>`;
+  }).join("");
+}
+
+function relLabel(i){
+  const diff = i - todayIdx(); const t = isoToday();
+  if (t < days[0].date || t > days[days.length-1].date) return `День ${i+1} из 14`;
+  return diff === 0 ? "Сегодня" : diff === 1 ? "Завтра" : diff === 2 ? "Послезавтра" : diff === -1 ? "Вчера" : `День ${i+1} из 14`;
+}
+
+function renderDay(animate){
+  const d = days[sel]; const list = ids(d);
+  const done = list.filter(id => checks[id]).length;
+  let n = 0;
+  const groups = GROUPS.filter(([k]) => d[k] && d[k].length).map(([k, label]) => `
+    <div class="g ${k}"><div class="gl">${label}</div>
+      ${d[k].map((t, i) => { const id = `${d.date}|${k}|${i}`; const cid = "c-" + id.replace(/\|/g,"-"); return `
+      <label class="task" style="--i:${n++}" for="${cid}">
+        <input type="checkbox" id="${cid}" data-id="${id}" ${checks[id]?"checked":""}>
+        <span class="box"><svg viewBox="0 0 16 16"><path d="M3 8.5l3.2 3.2L13 5"/></svg></span>
+        <span class="tx">${linkify(t)}</span>
+      </label>`; }).join("")}
+    </div>`).join("");
+  $("#dayHost").innerHTML = `
+    <article class="day ${animate?"enter":""} ${done===list.length?"complete":""}">
+      <div class="dhead"><div class="big">${d.date.slice(8)}.${d.date.slice(5,7)}</div>
+        <div class="meta"><div class="rel">${relLabel(sel)} · ${d.wd}</div><h2>${esc(d.theme)}</h2></div>
+        <div class="cnt" id="cnt">${done} / ${list.length}</div></div>
+      <div class="groups">${groups}</div>
+      <div class="celebrate">День закрыт. Отличная работа!</div>
+    </article>`;
+  $("#prev").disabled = sel === 0; $("#next").disabled = sel === days.length - 1;
+  const ti = todayIdx();
+  $("#qToday").setAttribute("aria-pressed", sel === ti); $("#qTomorrow").setAttribute("aria-pressed", sel === ti+1); $("#qAfter").setAttribute("aria-pressed", sel === ti+2);
+}
+
+function renderRing(){
+  const p = pct(allIds);
+  $("#ringVal").style.strokeDashoffset = 201.06 * (1 - p / 100);
+  $("#ringTxt").textContent = p + "%";
+}
+function renderAll(animate){ renderStrip(); renderDay(animate); renderRing(); }
+function go(i){ if (i < 0 || i >= days.length) return; sel = i; renderAll(true); }
+
+function save(){
+  try { localStorage.setItem("mcg-checks", JSON.stringify(checks)); } catch (e) {}
+  if (docRef) {
+    const body = { checks: { ...checks }, updatedAt: new Date().toISOString() };
+    writing = writing.then(() => docRef.set(body)).catch(err => { $("#status").textContent = "Не удалось сохранить в облако: отметки остались на этом устройстве."; });
+  }
+}
+
+document.addEventListener("change", ev => {
+  const el = ev.target; if (!el.matches(".task input")) return;
+  const id = el.dataset.id;
+  if (el.checked) checks[id] = true; else delete checks[id];
+  if (el.checked) { const b = el.nextElementSibling; b.classList.remove("burst"); void b.offsetWidth; b.classList.add("burst"); }
+  const d = days[sel]; const list = ids(d); const done = list.filter(x => checks[x]).length;
+  $("#cnt").textContent = `${done} / ${list.length}`;
+  document.querySelector(".day").classList.toggle("complete", done === list.length);
+  renderStrip(); renderRing(); save();
+});
+
+document.addEventListener("click", ev => {
+  const ref = ev.target.closest(".ref");
+  if (ref) { ev.preventDefault(); openSheet(ref.dataset.ref); return; }
+  const chip = ev.target.closest(".chip"); if (chip) go(+chip.dataset.i);
+});
+$("#prev").onclick = () => go(sel - 1);
+$("#next").onclick = () => go(sel + 1);
+$("#qToday").onclick = () => go(todayIdx());
+$("#qTomorrow").onclick = () => go(Math.min(todayIdx() + 1, days.length - 1));
+$("#qAfter").onclick = () => go(Math.min(todayIdx() + 2, days.length - 1));
+
+function openSheet(k){
+  const r = PLAN.reels[k], p = PLAN.posts[k];
+  const when = days.flatMap(d => d.post.filter(x => x.startsWith(k)).map(x => `${d.date.slice(8)}.${d.date.slice(5,7)} ${d.wd}${x.includes(" в ") ? ", " + x.split(" в ")[1].slice(0,5) : ""}`))[0] || "";
+  $("#shTag").textContent = `${k} · ${r ? "Reels" : "Карусель"} · публикация ${when}`;
+  $("#shTitle").textContent = (r || p).title;
+  $("#shBody").innerHTML = r ? `
+    <p class="goal">${esc(r.goal)}</p>
+    <div class="kv"><b>Хук, первые 2 секунды</b>${esc(r.hook)}</div>
+    <div class="kv"><b>Первый кадр</b>${esc(r.frame)}</div>
+    <div class="kv"><b>Структура · ${esc(r.len)}</b><ul>${r.plan.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+    <div class="kv"><b>Призыв в подписи</b>${esc(r.cta)}</div>
+    ${r.note ? `<div class="kv warn"><b>Важно</b>${esc(r.note)}</div>` : ""}` :
+    `<div class="kv"><b>Слайды</b><ol>${p.slides.map(x => `<li>${esc(x)}</li>`).join("")}</ol></div>`;
+  $("#sheet").hidden = false; $("#shClose").focus();
+}
+function closeSheet(){ $("#sheet").hidden = true; }
+$("#shClose").onclick = closeSheet;
+$("#sheet").addEventListener("click", e => { if (e.target.id === "sheet") closeSheet(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+
+sel = todayIdx();
+renderAll(false);
+
+(async () => {
+  try {
+    db = await window.claude?.use?.("db");
+    if (!db) return;
+    docRef = db.doc("progress/main");
+    let first = true;
+    const timer = setTimeout(() => { if (first) $("#status").textContent = "Облако не ответило: отметки сохраняются на этом устройстве."; }, 10000);
+    docRef.onSnapshot(snap => {
+      clearTimeout(timer);
+      const remote = snap.exists ? (snap.data().checks || {}) : null;
+      if (first && !remote && Object.keys(checks).length) save();
+      if (remote && !snap.metadata.hasPendingWrites) { checks = { ...remote }; try { localStorage.setItem("mcg-checks", JSON.stringify(checks)); } catch (e) {} renderAll(false); }
+      first = false;
+      $("#status").textContent = "Отметки синхронизируются между твоими устройствами.";
+    }, () => { $("#status").textContent = "Облако недоступно: отметки сохраняются на этом устройстве."; });
+  } catch (e) {}
+})();
+</script>
