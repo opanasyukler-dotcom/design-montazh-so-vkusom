@@ -446,11 +446,14 @@ for k, v in RAW.items():
     g_ = grade(v, STATS[k], TGT); st2 = skin_stats(g_); st2[:, 1] = TGT[:, 1]; g_ = grade(g_, st2, TGT)   # second pass, means only
     PH[k] = anon_top(g_, FACE[k]) if FACE[k] else g_
 ARM = photo("IMG_0625")
-def panel(im, n, pw, ph, neck_at=40, span=250):
+def panel(im, n, pw, ph, neck_at=40, span=250, key=True):
     neck, navel, cx = ALIGN[n]; s_ = span / (navel - neck); r = cv2.resize(im, None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
     out = np.zeros((ph, pw, 3), np.float32); ox, oy = int(cx * s_ - pw / 2), int(neck * s_ - neck_at)
     xs0, ys0 = max(0, ox), max(0, oy); xs1, ys1 = min(r.shape[1], ox + pw), min(r.shape[0], oy + ph)
     if xs1 > xs0 and ys1 > ys0: out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = r[ys0:ys1, xs0:xs1]
+    if not key:                                                         # the photo as shot: only its own edges fade into black, the body untouched
+        m = np.zeros((ph, pw), np.float32); m[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = 1
+        m = cv2.GaussianBlur(cv2.erode(m, np.ones((41, 41), np.uint8)), (0, 0), 12); return out * m[..., None]
     lum = out.mean(2); k = np.clip((lum - 0.2) / 0.14, 0, 1); k = k * k * (3 - 2 * k)
     k = np.maximum(k, np.clip((out[..., 2] - out[..., 0] - 0.04) / 0.05, 0, 1)); return out * k[..., None]
 def onphoto(img, fx, fy, z, t, t0, z0=None, d=2.5):
@@ -677,17 +680,19 @@ def s_g(t):
     return fr
 
 # K — the clinic-style collages, each angle on its own: ПОСЛЕ on top, ДО below (colour graded alike), a shutter on each, then the logo
-K_ANG = ("front", "34", "side", "back"); K_D = 1.6; KH = 680; KY = 240           # the halves: y 240-920 and 920-1600
-COLLS = [np.vstack([panel(PH["posle_" + a], "posle_" + a, W, KH, neck_at=40, span=300), panel(PH["do_" + a], "do_" + a, W, KH, neck_at=40, span=300)]) for a in K_ANG]
+K_ANG = ("front", "34", "side", "back"); K_D = 1.6; KH = 960; KY = 0             # full screen: ПОСЛЕ top half, ДО bottom half, neck to knees
+COLLS = [np.vstack([panel(PH["posle_" + a], "posle_" + a, W, KH, neck_at=50, span=470, key=False),
+                    panel(PH["do_" + a], "do_" + a, W, KH, neck_at=50, span=470, key=False)]) for a in K_ANG]
+_fl = np.clip((850 - np.arange(KH)) / 90, 0, 1)[:, None, None]                  # the ПОСЛЕ back shot shows the floor at knee height: fade it to black
+COLLS[3][:KH] *= _fl
 def s_k(t):
     lt = t - T_K; k = min(3, int(lt / K_D)); u = lt - k * K_D
     fr = np.zeros((H, W, 3), np.float32); s_ = 1 + 0.02 * (1 - eo(u / 0.35)); c = COLLS[k]
     if s_ > 1.001:
         c = cv2.resize(c, (int(W * s_), int(2 * KH * s_)), interpolation=cv2.INTER_LINEAR); ox, oy = (c.shape[1] - W) // 2, (c.shape[0] - 2 * KH) // 2; c = c[oy:oy + 2 * KH, ox:ox + W]
     fr[KY:KY + 2 * KH] = c; fr[KY + KH - 2:KY + KH + 2] = PINK
-    chip(fr, "ПОСЛЕ", LX, KY + 20); chip(fr, "ДО", LX, KY + KH + 20)
+    chip(fr, "ПОСЛЕ", LX, 260); chip(fr, "ДО", LX, KH + 30)                   # labels inside the safe zone
     f = 1 - eo(u / 0.18); fr = fr * (1 - f) + f * 0.9
-    if k == 3 and u > 0.5: blend(fr, logo_alpha(220), 540 - 110, 1530, PINK, eo((u - 0.5) / 0.4))
     return fr
 
 SCENES = [(0, s_a), (T_S["B"], s_b), (T_S["C"], s_c), (T_S["D"], s_d), (T_S["E"], s_e), (T_S["F"], s_f), (T_G, s_g), (T_K, s_k)]
