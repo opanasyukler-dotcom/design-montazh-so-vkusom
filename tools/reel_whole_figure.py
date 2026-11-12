@@ -523,17 +523,20 @@ def pills_row(fr, t, items, x0, y0, maxw=940, size=28, gap=14, dy=74):
 def pip_on(t, t_in, t_out): return eo((t - t_in) / 0.35) * (1 - eio((t - t_out + 0.3) / 0.3))
 
 # Instagram's safe zone for this client (her template): text and animation stay inside x 72-1018, y 234-1600, and out of the
-# bottom-right notch (x > 864 below y 1347). The footage is pulled back where a headline would otherwise lie on the body.
+# bottom-right notch (x > 864 below y 1347). The footage itself stays full frame (the client's call): only text and animation move.
 SX0, SX1, SY0, SY1, NX, NY = 72, 1018, 234, 1600, 864, 1347
 LX = 80                                                               # left edge for headlines, pills and chips
-INS = 0.78                                                            # «отдалить»: the shot shrinks to 78 % and sits at the bottom
+INS = 1.0                                                             # no pull-back of the footage (set < 1 to shrink the shot to the bottom)
 def inset(fr, s=INS, black=False):
+    if s >= 1: return fr
     """the whole frame scaled down, bottom-centred; around it a soft blur of the same frame (black for the studio photos)"""
     h, w = int(H * s), int(W * s); fg = cv2.resize(fr, (w, h), interpolation=cv2.INTER_AREA)
     if black: out = np.zeros_like(fr)
     else: out = cv2.resize(cv2.GaussianBlur(cv2.resize(fr, (W // 8, H // 8), interpolation=cv2.INTER_AREA), (0, 0), 6), (W, H))
     x0, y0 = (W - w) // 2, H - h; out[y0:, x0:x0 + w] = fg; return out
-def ip(x, y, s=INS): return (W - W * s) / 2 + x * s, H - H * s + y * s
+def ip(x, y, s=INS):
+    if s >= 1: return x, y
+    return (W - W * s) / 2 + x * s, H - H * s + y * s
 HSZ = 84                                                              # headline size: two lines end above y 430
 
 # A — the hook over the whole ДО figure (pulled back); the six zones pop under it; the surgeon in a circle says «сегодня у нас комплексная операция»
@@ -542,26 +545,26 @@ ZA = ["живот", "талия", "спина", "руки", "грудь", "яг�
 def s_a(t):
     fr = inset(full(anon_top(V["IMG_0610"].at(0.2 + t * 0.5), 330), 0.5, 0.55, pull(t, 0, 1.3, 1.0, 3.5)))
     HA.draw(fr, t, 0.05)
-    pills_row(fr, t, [(z, 1.3 + 0.22 * k) for k, z in enumerate(ZA)], LX, under(HA, 24), maxw=900)
-    pip(fr, consult(t), 870, 1150, 130, pip_on(t, vstart("A1") - 0.2, T_S["B"] + 0.4), 0.3, 0.5, 1.0)
+    pills_row(fr, t, [(z, 1.3 + 0.22 * k) for k, z in enumerate(ZA)], LX, 1200, maxw=700)            # on the thighs, the breast stays clear
+    pip(fr, consult(t), 900, 1000, 110, pip_on(t, vstart("A1") - 0.2, T_S["B"] + 0.4), 0.3, 0.5, 1.0)
     return fr
 
 # B — the belly: stretch marks drawn on the lower belly; «спортом … не уберётся» → the dumbbell gets crossed out
-HB = top(Drop(["ЖИВОТ И", "*РАСТЯНУТАЯ КОЖА*"], HSZ, LX, 0, maxw=900), 270)
+HB = lift(Drop(["ЖИВОТ И", "*РАСТЯНУТАЯ КОЖА*"], HSZ, LX, 0, maxw=900), 1290)   # under the belly: the breast stays clear
 TB = Track(["это уже не всегда решается спортом"], 32, LX, 0, 400)
 STRIAE = [(-170, 0), (-90, 30), (60, 26), (150, -6), (-130, 70), (110, 70)]
 def s_b(t):
     lt = t - T_S["B"]; fr = inset(full(anon_top(V["IMG_0611"].at(0.4 + lt * 1.0), 220), 0.5, 0.5, pull(t, T_S["B"], 1.15, 1.0, 2.0)))
-    HB.draw(fr, t, T_S["B"] + 0.05); TB.y = under(HB, 24) + TB.top; TB.draw(fr, t, R("B", 5.38))
+    HB.draw(fr, t, T_S["B"] + 0.05); TB.y = HB.y + HB.h + 18 + TB.top; TB.draw(fr, t, R("B", 5.38))
     tr = R("B", 4.58)
     for k, (dx, dy) in enumerate(STRIAE):
         u = t - tr - 0.08 * k
         if u > 0: path_draw(fr, [ip(540 + dx + 70 * i / 16, 1000 + dy + 6 * np.sin(i * 1.3)) for i in range(17)], eo(u / 0.35), PINK, 4)
     ts = R("B", 6.08)
     if t > ts:
-        u = t - ts; card(fr, "dumbbell", 910, 350, 0.62 * eback(u / 0.35), min(1, u / 0.2), eo(u / 0.5))
+        u = t - ts; card(fr, "dumbbell", 910, 1000, 0.62 * eback(u / 0.35), min(1, u / 0.2), eo(u / 0.5))
         xm = R("B", 7.28)
-        if t > xm: xmark(fr, 910, 350, 58, eo((t - xm) / 0.35), PINK, 10)
+        if t > xm: xmark(fr, 910, 1000, 58, eo((t - xm) / 0.35), PINK, 10)
     return fr
 
 # C — liposuction 360: she turns all the way round (sped up) inside an orbit with a 0→360 counter; the zones pop; then the arm (text off the arm)
@@ -601,8 +604,7 @@ def flow(fr, t, t0, a, b, bend, k):
             q = eio(min(1, u)); bx = lerp(x0, x1, q) + bend * np.sin(np.pi * q); by = lerp(y0, y1, q)
             fill_poly(fr, drop_pts(bx, by, 11 * (1 - 0.25 * q)), PINK, 1 - cl((u - 1) / 0.25))
 def s_d(t):
-    fr, mp = onphoto(PH["do_side"], 0.5, 0.5, 1.0, t, T_S["D"], 1.12, 2.0); fr = inset(fr, 0.8, True)
-    m2 = lambda x, y: ip(*mp(x, y), s=0.8)
+    fr, mp = onphoto(PH["do_side"], 0.5, 0.5, 1.0, t, T_S["D"], 1.12, 2.0); m2 = mp
     S_ = [m2(*p) for p in D_SRC]; D_ = [m2(*p) for p in D_DST]
     for (x, y) in S_:
         u = t - T_S["D"] - 0.2
@@ -645,8 +647,7 @@ def projection(fr, cx, cy, s, op, p):
     path_draw(fr, prof(0), 1, WHITE, 3, op=0.4); path_draw(fr, prof(40 * k), 1, PINK, 6)
     arrow(fr, (cx + 10 * s, cy), (cx + 80 * s, cy), k, PINK, 5)
 def s_f(t):
-    fr, mp = onphoto(PH["do_back"], 0.5, 0.52, 1.0, t, T_S["F"], 1.12, 2.5); fr = inset(fr, 0.8, True)
-    m2 = lambda x, y: ip(*mp(x, y), s=0.8); s_ = (m2(1, 0)[0] - m2(0, 0)[0])
+    fr, mp = onphoto(PH["do_back"], 0.5, 0.52, 1.0, t, T_S["F"], 1.12, 2.5); m2 = mp; s_ = (m2(1, 0)[0] - m2(0, 0)[0])
     th = R("F", 0.58)
     for sg, hx in ((-1, 605), (1, 1527)):
         x, y = m2(hx, 2074); u = t - th
