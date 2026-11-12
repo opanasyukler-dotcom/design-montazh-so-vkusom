@@ -389,7 +389,7 @@ def hearts(fr, t, t0, pts=((820, 560, 0.0), (260, 640, 0.35), (700, 420, 0.7))):
 
 # ---------------- voice edit: (block, source, [(in, out), …]) — whole sentences from the consultation; the pauses between them are tightened
 VO = [("A1", "IMG_0612", [(5.60, 7.62)]),                     # сегодня у нас комплексная операция
-      ("B", "IMG_0612", [(10.45, 13.15), (14.32, 19.64)]),    # будем делать ей абдоминопластику. здесь достаточно большое количество растяжек, поэтому спортом, к сожалению, это не уберётся
+      ("B", "IMG_0612", [(10.45, 11.12), (11.58, 13.15), (14.32, 19.64)]),   # будем делать (без «ей») абдоминопластику. здесь достаточно большое количество растяжек, поэтому спортом, к сожалению, это не уберётся
       ("C", "IMG_0612", [(23.70, 30.85)]),                    # сделаем липосакцию полностью живота, спинки. липосакция у нас 360. руки мы будем делать
       ("D", "IMG_0612", [(33.55, 37.48), (40.62, 41.88)]),    # мы весь забранный жир пересадим в область ягодицы … и в область груди
       ("E", "IMG_0612", [(42.56, 44.66), (125.52, 127.95)]),  # с грудью подтяжку мы не планируем. липофилинг увеличивает на размер, на полтора
@@ -464,9 +464,9 @@ def onphoto(img, fx, fy, z, t, t0, z0=None, d=2.5):
 # ---------------- subtitles
 SUBS = {
     'A1': [('Сегодня', 0.04, 0.32), ('у', 0.32, 0.42), ('нас', 0.42, 0.64), ('комплексная', 0.64, 1.22), ('операция.', 1.22, 1.96)],
-    'B': [('Будем', 0.02, 0.31), ('делать', 0.31, 0.75), ('ей', 0.75, 1.29), ('абдоминопластику.', 1.29, 2.67), ('Здесь', 2.76, 3.2), ('достаточно', 3.2, 3.64),
-          ('большое', 3.64, 4.06), ('количество', 4.06, 4.58), ('растяжек,', 4.58, 5.18), ('поэтому', 5.38, 6.08), ('спортом,', 6.08, 6.54), ('к', 6.54, 6.74),
-          ('сожалению,', 6.74, 7.06), ('это', 7.16, 7.28), ('не', 7.28, 7.48), ('уберётся.', 7.48, 7.98)],
+    'B': [('Будем', 0.02, 0.31), ('делать', 0.31, 0.67), ('абдоминопластику.', 0.83, 2.21), ('Здесь', 2.3, 2.74), ('достаточно', 2.74, 3.18),
+          ('большое', 3.18, 3.6), ('количество', 3.6, 4.12), ('растяжек,', 4.12, 4.72), ('поэтому', 4.92, 5.62), ('спортом,', 5.62, 6.08), ('к', 6.08, 6.28),
+          ('сожалению,', 6.28, 6.6), ('это', 6.7, 6.82), ('не', 6.82, 7.02), ('уберётся.', 7.02, 7.52)],
     'C': [('Сделаем', 0.02, 0.42), ('липосакцию', 0.42, 1.16), ('полностью', 1.16, 1.7), ('живота,', 2.0, 3.38), ('спинки.', 3.38, 3.94), ('Липосакция', 4.22, 4.76),
           ('у', 4.76, 4.82), ('нас', 4.82, 5.02), ('360.', 5.02, 5.72), ('Руки', 5.86, 6.24), ('мы', 6.24, 6.5), ('будем', 6.5, 6.72), ('делать.', 6.72, 7.12)],
     'D': [('Мы', 0.15, 0.27), ('весь', 0.27, 0.37), ('забранный', 0.37, 0.87), ('жир', 0.87, 1.13), ('пересадим', 1.13, 2.07), ('в', 2.07, 2.29), ('область', 2.29, 3.13),
@@ -557,15 +557,15 @@ TB = Track(["это уже не всегда решается спортом"], 
 STRIAE = [(-170, 0), (-90, 30), (60, 26), (150, -6), (-130, 70), (110, 70)]
 def s_b(t):
     lt = t - T_S["B"]; fr = inset(full(anon_top(V["IMG_0611"].at(0.4 + lt * 1.0), 220), 0.5, 0.5, pull(t, T_S["B"], 1.15, 1.0, 2.0)))
-    HB.draw(fr, t, T_S["B"] + 0.05); TB.y = HB.y + HB.h + 18 + TB.top; TB.draw(fr, t, R("B", 5.38))
-    tr = R("B", 4.58)
+    HB.draw(fr, t, T_S["B"] + 0.05); TB.y = HB.y + HB.h + 18 + TB.top; TB.draw(fr, t, R("B", 4.92))
+    tr = R("B", 4.12)
     for k, (dx, dy) in enumerate(STRIAE):
         u = t - tr - 0.08 * k
         if u > 0: path_draw(fr, [ip(540 + dx + 70 * i / 16, 1000 + dy + 6 * np.sin(i * 1.3)) for i in range(17)], eo(u / 0.35), PINK, 4)
-    ts = R("B", 6.08)
+    ts = R("B", 5.62)
     if t > ts:
         u = t - ts; card(fr, "dumbbell", 910, 1000, 0.62 * eback(u / 0.35), min(1, u / 0.2), eo(u / 0.5))
-        xm = R("B", 7.28)
+        xm = R("B", 6.82)
         if t > xm: xmark(fr, 910, 1000, 58, eo((t - xm) / 0.35), PINK, 10)
     return fr
 
@@ -578,7 +578,7 @@ def s_c(t):
     if t < T_ARM:
         st = min(36.8, 0.2 + max(0, lt - 0.3) * 6.6); fr = inset(full(anon_top(V["IMG_0610"].at(st), 330), 0.5, 0.55, 1.06))
         p = cl((lt - 0.3) / (T_ARM - T_S["C"] - 0.4))
-        cx, cy = ip(540, 950); rx, ry = 360 * INS, 80 * INS
+        cx, rx = waist_track(fr, t); cy, ry = 950, 70                    # the orbit follows her waist as she turns
         dashed(fr, ellipse_pts(cx, cy, rx, ry, 0, np.pi, 2 * np.pi), 1, WHITE, 3, 14, 0.6)
         path_draw(fr, ellipse_pts(cx, cy, rx, ry, 0, -np.pi / 2, -np.pi / 2 + 2 * np.pi * eio(p)), 1, PINK, 6)
         a = -np.pi / 2 + 2 * np.pi * eio(p); dot(fr, cx + rx * np.cos(a), cy + ry * np.sin(a), 12)
@@ -651,12 +651,14 @@ def projection(fr, cx, cy, s, op, p):
 def s_f(t):
     fr, mp = onphoto(PH["do_back"], 0.5, 0.52, 1.0, t, T_S["F"], 1.12, 2.5); m2 = mp; s_ = (m2(1, 0)[0] - m2(0, 0)[0])
     th = R("F", 0.58)
-    for sg, hx in ((-1, 605), (1, 1527)):
-        x, y = m2(hx, 2074); u = t - th
-        if u > 0:
-            b = 60 * eio(u / 0.8) * s_
-            pts = [(x + sg * (b * np.sin(np.pi * i / 20)), y - 330 * s_ + 660 * s_ * i / 20) for i in range(21)]
-            path_draw(fr, pts, eo(u / 0.4), PINK, 6); arrow(fr, (x, y), (x + sg * 80, y), eo((u - 0.3) / 0.35), PINK, 5)
+    u = t - th
+    if u > 0:                                                          # her own hip line, traced on the photo, bows outward
+        b = 70 * eio(u / 0.8); n_ = len(HIP_Y)
+        for sg, edge in ((-1, HIP_L), (1, HIP_R)):
+            pts = [m2(edge[i] + sg * b * np.sin(np.pi * i / (n_ - 1)), HIP_Y[i]) for i in range(n_)]
+            path_draw(fr, [m2(edge[i], HIP_Y[i]) for i in range(n_)], 1, WHITE, 3, op=0.45 * min(1, u / 0.3))
+            path_draw(fr, pts, eo(u / 0.4), PINK, 6)
+            x, y = m2(edge[HIP_W] + sg * b, HIP_Y[HIP_W]); arrow(fr, (x, y), (x + sg * 70, y), eo((u - 0.3) / 0.35), PINK, 5)
     tc = R("F", 4.56)
     for bx in (853, 1296):
         x, y = m2(bx, 2304); u = t - tc
@@ -665,6 +667,26 @@ def s_f(t):
     if t > tp - 0.3: u = t - tp + 0.3; projection(fr, 890, 640, 0.75 * eback(u / 0.35), min(1, u / 0.2), eo((u - 0.3) / 0.7))
     HF.draw(fr, t, T_S["F"] + 0.05); chip(fr, "ДО", LX, under(HF, 22))
     return fr
+
+def _hip_line():
+    """left / right body edge of the back ДО photo, row by row over the hips (gaps such as the gluteal cleft closed)"""
+    m = (PH["do_back"].astype(np.float32).mean(2) / 255 > 0.22).astype(np.uint8); m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((1, 41), np.uint8)).astype(int)
+    ys = np.arange(1760, 2420, 12); L, Rr = [], []
+    for y in ys:
+        d = np.diff(np.r_[0, m[y], 0]); st, en = np.where(d == 1)[0], np.where(d == -1)[0]; k = (en - st) > 20
+        L.append(st[k].min()); Rr.append(en[k].max())
+    sm = lambda a: np.convolve(np.pad(np.float32(a), 3, mode="edge"), np.ones(7) / 7, "valid")
+    L, Rr = sm(L), sm(Rr); return ys, L, Rr, int(np.argmax(Rr - L))
+HIP_Y, HIP_L, HIP_R, HIP_W = _hip_line()
+_WT = {"t": -9, "cx": 540, "rx": 330}
+def waist_track(fr, t):
+    """centre and half-width of the body at waist height in this frame (bright pixels on the dark backdrop), smoothed over time"""
+    occ = (fr[900:1000].mean(2) > 0.3).mean(0) > 0.6; d = np.diff(np.r_[0, occ.astype(int), 0]); st, en = np.where(d == 1)[0], np.where(d == -1)[0]
+    if len(st):
+        k = np.argmax(en - st); cx, rx = (st[k] + en[k]) / 2, (en[k] - st[k]) / 2 * 1.18 + 26
+        a = 0.25 if 0 < t - _WT["t"] < 0.2 else 1.0
+        _WT["cx"] += a * (cx - _WT["cx"]); _WT["rx"] += a * (rx - _WT["rx"])
+    _WT["t"] = t; return _WT["cx"], min(_WT["rx"], 470)
 
 # G — ПОСЛЕ, angle after angle (a flash and a shutter on each), the closing thought
 HG = Drop(["ОДНА ОПЕРАЦИЯ", "*И РАБОТА С ПРОПОРЦИЯМИ*", "*ВСЕГО ТЕЛА*"], 88, LX, 0, maxw=900)
@@ -778,12 +800,13 @@ def build_audio(path):
     KEYS = [load(kd)] if os.path.exists(kd) else [load(os.path.join(SRC, "keys", f"k{i:03d}.wav")) for i in range(1, 9)]
     td = os.path.join(SRC, "tick.wav"); TICK = load(td) if os.path.exists(td) else click()
     n_ch = sum(len(g) for g, _ in HA.rows)
-    if len(KEYS) == 1: put(KEYS[0], 0.05, 0.35)
+    if len(KEYS) == 1:                                                  # the client's keyboard: as long as the title types, then a short fade
+        kl = int((n_ch * HA.stag + 0.35) * SR); kb = KEYS[0][:kl].copy(); fo = int(0.2 * SR); kb[-fo:] *= np.linspace(1, 0, fo); put(kb, 0.05, 0.5)
     else:
         for j in range(n_ch): put(KEYS[j % len(KEYS)], 0.05 + j * HA.stag, 0.32)          # typing under the title
     for k in range(len(ZA)): put(TICK, 1.3 + 0.22 * k, 0.55)                              # the six zones
-    for k in range(6): put(tick(), R("B", 4.58) + 0.08 * k, 0.3)                          # stretch marks drawn
-    put(TICK, R("B", 6.08), 0.6); put(felt(70, 0.35), R("B", 7.28), 0.5)                   # dumbbell, crossed out
+    for k in range(6): put(tick(), R("B", 4.12) + 0.08 * k, 0.3)                          # stretch marks drawn
+    put(TICK, R("B", 5.62), 0.6); put(felt(70, 0.35), R("B", 6.82), 0.5)                   # dumbbell, crossed out
     put(swoosh(1.6), T_S["C"] + 0.3, 0.12)
     for j in range(16): put(tick(), T_S["C"] + 0.4 + 0.3 * j, 0.15)                       # the 360 counter
     for _, t0 in ZC: put(TICK, t0, 0.55)
