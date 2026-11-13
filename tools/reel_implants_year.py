@@ -483,16 +483,13 @@ def blur_box(f, x, y, w, h, pad=0.35):
     out = f.copy(); out[y0:y1, x0:x1] = (reg * (1 - m) + bl * m).astype(np.uint8); return out
 def frame(k, st):
     st = max(0.0, st); f = V[k].at(st)
-    if k == "CP1":
-        b = FACES[k][min(int(round(st * FPS)), len(FACES[k]) - 1)]; f = blur_box(f, *b, pad=0.6)
-    if k == "IMG_2253" and st < 7.5: f = blur_box(f, 170, 830, 180, 140, 0.15)      # the patient lying in the background
-    if k == "IMG_2288": f = anon_top(f, 190)
+    # no face blur on this patient (the client's call)
     return f
 def lsrc(b, t):
     _, _, parts, t0, d = next(x for x in SEG if x[0] == b); return parts[0][0] + (t - t0)
 
 def photo(n): return cv2.imread(os.path.join(WORK, n + ".png"))[..., ::-1].copy()
-FACE = {"D_271025": 220, "D_311025": 0, "D_271125": 0, "D_060426": 620, "D_041126": 160, "IMG_2274": 260, "IMG_2284": 150, "IMG_5850": 120, "IMG_5854": 150}
+FACE = {n: 0 for n in ("D_271025", "D_311025", "D_271125", "D_060426", "D_041126", "IMG_2274", "IMG_2284", "IMG_5850", "IMG_5854")}   # the client: no face blur on this patient
 PH = {n: (anon_top(photo(n), FACE[n]) if FACE[n] else photo(n)) for n in FACE}
 
 # ---------------- subtitles
@@ -668,7 +665,7 @@ def grade(rgb, st, tgt):
     out = cv2.cvtColor(np.clip(lab, 0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB).astype(np.float32)
     w = blackdrop(rgb); return np.clip(out * w + rgb.astype(np.float32) * (1 - w) * (rgb.max(2, keepdims=True) > 70), 0, 255).astype(np.uint8)
 GR = ["D_271025", "IMG_2274", "IMG_2284", "IMG_5850", "D_041126", "IMG_5854"]       # slider + collage photos: one grade, one skin tone
-_ST = {n: skin_stats(PH[n]) for n in GR}; _TG = np.mean(list(_ST.values()), 0); _TG[1, 0] += WARM[0]; _TG[2, 0] += WARM[1]
+_ST = {n: skin_stats(PH[n]) for n in GR}; _TG = np.mean(list(_ST.values()), 0); _TG[2, 0] -= 3.0; _TG[2, 1] *= 0.92          # the common skin tone, a little less orange than the photos' mean
 PHG = {}
 for n in GR:
     g_ = grade(PH[n], _ST[n], _TG); st2 = skin_stats(g_); st2[:, 1] = _TG[:, 1]; g_ = grade(g_, st2, _TG)
