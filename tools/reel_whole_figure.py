@@ -557,7 +557,7 @@ def s_a(t):
     return fr
 def s_a1(t):
     """«сегодня у нас комплексная операция»: the surgeon full frame (the consultation), the hook still on"""
-    fr = full(consult(t), 0.5, 0.5, pull(t, T_A1, 1.08, 1.0, 2.0))
+    fr = full(consult(t))                                          # the surgeon full frame from the very first frame, uncropped
     HA.draw(fr, t, 0.05); pills_row(fr, t, [(z, 1.3 + 0.22 * k) for k, z in enumerate(ZA)], LX, 1200, maxw=700)
     return fr
 
@@ -747,8 +747,8 @@ def s_k(t):
     f = 1 - eo(u / 0.18); fr = fr * (1 - f) + f * 0.9
     return fr
 
-SCENES = [(0, s_a), (T_A1, s_a1), (T_S["B"], s_b), (T_S["C"], s_c), (T_S["D"], s_d), (T_S["E"], s_e), (T_S["F"], s_f), (T_G, s_g), (T_K, s_k)]
-TRANS = {T_A1: ("zoom", 0.3), T_S["B"]: ("zoom", 0.35), T_S["C"]: ("diag", 0.45), T_ARM: ("flash", 0.18), T_S["D"]: ("zoom", 0.35), T_S["E"]: ("iris", 0.5),
+SCENES = [(0, s_a1), (T_S["B"], s_b), (T_S["C"], s_c), (T_S["D"], s_d), (T_S["E"], s_e), (T_S["F"], s_f), (T_G, s_g), (T_K, s_k)]
+TRANS = {T_S["B"]: ("zoom", 0.35), T_S["C"]: ("diag", 0.45), T_ARM: ("flash", 0.18), T_S["D"]: ("zoom", 0.35), T_S["E"]: ("iris", 0.5),
          T_S["F"]: ("zoom", 0.35), T_G: ("iris", 0.5)}
 def render(t):
     k = max(i for i, (s0, _) in enumerate(SCENES) if t >= s0); s0, fn = SCENES[k]
