@@ -467,7 +467,9 @@ def vstart(b): return next(s[3] for s in SEG if s[0] == b)
 def vend(b): return next(s[3] + s[4] for s in SEG if s[0] == b)
 def R(b, rel): return vstart(b) + rel
 T_S = {b: vstart(b) - 0.12 for b, *_ in VO}; T_S["A"] = 0.0
-T_H = vend("G") + 1.2                                        # the closing card
+T_SL = vend("G") + 1.0; SL_D = 2.5; K_D = 1.8                # ДО → через год slider, then the 3/4 and side collages
+T_K = T_SL + SL_D
+T_H = T_K + 2 * K_D                                          # the closing card
 DUR = T_H + 3.6
 
 V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ["IMG_2253", "IMG_8110", "IMG_2288", "CP1"]}
@@ -489,7 +491,7 @@ def lsrc(b, t):
     _, _, parts, t0, d = next(x for x in SEG if x[0] == b); return parts[0][0] + (t - t0)
 
 def photo(n): return cv2.imread(os.path.join(WORK, n + ".png"))[..., ::-1].copy()
-FACE = {"D_271025": 220, "D_311025": 0, "D_271125": 0, "D_060426": 620, "D_041126": 160}
+FACE = {"D_271025": 220, "D_311025": 0, "D_271125": 0, "D_060426": 620, "D_041126": 160, "IMG_2274": 260, "IMG_2284": 150, "IMG_5850": 120, "IMG_5854": 150}
 PH = {n: (anon_top(photo(n), FACE[n]) if FACE[n] else photo(n)) for n in FACE}
 
 # ---------------- subtitles
@@ -641,6 +643,44 @@ def s_g(t):
     HG.y = 1215 - HG.h; HG.draw(fr, t, T_S["G"] + 0.05); TG.y = HG.y + HG.h + 22 + TG.top; TG.draw(fr, t, T_S["G"] + 0.6)
     return fr
 
+# SL — the slider: ДО front, a pink line sweeps and leaves the result a year on behind it (aligned on the nipples)
+def place(n, mid, d, at=(540, 760), dist=380, h=H):
+    """photo n scaled so the nipples (mid point, distance) land on `at` with `dist` between them; soft edges into black"""
+    s_ = dist / d; r = cv2.resize(PH[n], None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+    out = np.zeros((h, W, 3), np.float32); ox, oy = int(mid[0] * s_ - at[0]), int(mid[1] * s_ - at[1])
+    xs0, ys0 = max(0, ox), max(0, oy); xs1, ys1 = min(r.shape[1], ox + W), min(r.shape[0], oy + h)
+    out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = r[ys0:ys1, xs0:xs1]
+    m = np.zeros((h, W), np.float32); m[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = 1
+    return out * cv2.GaussianBlur(cv2.erode(m, np.ones((31, 31), np.uint8)), (0, 0), 9)[..., None]
+SL_DO = place("D_271025", (856, 500), 337); SL_PO = place("IMG_2274", (1114, 1245), 714)
+def s_sl(t):
+    lt = t - T_SL; p = eio((lt - 0.4) / 1.4); xs = int(lerp(-6, W + 6, p)); fr = SL_PO.copy()
+    if xs < W: fr[:, max(0, xs):] = SL_DO[:, max(0, xs):]
+    if 0 < p < 1:
+        fr[:, max(0, xs - 3):min(W, xs + 3)] = PINK
+        hx = min(max(xs, 112), 978); dot(fr, hx, 760, 34, PINK); dot(fr, hx, 760, 28, WHITE)
+        for sg in (-1, 1): fill_poly(fr, [(hx + sg * 8, 748), (hx + sg * 20, 760), (hx + sg * 8, 772)], PINK)
+    if xs < 820: chip(fr, "ДО", min(max(xs + 20, LX), 860), 262, 1 - cl((xs - 700) / 120))
+    if xs > 300: chip(fr, "ЧЕРЕЗ ГОД", LX, 262, cl((xs - 300) / 120))
+    return fr
+
+# K — ПОСЛЕ (a year on) over ДО, 3/4 and side, aligned on nipple row and waist
+KH = 960
+def kpanel(n, nip, waist, cx, y_nip=330, y_waist=650):
+    s_ = (y_waist - y_nip) / (waist - nip); r = cv2.resize(PH[n], None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+    out = np.zeros((KH, W, 3), np.float32); ox, oy = int(cx * s_ - W / 2), int(nip * s_ - y_nip)
+    xs0, ys0 = max(0, ox), max(0, oy); xs1, ys1 = min(r.shape[1], ox + W), min(r.shape[0], oy + KH)
+    out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = r[ys0:ys1, xs0:xs1]
+    m = np.zeros((KH, W), np.float32); m[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = 1
+    return out * cv2.GaussianBlur(cv2.erode(m, np.ones((31, 31), np.uint8)), (0, 0), 9)[..., None]
+COLLS = [np.vstack([kpanel("IMG_2284", 825, 1360, 1020), kpanel("IMG_5850", 495, 825, 690)]),       # 3/4
+         np.vstack([kpanel("D_041126", 855, 1420, 950), kpanel("IMG_5854", 546, 865, 670)])]        # side
+def s_k(t):
+    lt = t - T_K; k = min(1, int(lt / K_D)); u = lt - k * K_D
+    fr = COLLS[k].copy(); fr[KH - 2:KH + 2] = PINK
+    chip(fr, "ЧЕРЕЗ ГОД", LX, 262); chip(fr, "ДО", LX, KH + 30)
+    f = 1 - eo(u / 0.18); return fr * (1 - f) + f * 0.9
+
 # H — the closing card
 HH = Drop(["УВЕЛИЧЕНИЕ ГРУДИ", "ЭТО НЕ ТОЛЬКО ОПЕРАЦИЯ,", "*ЭТО ЕЩЁ И НАБЛЮДЕНИЕ*", "*ПОСЛЕ*"], 92, LX, 760, maxw=900, stag=0.02)
 def s_h(t):
@@ -648,8 +688,8 @@ def s_h(t):
     blend(fr, logo_alpha(280), 540 - 140, 450, PINK, eo((lt - 0.1) / 0.5))
     HH.draw(fr, t, T_H + 0.2); return fr
 
-SCENES = [(0, s_a), (T_B, s_b), (T_C, s_c), (T_D, s_d), (T_S["E"], s_e), (T_S["F"], s_f), (T_S["G"], s_g), (T_H, s_h)]
-TRANS = {T_B: ("zoom", 0.35), T_C: ("diag", 0.45), T_D: ("zoom", 0.35), T_S["E"]: ("iris", 0.5), T_S["F"]: ("zoom", 0.35), T_S["G"]: ("iris", 0.5), T_H: ("iris", 0.5)}
+SCENES = [(0, s_a), (T_B, s_b), (T_C, s_c), (T_D, s_d), (T_S["E"], s_e), (T_S["F"], s_f), (T_S["G"], s_g), (T_SL, s_sl), (T_K, s_k), (T_H, s_h)]
+TRANS = {T_B: ("zoom", 0.35), T_C: ("diag", 0.45), T_D: ("zoom", 0.35), T_S["E"]: ("iris", 0.5), T_S["F"]: ("zoom", 0.35), T_S["G"]: ("iris", 0.5), T_SL: ("zoom", 0.35), T_H: ("iris", 0.5)}
 def render(t):
     k = max(i for i, (s0, _) in enumerate(SCENES) if t >= s0); s0, fn = SCENES[k]
     kind, d = TRANS.get(s0, ("none", 0))
@@ -712,6 +752,8 @@ def build_audio(path):
     for j in range(20): put(tick(), R("E", 3.76) + 0.06 * j, 0.15)                     # the bar filling
     put(glass(1174.7), R("E", 4.74), 0.12)
     for _, b, rel in FIND: put(TICK, R(b, rel), 0.6)
+    put(swoosh(1.3), T_SL + 0.4, 0.18)
+    for k in range(2): put(SHOT, T_K + k * K_D, 0.45)
     put(glass(1318.5), T_H + 0.3, 0.1)
     sfx[:n] *= 1 - 0.6 * np.clip(dd, 0, 1)
     tt = np.arange(n) / SR; fade = np.clip((DUR - tt) / 1.8, 0, 1) ** 1.5 * np.minimum(1, tt / 0.15)
