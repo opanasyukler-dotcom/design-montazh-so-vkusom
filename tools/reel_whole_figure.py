@@ -406,7 +406,7 @@ def R(b, rel): return vstart(b) + rel
 T_S = {b: vstart(b) - 0.08 for b, *_ in VO}
 T_ARM = R("C", 5.78)                                          # «руки» — the arm photo
 T_G = vend("F") + 0.5                                         # ПОСЛЕ, angle after angle
-T_K = T_G + 3.9                                               # ПОСЛЕ / ДО collages, one per angle
+T_K = T_G + 2.2 + 3 * 0.95                                    # ПОСЛЕ / ДО collages, one per angle (after the slider and three more angles)
 DUR = T_K + 4 * 1.6
 
 V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ["IMG_0610", "IMG_0611", "IMG_0612"]}
@@ -417,9 +417,9 @@ def consult(t):
 # ---------------- photos: ДО and ПОСЛЕ, one warm grade for all eight
 def photo(n): return cv2.imread(os.path.join(WORK, n + ".png"))[..., ::-1].copy()
 ALIGN = {"do_front": (288, 1688, 1123), "do_34": (345, 1700, 1094), "do_side": (317, 1700, 991), "do_back": (403, 1728, 1066),
-         "posle_front": (173, 1544, 1118), "posle_34": (202, 1498, 1094), "posle_side": (173, 1527, 1014), "posle_back": (-6, 1474, 1106)}
+         "posle_front": (90, 988, 722), "posle_34": (115, 922, 745), "posle_side": (115, 945, 633), "posle_back": (-6, 1474, 1106)}
                                                               # (neck, navel / underwear row, body centre x); the ПОСЛЕ back is matched on the buttock fold and the heels
-FACE = {"do_front": 340, "do_34": 420, "do_side": 470, "do_back": 0, "posle_front": 220, "posle_34": 250, "posle_side": 270, "posle_back": 0}
+FACE = {"do_front": 340, "do_34": 420, "do_side": 470, "do_back": 0, "posle_front": 110, "posle_34": 140, "posle_side": 130, "posle_back": 0}
 def skin(rgb):
     hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV); return (hsv[..., 2] > 90) & (hsv[..., 1] > 25) & (hsv[..., 1] < 170) & ((hsv[..., 0] < 25) | (hsv[..., 0] > 165))
 def blackdrop(im):
@@ -437,7 +437,7 @@ def grade(rgb, st, tgt):
     out = cv2.cvtColor(np.clip(lab, 0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB).astype(np.float32)
     w = blackdrop(rgb); return np.clip(out * w + rgb.astype(np.float32) * (1 - w) * (rgb.max(2, keepdims=True) > 70), 0, 255).astype(np.uint8)
 NAMES = {"do_front": "IMG_0588", "do_34": "IMG_0594", "do_side": "IMG_0597", "do_back": "IMG_0599",
-         "posle_front": "IMG_2356", "posle_34": "IMG_2359", "posle_side": "IMG_2362", "posle_back": "IMG_2369"}
+         "posle_front": "IMG_P1", "posle_34": "IMG_P2", "posle_side": "IMG_P3", "posle_back": "IMG_2369"}   # ПОСЛЕ front / 3/4 / side: the client's later set
 RAW = {k: photo(n) for k, n in NAMES.items()}
 STATS = {k: skin_stats(v) for k, v in RAW.items()}
 TGT = np.mean([v for v in STATS.values()], 0); TGT[1, 0] += WARM[0]; TGT[2, 0] += WARM[1]
@@ -549,6 +549,7 @@ def s_a(t):
     fr = inset(full(anon_top(V["IMG_0610"].at(0.2 + t * 0.5), 330), 0.5, 0.55, pull(t, 0, 1.3, 1.0, 3.5)))
     HA.draw(fr, t, 0.05)
     pills_row(fr, t, [(z, 1.3 + 0.22 * k) for k, z in enumerate(ZA)], LX, 1200, maxw=700)            # on the thighs, the breast stays clear
+    pip(fr, consult(t), 900, 1000, 110, pip_on(t, vstart("A1") - 0.2, T_S["B"] + 0.4), 0.3, 0.5, 1.0)   # the surgeon in a circle, opening only
     return fr
 
 # B — the belly: stretch marks drawn on the lower belly; «спортом … не уберётся» → the dumbbell gets crossed out
@@ -691,13 +692,27 @@ def waist_track(fr, t):
 # G — ПОСЛЕ, angle after angle (a flash and a shutter on each), the closing thought
 HG = Drop(["ОДНА ОПЕРАЦИЯ", "*И РАБОТА С ПРОПОРЦИЯМИ*", "*ВСЕГО ТЕЛА*"], 88, LX, 0, maxw=900)
 TG = Track(["результат ещё ранний,", "ткани продолжают восстанавливаться"], 30, LX, 0, 400)
-G_SEQ = ["posle_front", "posle_34", "posle_side", "posle_back"]; G_D = 0.95
+G_SEQ = ["posle_front", "posle_34", "posle_side", "posle_back"]; G_D = 0.95; G_S = 2.2      # the first ПОСЛЕ is revealed by a slider over the ДО
+GP = {n: panel(PH[n], n, W, H, neck_at=300, span=700, key=False) for n in G_SEQ + ["do_front"]}   # all aligned on neck and navel
+GP["posle_back"] *= np.clip((1480 - np.arange(H)) / 110, 0, 1)[:, None, None]                    # its floor faded out
+def g_start(k): return T_G + (0 if k == 0 else G_S + (k - 1) * G_D)
 def s_g(t):
-    lt = t - T_G; k = min(3, int(lt / G_D)); u = lt - k * G_D; n = G_SEQ[k]
-    fr, _ = onphoto(PH[n], 0.5, 0.42 if n != "posle_back" else 0.35, 1.0, t, T_G + k * G_D, 1.06, G_D)
-    chip(fr, "ПОСЛЕ", LX, 260)
-    f = 1 - eo(u / 0.18) if (k or lt > 0.5) else 0; fr = fr * (1 - f * 0.85) + f * 0.85
-    HG.y = 1300 - HG.h; HG.draw(fr, t, T_G + 0.3); TG.y = HG.y + HG.h + 36 + TG.top; TG.draw(fr, t, T_G + 1.4)
+    lt = t - T_G; k = 0 if lt < G_S else min(3, 1 + int((lt - G_S) / G_D)); u = t - g_start(k); n = G_SEQ[k]
+    fr = GP[n].copy()
+    if k == 0:                                                          # ДО first, then the pink slider sweeps and leaves ПОСЛЕ behind it
+        p = eio((lt - 0.35) / 1.3); xs = int(lerp(-6, W + 6, p))
+        if xs < W: fr[:, max(0, xs):] = GP["do_front"][:, max(0, xs):]
+        if 0 < p < 1:
+            fr[:, max(0, xs - 3):min(W, xs + 3)] = PINK
+            hx = min(max(xs, SX0 + 40), SX1 - 40); dot(fr, hx, 840, 34, PINK); dot(fr, hx, 840, 28, WHITE)
+            for sg in (-1, 1): fill_poly(fr, [(hx + sg * 8, 828), (hx + sg * 20, 840), (hx + sg * 8, 852)], PINK)
+        if p < 0.98: chip(fr, "ДО", min(max(xs + 20, LX), 860), 260, 1 - cl((p - 0.8) / 0.18))
+        if xs > 300: chip(fr, "ПОСЛЕ", LX, 260, cl((xs - 300) / 120))          # each label stays on its own side of the line
+        f = 0
+    else:
+        chip(fr, "ПОСЛЕ", LX, 260); f = 1 - eo(u / 0.18)
+    fr = fr * (1 - f * 0.85) + f * 0.85
+    HG.y = 1300 - HG.h; HG.draw(fr, t, T_G + G_S - 0.35); TG.y = HG.y + HG.h + 36 + TG.top; TG.draw(fr, t, T_G + G_S + 0.4)   # after the slider
     return fr
 
 # K — the clinic-style collages, each angle on its own: ПОСЛЕ on top, ДО below (colour graded alike), a shutter on each, then the logo
@@ -814,7 +829,8 @@ def build_audio(path):
         for j in range(8): put(water(450 + 90 * j, 1500 + 120 * j), tt + 0.13 * j, 0.12)  # the drops travelling
     put(TICK, R("E", 1.26), 0.55); put(TICK, R("E", 3.0), 0.55); put(glass(1174.7), R("E", 3.62), 0.1)
     put(TICK, R("F", 0.58), 0.55); put(TICK, R("F", 4.56), 0.55); put(TICK, R("F", 7.22), 0.55)
-    for k in range(4): put(SHOT, T_G + k * G_D, 0.45)
+    put(swoosh(1.3), T_G + 0.35, 0.18)                                                  # the slider
+    for k in range(1, 4): put(SHOT, g_start(k), 0.45)
     for k in range(4): put(SHOT, T_K + 1.6 * k, 0.5)
     put(glass(1318.5), T_K + 3 * 1.6 + 0.5, 0.1)
     sfx[:n] *= 1 - 0.6 * np.clip(dd, 0, 1)
