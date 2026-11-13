@@ -404,6 +404,7 @@ def vstart(b): return next(s[3] for s in SEG if s[0] == b)
 def vend(b): return next(s[3] + s[4] for s in SEG if s[0] == b)
 def R(b, rel): return vstart(b) + rel
 T_S = {b: vstart(b) - 0.08 for b, *_ in VO}
+T_A1 = vstart("A1") - 0.12                                   # the cut to the surgeon
 T_ARM = R("C", 5.78)                                          # «руки» — the arm photo
 T_G = vend("F") + 0.5                                         # ПОСЛЕ, angle after angle
 T_K = T_G + 2.2 + 3 * 0.95                                    # ПОСЛЕ / ДО collages, one per angle (after the slider and three more angles)
@@ -417,7 +418,7 @@ def consult(t):
 # ---------------- photos: ДО and ПОСЛЕ, one warm grade for all eight
 def photo(n): return cv2.imread(os.path.join(WORK, n + ".png"))[..., ::-1].copy()
 ALIGN = {"do_front": (288, 1688, 1123), "do_34": (345, 1700, 1094), "do_side": (317, 1700, 991), "do_back": (403, 1728, 1066),
-         "posle_front": (90, 988, 722), "posle_34": (115, 922, 745), "posle_side": (115, 945, 633), "posle_back": (-6, 1474, 1106)}
+         "posle_front": (90, 988, 722), "posle_34": (115, 922, 745), "posle_side": (115, 945, 633), "posle_back": (-80, 773, 789)}
                                                               # (neck, navel / underwear row, body centre x); the ПОСЛЕ back is matched on the buttock fold and the heels
 FACE = {"do_front": 340, "do_34": 420, "do_side": 470, "do_back": 0, "posle_front": 110, "posle_34": 140, "posle_side": 130, "posle_back": 0}
 def skin(rgb):
@@ -437,7 +438,7 @@ def grade(rgb, st, tgt):
     out = cv2.cvtColor(np.clip(lab, 0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB).astype(np.float32)
     w = blackdrop(rgb); return np.clip(out * w + rgb.astype(np.float32) * (1 - w) * (rgb.max(2, keepdims=True) > 70), 0, 255).astype(np.uint8)
 NAMES = {"do_front": "IMG_0588", "do_34": "IMG_0594", "do_side": "IMG_0597", "do_back": "IMG_0599",
-         "posle_front": "IMG_P1", "posle_34": "IMG_P2", "posle_side": "IMG_P3", "posle_back": "IMG_2369"}   # ПОСЛЕ front / 3/4 / side: the client's later set
+         "posle_front": "IMG_P1", "posle_34": "IMG_P2", "posle_side": "IMG_P3", "posle_back": "IMG_P4"}   # ПОСЛЕ front / 3/4 / side: the client's later set
 RAW = {k: photo(n) for k, n in NAMES.items()}
 STATS = {k: skin_stats(v) for k, v in RAW.items()}
 TGT = np.mean([v for v in STATS.values()], 0); TGT[1, 0] += WARM[0]; TGT[2, 0] += WARM[1]
@@ -445,6 +446,10 @@ PH = {}
 for k, v in RAW.items():
     g_ = grade(v, STATS[k], TGT); st2 = skin_stats(g_); st2[:, 1] = TGT[:, 1]; g_ = grade(g_, st2, TGT)   # second pass, means only
     PH[k] = anon_top(g_, FACE[k]) if FACE[k] else g_
+FLOOR = {"posle_34": 1960, "posle_side": 1940, "posle_back": 1640}            # where the light floor / skirting comes up behind the legs (photo px)
+for k, y0 in FLOOR.items():                                                     # below that line keep only the skin: the floor goes black, the legs stay
+    sk = cv2.GaussianBlur(cv2.dilate(cv2.morphologyEx(skin(RAW[k]).astype(np.uint8) * 255, cv2.MORPH_OPEN, np.ones((9, 9), np.uint8)), np.ones((5, 5), np.uint8)).astype(np.float32) / 255, (0, 0), 3)
+    PH[k][y0:] = (PH[k][y0:] * sk[y0:, :, None]).astype(np.uint8)
 ARM = photo("IMG_0625")
 def panel(im, n, pw, ph, neck_at=40, span=250, key=True):
     neck, navel, cx = ALIGN[n]; s_ = span / (navel - neck); r = cv2.resize(im, None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
@@ -549,7 +554,11 @@ def s_a(t):
     fr = inset(full(anon_top(V["IMG_0610"].at(0.2 + t * 0.5), 330), 0.5, 0.55, pull(t, 0, 1.3, 1.0, 3.5)))
     HA.draw(fr, t, 0.05)
     pills_row(fr, t, [(z, 1.3 + 0.22 * k) for k, z in enumerate(ZA)], LX, 1200, maxw=700)            # on the thighs, the breast stays clear
-    pip(fr, consult(t), 900, 1000, 110, pip_on(t, vstart("A1") - 0.2, T_S["B"] + 0.4), 0.3, 0.5, 1.0)   # the surgeon in a circle, opening only
+    return fr
+def s_a1(t):
+    """«сегодня у нас комплексная операция»: the surgeon full frame (the consultation), the hook still on"""
+    fr = full(consult(t), 0.5, 0.5, pull(t, T_A1, 1.08, 1.0, 2.0))
+    HA.draw(fr, t, 0.05); pills_row(fr, t, [(z, 1.3 + 0.22 * k) for k, z in enumerate(ZA)], LX, 1200, maxw=700)
     return fr
 
 # B — the belly: stretch marks drawn on the lower belly; «спортом … не уберётся» → the dumbbell gets crossed out
@@ -716,11 +725,19 @@ def s_g(t):
     return fr
 
 # K — the clinic-style collages, each angle on its own: ПОСЛЕ on top, ДО below (colour graded alike), a shutter on each, then the logo
-K_ANG = ("front", "34", "side", "back"); K_D = 1.6; KH = 960; KY = 0             # full screen: ПОСЛЕ top half, ДО bottom half, neck to knees
-COLLS = [np.vstack([panel(PH["posle_" + a], "posle_" + a, W, KH, neck_at=50, span=470, key=False),
-                    panel(PH["do_" + a], "do_" + a, W, KH, neck_at=50, span=470, key=False)]) for a in K_ANG]
-_fl = np.clip((850 - np.arange(KH)) / 90, 0, 1)[:, None, None]                  # the ПОСЛЕ back shot shows the floor at knee height: fade it to black
-COLLS[3][:KH] *= _fl
+K_ANG = ("front", "34", "side", "back"); K_D = 1.6; KH = 960; KY = 0             # full screen: ПОСЛЕ top half, ДО bottom half
+KNEE = {"do_front": (353, 2975, 1123), "do_34": (479, 3226, 1084), "do_side": (454, 3478, 1000), "do_back": (504, 2974, 1090),
+        "posle_front": (97, 2028, 724), "posle_34": (145, 2093, 789), "posle_side": (161, 2125, 660), "posle_back": (0, 1771, 789)}
+                                                              # (neck — the shoulder line on the backs —, just below the knees, body centre x) in photo px
+def kpanel(n, y_top=40, y_bot=930):
+    """neck at y_top, just below the knees at y_bot: every half shows the same stretch of body"""
+    a, b, cx = KNEE[n]; s_ = (y_bot - y_top) / (b - a); r = cv2.resize(PH[n], None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+    out = np.zeros((KH, W, 3), np.float32); ox, oy = int(cx * s_ - W / 2), int(a * s_ - y_top)
+    xs0, ys0 = max(0, ox), max(0, oy); xs1, ys1 = min(r.shape[1], ox + W), min(r.shape[0], oy + KH)
+    out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = r[ys0:ys1, xs0:xs1]
+    m = np.zeros((KH, W), np.float32); m[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = 1
+    m = cv2.GaussianBlur(cv2.erode(m, np.ones((31, 31), np.uint8)), (0, 0), 9); return out * m[..., None]
+COLLS = [np.vstack([kpanel("posle_" + a), kpanel("do_" + a)]) for a in K_ANG]
 def s_k(t):
     lt = t - T_K; k = min(3, int(lt / K_D)); u = lt - k * K_D
     fr = np.zeros((H, W, 3), np.float32); s_ = 1 + 0.02 * (1 - eo(u / 0.35)); c = COLLS[k]
@@ -731,8 +748,8 @@ def s_k(t):
     f = 1 - eo(u / 0.18); fr = fr * (1 - f) + f * 0.9
     return fr
 
-SCENES = [(0, s_a), (T_S["B"], s_b), (T_S["C"], s_c), (T_S["D"], s_d), (T_S["E"], s_e), (T_S["F"], s_f), (T_G, s_g), (T_K, s_k)]
-TRANS = {T_S["B"]: ("zoom", 0.35), T_S["C"]: ("diag", 0.45), T_ARM: ("flash", 0.18), T_S["D"]: ("zoom", 0.35), T_S["E"]: ("iris", 0.5),
+SCENES = [(0, s_a), (T_A1, s_a1), (T_S["B"], s_b), (T_S["C"], s_c), (T_S["D"], s_d), (T_S["E"], s_e), (T_S["F"], s_f), (T_G, s_g), (T_K, s_k)]
+TRANS = {T_A1: ("zoom", 0.3), T_S["B"]: ("zoom", 0.35), T_S["C"]: ("diag", 0.45), T_ARM: ("flash", 0.18), T_S["D"]: ("zoom", 0.35), T_S["E"]: ("iris", 0.5),
          T_S["F"]: ("zoom", 0.35), T_G: ("iris", 0.5)}
 def render(t):
     k = max(i for i, (s0, _) in enumerate(SCENES) if t >= s0); s0, fn = SCENES[k]
