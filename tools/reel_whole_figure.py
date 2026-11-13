@@ -407,7 +407,7 @@ T_S = {b: vstart(b) - 0.08 for b, *_ in VO}
 T_A1 = vstart("A1") - 0.12                                   # the cut to the surgeon
 T_ARM = R("C", 5.78)                                          # «руки» — the arm photo
 T_G = vend("F") + 0.5                                         # ПОСЛЕ, angle after angle
-T_K = T_G + 2.2 + 3 * 0.95                                    # ПОСЛЕ / ДО collages, one per angle (after the slider and three more angles)
+T_K = T_G + 2.2 + 2 * 0.95                                    # ПОСЛЕ / ДО collages, one per angle (after the slider and two more angles)
 DUR = T_K + 4 * 1.6
 
 V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ["IMG_0610", "IMG_0611", "IMG_0612"]}
@@ -446,10 +446,10 @@ PH = {}
 for k, v in RAW.items():
     g_ = grade(v, STATS[k], TGT); st2 = skin_stats(g_); st2[:, 1] = TGT[:, 1]; g_ = grade(g_, st2, TGT)   # second pass, means only
     PH[k] = anon_top(g_, FACE[k]) if FACE[k] else g_
-FLOOR = {"posle_34": 1960, "posle_side": 1940, "posle_back": 1640}            # where the light floor / skirting comes up behind the legs (photo px)
-for k, y0 in FLOOR.items():                                                     # below that line keep only the skin: the floor goes black, the legs stay
-    sk = cv2.GaussianBlur(cv2.dilate(cv2.morphologyEx(skin(RAW[k]).astype(np.uint8) * 255, cv2.MORPH_OPEN, np.ones((9, 9), np.uint8)), np.ones((5, 5), np.uint8)).astype(np.float32) / 255, (0, 0), 3)
-    PH[k][y0:] = (PH[k][y0:] * sk[y0:, :, None]).astype(np.uint8)
+for k, n in NAMES.items():                                                      # the figure cut out (rembg masks made beforehand): clean black around her, no floor
+    mp_ = os.path.join(WORK, n + "_mask.png")
+    if os.path.exists(mp_):
+        m = cv2.GaussianBlur(cv2.imread(mp_, 0).astype(np.float32) / 255, (0, 0), 1.2)[..., None]; PH[k] = (PH[k] * m).astype(np.uint8)
 ARM = photo("IMG_0625")
 def panel(im, n, pw, ph, neck_at=40, span=250, key=True):
     neck, navel, cx = ALIGN[n]; s_ = span / (navel - neck); r = cv2.resize(im, None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
@@ -701,12 +701,11 @@ def waist_track(fr, t):
 # G — ПОСЛЕ, angle after angle (a flash and a shutter on each), the closing thought
 HG = Drop(["ОДНА ОПЕРАЦИЯ", "*И РАБОТА С ПРОПОРЦИЯМИ*", "*ВСЕГО ТЕЛА*"], 88, LX, 0, maxw=900)
 TG = Track(["результат ещё ранний,", "ткани продолжают восстанавливаться"], 30, LX, 0, 400)
-G_SEQ = ["posle_front", "posle_34", "posle_side", "posle_back"]; G_D = 0.95; G_S = 2.2      # the first ПОСЛЕ is revealed by a slider over the ДО
+G_SEQ = ["posle_front", "posle_34", "posle_side"]; G_D = 0.95; G_S = 2.2      # the first ПОСЛЕ is revealed by a slider over the ДО
 GP = {n: panel(PH[n], n, W, H, neck_at=300, span=700, key=False) for n in G_SEQ + ["do_front"]}   # all aligned on neck and navel
-GP["posle_back"] *= np.clip((1480 - np.arange(H)) / 110, 0, 1)[:, None, None]                    # its floor faded out
 def g_start(k): return T_G + (0 if k == 0 else G_S + (k - 1) * G_D)
 def s_g(t):
-    lt = t - T_G; k = 0 if lt < G_S else min(3, 1 + int((lt - G_S) / G_D)); u = t - g_start(k); n = G_SEQ[k]
+    lt = t - T_G; k = 0 if lt < G_S else min(2, 1 + int((lt - G_S) / G_D)); u = t - g_start(k); n = G_SEQ[k]
     fr = GP[n].copy()
     if k == 0:                                                          # ДО first, then the pink slider sweeps and leaves ПОСЛЕ behind it
         p = eio((lt - 0.35) / 1.3); xs = int(lerp(-6, W + 6, p))
@@ -847,7 +846,7 @@ def build_audio(path):
     put(TICK, R("E", 1.26), 0.55); put(TICK, R("E", 3.0), 0.55); put(glass(1174.7), R("E", 3.62), 0.1)
     put(TICK, R("F", 0.58), 0.55); put(TICK, R("F", 4.56), 0.55); put(TICK, R("F", 7.22), 0.55)
     put(swoosh(1.3), T_G + 0.35, 0.18)                                                  # the slider
-    for k in range(1, 4): put(SHOT, g_start(k), 0.45)
+    for k in range(1, 3): put(SHOT, g_start(k), 0.45)
     for k in range(4): put(SHOT, T_K + 1.6 * k, 0.5)
     put(glass(1318.5), T_K + 3 * 1.6 + 0.5, 0.1)
     sfx[:n] *= 1 - 0.6 * np.clip(dd, 0, 1)
