@@ -564,7 +564,7 @@ def s_b(t):
     for k, (cx, cy, rx, ry) in enumerate(((688, 486, 102, 88), (1018, 488, 96, 86))):
         x, y = mp(cx, cy); path_draw(fr, ellipse_pts(x, y, rx * s_, ry * s_, 0, 0.05 * np.pi, 0.95 * np.pi), eo((lt - 0.9 - 0.25 * k) / 0.5), PINK, 6)
     HB.draw(fr, t, T_B + 0.05); TB.y = under(HB, 22) + TB.top; TB.draw(fr, t, T_B + 0.7)
-    chip(fr, "ДО", LX, TB.y + 40); pillx(fr, "27.10.25", LX + 90, TB.y + 37, eo((lt - 0.5) / 0.3), 0.0, 28)
+    chip(fr, "ДО", LX, TB.y + 40)
     return fr
 
 # C — the operating room: two implants of different volume, 270 and 250 ml
@@ -591,7 +591,7 @@ def s_d(t):
     fr, _ = onphoto(PH[n], fx, fy, z, t, T_D + k * D_D, z * 1.06, D_D)
     f = 1 - eo(u / 0.16); fr = fr * (1 - f * 0.8) + f * 0.8
     HD.draw(fr, t, T_D + 0.05)
-    y0 = under(HD, 26); pillx(fr, f"{date} · {lab}", LX, y0, eo(u / 0.25), 0.0, 34)
+    y0 = under(HD, 26); pillx(fr, f"{lab} после операции", LX, y0, eo(u / 0.25), 0.0, 34)   # no exam dates on screen
     xs = np.linspace(140, 860, D_N); yb = 1250                       # the timeline
     path_draw(fr, [(xs[0], yb), (xs[-1], yb)], 1, WHITE, 3, op=0.45)
     path_draw(fr, [(xs[0], yb), (lerp(xs[0], xs[-1], (k + min(1, u / 0.4)) / (D_N - 1) if k < D_N - 1 else 1), yb)], 1, PINK, 6) if k > 0 or u > 0 else None
@@ -705,7 +705,7 @@ def build_audio(path):
         n_ch = sum(len(g_) for g_, _ in hd.rows); kl = int((n_ch * hd.stag + 0.35) * SR); kb = KB[:kl].copy(); fo = int(0.2 * SR); kb[-fo:] *= np.linspace(1, 0, fo); put(kb, t0, g)
     typing(HA, 0.05)
     put(TICK, R("A", 2.0), 0.55); put(TICK, R("A", 4.78), 0.55)
-    put(swoosh(0.5), T_B - 0.1, 0.15); typing(HB, T_B + 0.05, 0.4); put(TICK, T_B + 0.5, 0.5)
+    put(swoosh(0.5), T_B - 0.1, 0.15); typing(HB, T_B + 0.05, 0.4)
     put(swoosh(0.5), T_C - 0.1, 0.15); typing(HC, T_C + 0.05, 0.4); put(TICK, T_C + 0.9, 0.6); put(TICK, T_C + 1.35, 0.6)
     typing(HD, T_D + 0.05, 0.4)
     for k in range(D_N): put(SHOT, T_D + k * D_D, 0.42)
