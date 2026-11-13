@@ -478,12 +478,13 @@ def blur_box(f, x, y, w, h, pad=0.35):
     x0, y0 = int(max(0, x - w * pad)), int(max(0, y - h * pad)); x1, y1 = int(min(f.shape[1], x + w * (1 + pad))), int(min(f.shape[0], y + h * (1 + pad)))
     if x1 <= x0 or y1 <= y0: return f
     reg = f[y0:y1, x0:x1].astype(np.float32); bl = cv2.resize(cv2.GaussianBlur(cv2.resize(reg, None, fx=0.08, fy=0.08), (0, 0), 2), (x1 - x0, y1 - y0))
-    m = np.zeros((y1 - y0, x1 - x0), np.float32); cv2.ellipse(m, ((x1 - x0) // 2, (y1 - y0) // 2), ((x1 - x0) // 2, (y1 - y0) // 2), 0, 0, 360, 1, -1)
-    m = cv2.GaussianBlur(m, (0, 0), max(3, (x1 - x0) / 14))[..., None]; out = f.copy(); out[y0:y1, x0:x1] = (reg * (1 - m) + bl * m).astype(np.uint8); return out
+    m = np.zeros((y1 - y0, x1 - x0), np.float32); cv2.ellipse(m, ((x1 - x0) // 2, (y1 - y0) // 2), (int((x1 - x0) * 0.36), int((y1 - y0) * 0.36)), 0, 0, 360, 1, -1)   # inner ellipse: the feather fades out inside the box
+    m = cv2.GaussianBlur(cv2.resize(cv2.GaussianBlur(cv2.resize(m, None, fx=0.25, fy=0.25), (0, 0), max(2, (x1 - x0) / 28)), (x1 - x0, y1 - y0)), (0, 0), 2)[..., None]   # wide soft edge
+    out = f.copy(); out[y0:y1, x0:x1] = (reg * (1 - m) + bl * m).astype(np.uint8); return out
 def frame(k, st):
     st = max(0.0, st); f = V[k].at(st)
     if k == "CP1":
-        b = FACES[k][min(int(round(st * FPS)), len(FACES[k]) - 1)]; f = blur_box(f, *b)
+        b = FACES[k][min(int(round(st * FPS)), len(FACES[k]) - 1)]; f = blur_box(f, *b, pad=0.6)
     if k == "IMG_2253" and st < 7.5: f = blur_box(f, 170, 830, 180, 140, 0.15)      # the patient lying in the background
     if k == "IMG_2288": f = anon_top(f, 190)
     return f
@@ -646,12 +647,33 @@ def s_g(t):
 # SL — the slider: ДО front, a pink line sweeps and leaves the result a year on behind it (aligned on the nipples)
 def place(n, mid, d, at=(540, 760), dist=380, h=H):
     """photo n scaled so the nipples (mid point, distance) land on `at` with `dist` between them; soft edges into black"""
-    s_ = dist / d; r = cv2.resize(PH[n], None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+    s_ = dist / d; r = cv2.resize(PHG[n], None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
     out = np.zeros((h, W, 3), np.float32); ox, oy = int(mid[0] * s_ - at[0]), int(mid[1] * s_ - at[1])
     xs0, ys0 = max(0, ox), max(0, oy); xs1, ys1 = min(r.shape[1], ox + W), min(r.shape[0], oy + h)
     out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = r[ys0:ys1, xs0:xs1]
     m = np.zeros((h, W), np.float32); m[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = 1
     return out * cv2.GaussianBlur(cv2.erode(m, np.ones((31, 31), np.uint8)), (0, 0), 9)[..., None]
+def blackdrop(im):
+    lum = im.astype(np.float32).mean(2) / 255; k = np.clip((lum - 0.16) / 0.12, 0, 1); k = cv2.GaussianBlur(k * k * (3 - 2 * k), (0, 0), 2)
+    k = np.maximum(k, np.clip((im[..., 2].astype(np.float32) - im[..., 0] - 10) / 12, 0, 1)); return k[..., None]
+WARM = (2.5, 7.0)                                                       # Lab a/b lift (OpenCV units): a touch pinker, clearly warmer
+def skin_stats(rgb):
+    lab = cv2.cvtColor(rgb, cv2.COLOR_RGB2LAB).astype(np.float32); m = skin(rgb)
+    return np.float32([[lab[..., c][m].mean(), lab[..., c][m].std()] for c in range(3)])
+def grade(rgb, st, tgt):
+    """one grade for all photos: skin statistics moved to the common target; the black backdrop stays black"""
+    lab = cv2.cvtColor(rgb, cv2.COLOR_RGB2LAB).astype(np.float32)
+    for c in range(3):
+        k = float(np.clip(tgt[c, 1] / (st[c, 1] + 1e-3), 0.75, 1.35)); lab[..., c] = (lab[..., c] - st[c, 0]) * k + tgt[c, 0]
+    out = cv2.cvtColor(np.clip(lab, 0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB).astype(np.float32)
+    w = blackdrop(rgb); return np.clip(out * w + rgb.astype(np.float32) * (1 - w) * (rgb.max(2, keepdims=True) > 70), 0, 255).astype(np.uint8)
+GR = ["D_271025", "IMG_2274", "IMG_2284", "IMG_5850", "D_041126", "IMG_5854"]       # slider + collage photos: one grade, one skin tone
+_ST = {n: skin_stats(PH[n]) for n in GR}; _TG = np.mean(list(_ST.values()), 0); _TG[1, 0] += WARM[0]; _TG[2, 0] += WARM[1]
+PHG = {}
+for n in GR:
+    g_ = grade(PH[n], _ST[n], _TG); st2 = skin_stats(g_); st2[:, 1] = _TG[:, 1]; g_ = grade(g_, st2, _TG)
+    k_ = cv2.GaussianBlur(cv2.dilate(skin(PH[n]).astype(np.uint8) * 255, np.ones((9, 9), np.uint8)).astype(np.float32) / 255, (0, 0), 8)[..., None]
+    PHG[n] = (PH[n] * (1 - k_) + g_ * k_).astype(np.uint8)                       # only the skin is graded: jeans and underwear keep their colour
 SL_DO = place("D_271025", (856, 500), 337); SL_PO = place("IMG_2274", (1114, 1245), 714)
 def s_sl(t):
     lt = t - T_SL; p = eio((lt - 0.4) / 1.4); xs = int(lerp(-6, W + 6, p)); fr = SL_PO.copy()
@@ -667,7 +689,7 @@ def s_sl(t):
 # K — ПОСЛЕ (a year on) over ДО, 3/4 and side, aligned on nipple row and waist
 KH = 960
 def kpanel(n, nip, waist, cx, y_nip=330, y_waist=650):
-    s_ = (y_waist - y_nip) / (waist - nip); r = cv2.resize(PH[n], None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+    s_ = (y_waist - y_nip) / (waist - nip); r = cv2.resize(PHG[n], None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
     out = np.zeros((KH, W, 3), np.float32); ox, oy = int(cx * s_ - W / 2), int(nip * s_ - y_nip)
     xs0, ys0 = max(0, ox), max(0, oy); xs1, ys1 = min(r.shape[1], ox + W), min(r.shape[0], oy + KH)
     out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = r[ys0:ys1, xs0:xs1]
@@ -756,7 +778,7 @@ def build_audio(path):
     for k in range(2): put(SHOT, T_K + k * K_D, 0.45)
     put(glass(1318.5), T_H + 0.3, 0.1)
     sfx[:n] *= 1 - 0.6 * np.clip(dd, 0, 1)
-    tt = np.arange(n) / SR; fade = np.clip((DUR - tt) / 1.8, 0, 1) ** 1.5 * np.minimum(1, tt / 0.15)
+    tt = np.arange(n) / SR; fade = np.clip((DUR - tt) / 3.0, 0, 1) ** 1.6 * np.clip(tt / 1.5, 0, 1) ** 1.5    # the music fades in from silence and out to nothing
     if os.path.exists(MUSIC): mus = track(n) * ((G_GAP - (G_GAP - G_VO) * np.clip(dd, 0, 1)) * fade)[:, None]
     else:
         bed = pad_bed(n) * np.clip(np.minimum((tt - vend("A") + 0.2) / 0.6, (vstart("E") + 0.1 - tt) / 0.6), 0, 1) * 0.05; mus = np.stack([bed, bed], 1)
