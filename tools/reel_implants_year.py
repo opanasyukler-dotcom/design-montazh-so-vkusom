@@ -702,8 +702,8 @@ def render(t):
 def render(t, _base=render):
     fr = np.asarray(_base(t), np.float32).copy(); subtitles(fr, t); return fr
 
-MUSIC = os.path.join(SRC, "music.wav"); M0 = 0.0                       # the client's track, if given
-G_VO, G_GAP = 0.022, 0.075
+MUSIC = os.path.join(SRC, "music.wav"); M0 = 0.0                       # the client's track from its start: its lift at 16 s lands on the dated photos, its dip (49 s) falls after the end
+G_VO, G_GAP = 0.022, 0.095
 def track(n):
     if not os.path.exists(MUSIC): return np.zeros((n, 2))
     w = wave.open(MUSIC); x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64).reshape(-1, w.getnchannels()) / 32768
@@ -764,7 +764,7 @@ def build_audio(path):
     mix *= 10 ** (GAIN / 20); mix /= max(1, np.abs(mix).max() / 0.95)
     with wave.open(path, "wb") as w:
         w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR); w.writeframes((mix * 32767).astype(np.int16).tobytes())
-GAIN = 1.5 if os.path.exists(MUSIC) else 0.9
+GAIN = 1.8 if os.path.exists(MUSIC) else 0.9
 
 def make_cover(path):
     """inside the centre 3:4 (y 240-1680): the ultrasound monitor | the result a year on, the hook below"""
