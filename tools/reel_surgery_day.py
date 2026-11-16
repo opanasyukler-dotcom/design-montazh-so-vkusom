@@ -674,25 +674,22 @@ def cover_match(src, ref):
     k = np.clip((src.astype(np.float32).mean(2) - 25) / 30, 0, 1)[..., None]      # the black backdrop stays black
     return (out * k + src * (1 - k)).astype(np.uint8)
 def make_cover(path):
-    """ДО | ПОСЛЕ side by side, the same scale (navel on one line), «комплексная операция» and what was done; all inside the centre 3:4"""
-    CBG = np.clip(np.float32([0, 8, 28]) / 255 * (1 + 0.3 * np.exp(-(((xx - 540) / 900) ** 2 + ((yy - 520) / 900) ** 2)))[..., None], 0, 1).astype(np.float32)
-    fr = CBG.copy()
-    do = anon_top(photo_png("IMG_9672"), 330)                                   # ДО, front (face blurred as in the reel)
-    po = photo_png("IMG_9693"); po = po[:po.shape[0] // 2 - 60]                  # ПОСЛЕ, front: the top half of the clinic's collage, above its caption
-    po = cover_match(po, do)                                                    # the same skin tone on both
-    s_do = 0.45; s_po = s_do * 1.565                                            # one scale for both bodies (shoulder width and torso height averaged)
-    y0 = 320
-    fr[y0:y0 + 820, :540] = cover_panel(do, 348, (727, 1303), s_do); fr[y0:y0 + 820, 540:] = cover_panel(po, 98, (660, 636), s_po)
-    fr[y0:y0 + 820, 538:542] = PINK
-    g = np.clip((yy[:, :1] - (y0 + 640)) / 180, 0, 1)[..., None]; fr = fr * (1 - g) + CBG * g
-    chip(fr, "ДО", 60, y0 + 24); chip(fr, "ПОСЛЕ", 600, y0 + 24)
-    blend(fr, logo_alpha(260), 540 - 130, 254, PINK)
-    hd = Drop(["КОМПЛЕКСНАЯ", "*ОПЕРАЦИЯ*"], 124, 70, 1130, maxw=900); hd.draw(fr, 99, 0)
-    y = 1130 + hd.h + 40
-    for lab in ("Т-образная подтяжка груди", "абдоминопластика", "липосакция 360"):
-        a = alpha_img(lab, mont(32, 600)); w_ = a.shape[1] + 56
-        blend(fr, rrect(70, y, 70 + w_, y + 64, 32), 0, 0, NAVY, 0.9); rrect_line(fr, 70, y, 70 + w_, y + 64, 32, PINK, 2)
-        blend(fr, a, 70 + 28, y + 32 - a.shape[0] / 2 + 2, WHITE); y += 80
+    """in the style of the client's grid: ДО | ПОСЛЕ full bleed side by side, small chips in the top corners, the big headline over
+    the bottom of the photos, a thin line under it; everything inside the centre 3:4 (y 240-1680)"""
+    fr = np.zeros((H, W, 3), np.float32) + DEEP
+    do = anon_top(photo_png("IMG_9672"), 330)
+    po = photo_png("IMG_9693"); po = po[:1060]; po = cover_match(po, do)          # stops above the clinic's «3 недели» caption
+    s_do = 0.6; s_po = s_do * 1.565; y0, ph = 240, 1440
+    fr[y0:y0 + ph, :540] = cover_panel(do, 348, (727, 1303), s_do, ph=ph, navel_at=640)
+    fr[y0:y0 + ph, 540:] = cover_panel(po, 98, (660, 636), s_po, ph=ph, navel_at=640)
+    fr[y0:y0 + ph, 539:541] = DEEP
+    g = np.clip((yy[:, :1] - 1040) / 230, 0, 1)[..., None] ** 1.1; fr[1270:] = DEEP; fr = fr * (1 - g) + DEEP * g   # both halves fade out at the same line
+    for txt, x in (("ДО", 36), ("ПОСЛЕ", 576)):
+        a = alpha_img(txt, mont(26, 600)); w_, h_ = a.shape[1] + 24, 44
+        blend(fr, rrect(x, y0 + 26, x + w_, y0 + 26 + h_, 4), 0, 0, NAVY, 0.9); rrect_line(fr, x, y0 + 26, x + w_, y0 + 26 + h_, 4, WHITE, 2)
+        blend(fr, a, x + 12, y0 + 26 + h_ / 2 - a.shape[0] / 2 + 2, WHITE)
+    hd = Drop(["КОМПЛЕКСНАЯ *ОПЕРАЦИЯ*"], 124, 60, 0, maxw=960); hd.y = 1390 - hd.h; hd.draw(fr, 99, 0)
+    ty = Track(["подтяжка груди · абдоминопластика · липосакция 360"], 30, 60, 0, 400); ty.y = 1390 + 34 + ty.top; ty.draw(fr, 99, 0)
     cv2.imwrite(path, cv2.cvtColor((np.clip(fr, 0, 1) * 255).astype(np.uint8), cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])
 
 def to8(fr): return (np.clip(fr, 0, 1) * 255 + 0.5).astype(np.uint8)
