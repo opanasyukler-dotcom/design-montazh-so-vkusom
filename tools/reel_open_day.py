@@ -41,10 +41,11 @@ def mont(size, wght=300):
         f = ImageFont.truetype(os.path.join(FD, "Montserrat-VariableFont_wght.ttf"), size); f.set_variation_by_axes([wght]); _FC[k] = f
     return _FC[k]
 def alpha_img(txt, f):
-    asc, desc = f.getmetrics(); w = int(f.getlength(txt)) + 8
-    im = Image.new("L", (w, asc + desc + 4), 0); ImageDraw.Draw(im).text((4, 2 + asc), txt, font=f, fill=255, anchor="ls")
+    asc, desc = f.getmetrics(); w = int(f.getlength(txt)) + 8; P = _pad(f)          # room above the cap height for Й / Ё, the same below so centring holds
+    im = Image.new("L", (w, asc + desc + 4 + 2 * P), 0); ImageDraw.Draw(im).text((4, 2 + P + asc), txt, font=f, fill=255, anchor="ls")
     return np.asarray(im, np.float32) / 255
-def cap_top(f): asc, _ = f.getmetrics(); return 2 + asc + f.getbbox("Н", anchor="ls")[1]
+def _pad(f): return int(f.size * 0.18)
+def cap_top(f): asc, _ = f.getmetrics(); return 2 + _pad(f) + asc + f.getbbox("Н", anchor="ls")[1]
 def blend(fr, a, x, y, col, op=1.0):
     x, y = int(round(x)), int(round(y)); h, w = a.shape[:2]
     x0, y0, x1, y1 = max(0, x), max(0, y), min(W, x + w), min(H, y + h)
@@ -553,7 +554,7 @@ def gift_icon(fr, cx, cy, s, p):
     if p > 0.6: text_c(fr, "%", cx + w * 0.55, cy + 40 * s, bebas(int(80 * s)), PINK, cl((p - 0.6) / 0.3))
 
 # ---------------- the overlays, word by word
-HA = top(Drop(["*ПЛАНИРУЕТЕ ОПЕРАЦИЮ*", "*В 2027 ГОДУ?*"], 96, LX, 0, maxw=880), 280) if MIRROR else top(Drop(["*ХОТЕЛИ ПОЗНАКОМИТЬСЯ*", "*СО МНОЙ И КОМАНДОЙ?*"], 86, LX, 0, maxw=880), 280)
+HA = top(Drop(["*К ХИРУРГУ МОЖНО ПРИЙТИ,*", "*ДАЖЕ ЕСЛИ ВЫ ПОКА ПРОСТО*", "*ПРИСМАТРИВАЕТЕСЬ*"], 80, LX, 0, maxw=900), 280) if MIRROR else top(Drop(["*К ХИРУРГУ МОЖНО ПРИЙТИ,*", "*ДАЖЕ ЕСЛИ ВЫ ПОКА ПРОСТО*", "*ПРИСМАТРИВАЕТЕСЬ*"], 80, LX, 0, maxw=900), 280)
 TA = Track(["обязательно посмотрите:"], 34, LX, 0, 400)
 HN = Drop(["*ХОРОШАЯ НОВОСТЬ!*"], 110, LX, 0, maxw=900)
 HD = top(Drop(["ДЕНЬ ОТКРЫТЫХ", "*ДВЕРЕЙ*"], 96, LX, 0, maxw=560), 280)
@@ -564,7 +565,6 @@ HW = Drop(["*ЖДЁМ ВАС!*"], 150, LX, 0, maxw=900)
 def overlays(fr, t):
     st = t - T_PRE + T_IN
     head(fr, HA, t, 0.05, S_(9.0))                                       # the hook, typed from frame one
-    if MIRROR: TA.y = under(HA, 26) + TA.top; TA.draw(fr, t, 0.9, S_(9.0))
     if S_(7.68) <= t < S_(9.0):                                          # «с моей командой» → three people
         u = t - S_(7.68); s_ = 0.8 * eback(u / 0.35); navy_card(fr, 860, 640, 120, 105, s_, min(1, u / 0.15))
         if s_ > 0.75: people_icon(fr, 860, 655, 0.8, eo(u / 0.6))
