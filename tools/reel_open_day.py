@@ -492,8 +492,8 @@ def subtitles(fr, t):
 # ---------------- building blocks (all inside the client's Instagram safe zone: x 72-1018, y 234-1600, not x > 864 below y 1347)
 LX = 80
 def plate(fr, x0, y0, x1, y1, op):
-    """a soft navy plate under text on the busy painting"""
-    if op > 0: blend(fr, cv2.GaussianBlur(rrect(x0, y0, x1, y1, 26), (0, 0), 3), 0, 0, DEEP, 0.62 * op)
+    """no plate under the headlines (the client's call): the letters' own drop shadow carries them"""
+    return
 def head(fr, hd, t, t0, t1):
     if t < t0 or t > t1 + 0.4: return
     op = min(1, (t - t0) / 0.2) * (1 - eio((t - t1) / 0.3) if t > t1 else 1)
