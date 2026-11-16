@@ -654,15 +654,45 @@ def build_audio(path):
     with wave.open(path, "wb") as w:
         w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR); w.writeframes((mix * 32767).astype(np.int16).tobytes())
 
+def cover_panel(img, shoulder_y, navel, scale, pw=540, ph=820, navel_at=560):
+    """one figure, scaled by `scale`, navel (x, y) placed at (pw/2, navel_at); soft edges into the dark backdrop"""
+    r = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+    out = np.zeros((ph, pw, 3), np.float32); ox, oy = int(navel[0] * scale - pw / 2), int(navel[1] * scale - navel_at)
+    xs0, ys0 = max(0, ox), max(0, oy); xs1, ys1 = min(r.shape[1], ox + pw), min(r.shape[0], oy + ph)
+    out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = r[ys0:ys1, xs0:xs1]
+    m = np.zeros((ph, pw), np.float32); m[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = 1
+    return out * cv2.GaussianBlur(cv2.erode(m, np.ones((25, 25), np.uint8)), (0, 0), 8)[..., None]
+def cover_match(src, ref):
+    """move the skin colour statistics of src to those of ref (Lab, skin pixels only)"""
+    def skin(rgb):
+        hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV); return (hsv[..., 2] > 90) & (hsv[..., 1] > 25) & (hsv[..., 1] < 170) & ((hsv[..., 0] < 25) | (hsv[..., 0] > 165))
+    a = cv2.cvtColor(src, cv2.COLOR_RGB2LAB).astype(np.float32); b = cv2.cvtColor(ref, cv2.COLOR_RGB2LAB).astype(np.float32); ms, mr = skin(src), skin(ref)
+    for c in range(3):
+        s0, s1 = a[..., c][ms].mean(), a[..., c][ms].std() + 1e-3; r0, r1 = b[..., c][mr].mean(), b[..., c][mr].std() + 1e-3
+        a[..., c] = (a[..., c] - s0) * float(np.clip(r1 / s1, 0.8, 1.25)) + r0
+    out = cv2.cvtColor(np.clip(a, 0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB)
+    k = np.clip((src.astype(np.float32).mean(2) - 25) / 30, 0, 1)[..., None]      # the black backdrop stays black
+    return (out * k + src * (1 - k)).astype(np.uint8)
 def make_cover(path):
-    """everything inside the centre 3:4 (y 240-1680) that the profile grid shows"""
+    """ДО | ПОСЛЕ side by side, the same scale (navel on one line), «комплексная операция» and what was done; all inside the centre 3:4"""
     CBG = np.clip(np.float32([0, 8, 28]) / 255 * (1 + 0.3 * np.exp(-(((xx - 540) / 900) ** 2 + ((yy - 520) / 900) ** 2)))[..., None], 0, 1).astype(np.float32)
-    fr = CBG.copy(); im = cv2.resize(COLL[0], (620, int(620 * 2346 / 1320)), interpolation=cv2.INTER_AREA).astype(np.float32) / 255
-    im = im[:820]; x0, y0 = 230, 330; m = rrect(x0, y0, x0 + 620, y0 + 820, 26)[y0:y0 + 820, x0:x0 + 620, None]
-    reg = fr[y0:y0 + 820, x0:x0 + 620]; reg[:] = reg * (1 - m) + im * m; rrect_line(fr, x0, y0, x0 + 620, y0 + 820, 26, PINK, 3)
-    blend(fr, logo_alpha(300), 540 - 150, 262, PINK)
-    hd = Drop(["ДЕНЬ ОПЕРАЦИИ"], 120, 0, 1200, maxw=880); hd.x = 540 - max(r[1] for r in hd.rows) / 2; hd.draw(fr, 99, 0)
-    ty = Track(["[ глазами пациентки ]"], 36, 540, 0, 400, center=True); ty.y = 1200 + hd.h + 50 + ty.top; ty.draw(fr, 99, 0)
+    fr = CBG.copy()
+    do = anon_top(photo_png("IMG_9672"), 330)                                   # ДО, front (face blurred as in the reel)
+    po = photo_png("IMG_9693"); po = po[:po.shape[0] // 2 - 60]                  # ПОСЛЕ, front: the top half of the clinic's collage, above its caption
+    po = cover_match(po, do)                                                    # the same skin tone on both
+    s_do = 0.45; s_po = s_do * 1.565                                            # one scale for both bodies (shoulder width and torso height averaged)
+    y0 = 320
+    fr[y0:y0 + 820, :540] = cover_panel(do, 348, (727, 1303), s_do); fr[y0:y0 + 820, 540:] = cover_panel(po, 98, (660, 636), s_po)
+    fr[y0:y0 + 820, 538:542] = PINK
+    g = np.clip((yy[:, :1] - (y0 + 640)) / 180, 0, 1)[..., None]; fr = fr * (1 - g) + CBG * g
+    chip(fr, "ДО", 60, y0 + 24); chip(fr, "ПОСЛЕ", 600, y0 + 24)
+    blend(fr, logo_alpha(260), 540 - 130, 254, PINK)
+    hd = Drop(["КОМПЛЕКСНАЯ", "*ОПЕРАЦИЯ*"], 124, 70, 1130, maxw=900); hd.draw(fr, 99, 0)
+    y = 1130 + hd.h + 40
+    for lab in ("Т-образная подтяжка груди", "абдоминопластика", "липосакция 360"):
+        a = alpha_img(lab, mont(32, 600)); w_ = a.shape[1] + 56
+        blend(fr, rrect(70, y, 70 + w_, y + 64, 32), 0, 0, NAVY, 0.9); rrect_line(fr, 70, y, 70 + w_, y + 64, 32, PINK, 2)
+        blend(fr, a, 70 + 28, y + 32 - a.shape[0] / 2 + 2, WHITE); y += 80
     cv2.imwrite(path, cv2.cvtColor((np.clip(fr, 0, 1) * 255).astype(np.uint8), cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])
 
 def to8(fr): return (np.clip(fr, 0, 1) * 255 + 0.5).astype(np.uint8)
