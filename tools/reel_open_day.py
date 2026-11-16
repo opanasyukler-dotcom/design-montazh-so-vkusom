@@ -454,20 +454,21 @@ def click():
 WORDS = [("Если", 4.60, 5.16), ("вы", 5.16, 5.42), ("давно", 5.42, 5.80), ("хотели", 5.80, 6.20), ("познакомиться", 6.20, 6.88), ("со", 6.88, 7.08), ("мной", 7.08, 7.24), ("и", 7.24, 7.46), ("с", 7.46, 7.50), ("моей", 7.50, 7.68), ("командой,", 7.68, 8.16), ("то", 8.24, 8.36), ("у", 8.36, 8.40), ("меня", 8.40, 8.64), ("для", 8.64, 8.78), ("вас", 8.78, 9.04), ("хорошая", 9.04, 9.52), ("новость.", 9.52, 10.00), ("20", 10.22, 10.64), ("ноября", 10.64, 11.36), ("мы", 11.36, 11.64), ("проводим", 11.64, 12.06), ("последний", 12.06, 12.80), ("в", 12.80, 12.96), ("этом", 12.96, 13.16), ("году", 13.16, 13.48), ("день", 13.48, 13.78), ("открытых", 13.78, 14.34), ("дверей.", 14.34, 14.80), ("Это", 15.02, 15.32), ("прекрасная", 15.32, 15.88), ("возможность", 15.88, 16.46), ("лично", 16.46, 16.96), ("познакомиться,", 16.96, 17.78), ("задать", 18.08, 18.36), ("все", 18.36, 18.56), ("интересующие", 18.56, 19.30), ("вопросы", 19.30, 19.70), ("и", 19.70, 19.82), ("рассказать", 19.82, 20.30), ("о", 20.30, 20.46), ("своих", 20.46, 20.70), ("пожеланиях.", 20.70, 21.52), ("Для", 21.62, 21.84), ("гостей", 21.84, 22.66), ("у", 22.66, 22.72), ("нас", 22.72, 22.90), ("будут", 22.90, 23.14), ("специальные", 23.14, 23.66), ("условия,", 23.66, 24.12), ("о", 24.34, 24.34), ("которых", 24.34, 24.56), ("мы", 24.56, 24.82), ("обязательно", 24.82, 25.22), ("напишем", 25.22, 25.68), ("под", 25.68, 25.94), ("этим", 25.94, 26.16), ("видео.", 26.16, 26.46), ("Ждём", 26.56, 26.82), ("вас!", 26.82, 27.06)]
 
 # ---------------- one take, kept whole; reel time = source time - T_IN. Zoom in / out on her face confirms the key words.
-T_IN = 3.9; SRC_END = 27.25; T_END = SRC_END - T_IN; DUR = T_END + 2.8
+T_IN = 4.5; SRC_END = 27.25; T_END = SRC_END - T_IN; DUR = T_END + 2.8
 def S_(src): return src - T_IN                                           # source second -> reel second
 V = {"V1": Src(os.path.join(WORK, "V1.mp4"))}
-FACE = json.load(open(os.path.join(WORK, "V1_faces.json")))
-# (source second, zoom): the zoom snaps over 0.22 s on the word, then breathes slowly
-ZK = [(3.9, 1.0), (6.20, 1.18), (9.04, 1.42), (10.22, 1.0), (13.48, 1.2), (15.02, 1.0), (21.62, 1.3), (25.22, 1.0), (26.56, 1.38)]
+FACE = np.array(json.load(open(os.path.join(WORK, "V1_faces.json"))))
+FACE = np.stack([np.convolve(np.pad(FACE[:, k], 30, mode="edge"), np.ones(61) / 61, "valid") for k in range(4)], 1)   # a calm camera: the face centre smoothed over 2 s
+# (source second, zoom): the zoom glides over 1.2 s around the word
+ZK = [(4.5, 1.0), (6.0, 1.1), (8.6, 1.22), (10.0, 1.05), (13.2, 1.15), (14.9, 1.03), (21.4, 1.18), (25.0, 1.05), (26.4, 1.2)]   # gentle steps
 def zoom_at(st):
     z = ZK[0][1]
     for (t0, z0), (t1, z1) in zip(ZK, ZK[1:]):
         if st >= t1: z = z1
         elif st >= t0: z = z0
     for (t0, z0), (t1, z1) in zip(ZK, ZK[1:]):
-        if t1 <= st < t1 + 0.22: z = lerp(z0, z1, eio((st - t1) / 0.22))
-    k = max(t for t, _ in ZK if t <= st + 1e-9); return z * (1 + 0.025 * min(1, (st - k) / 3.0))
+        if t1 <= st < t1 + 1.2: z = lerp(z0, z1, eio((st - t1) / 1.2))      # a slow, smooth move — no snaps
+    return z
 def frame_at(t):
     st = t + T_IN; f = V["V1"].at(st); b = FACE[min(int(round(st * FPS)), len(FACE) - 1)]
     cx, cy = b[0] + b[2] / 2, b[1] + b[3] * 0.55
@@ -638,7 +639,6 @@ def build_audio(path):
     def typing(hd, t0, g_=0.45):
         n_ch = sum(len(q) for q, _ in hd.rows); kl = int((n_ch * hd.stag + 0.35) * SR); kb = KB[:kl].copy(); f_ = int(0.2 * SR); kb[-f_:] *= np.linspace(1, 0, f_); put(kb, t0, g_)
     typing(HA, 0.05)
-    for st, _ in ZK[1:]: put(zap(), S_(st) - 0.06, 0.22)                 # every zoom snap
     put(TICK, S_(7.68), 0.55); put(glass(1318.5), S_(9.04), 0.12); typing(HN, S_(9.04), 0.35)
     for j in range(7): put(tick(), S_(10.32) + 0.13 * j, 0.25)           # the calendar rolling
     put(TICK, S_(11.22), 0.6); put(TICK, S_(12.06), 0.55)
