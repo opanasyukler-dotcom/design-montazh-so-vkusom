@@ -678,18 +678,21 @@ def make_cover(path):
     the bottom of the photos, a thin line under it; everything inside the centre 3:4 (y 240-1680)"""
     fr = np.zeros((H, W, 3), np.float32) + DEEP
     do = anon_top(photo_png("IMG_9672"), 330)
-    po = photo_png("IMG_9693"); po = po[:1060]; po = cover_match(po, do)          # stops above the clinic's «3 недели» caption
-    s_do = 0.6; s_po = s_do * 1.565; y0, ph = 240, 1440
-    fr[y0:y0 + ph, :540] = cover_panel(do, 348, (727, 1303), s_do, ph=ph, navel_at=640)
-    fr[y0:y0 + ph, 540:] = cover_panel(po, 98, (660, 636), s_po, ph=ph, navel_at=640)
+    po = photo_png("IMG_9693")[:1172].copy()                                    # the ПОСЛЕ half of the clinic's collage, down to where its legs end
+    cap = np.zeros(po.shape[:2], np.uint8); reg = po[1080:]; cap[1080:] = ((reg.min(2) > 185) * 255).astype(np.uint8)
+    po = cv2.inpaint(po, cv2.dilate(cap, np.ones((9, 9), np.uint8)), 7, cv2.INPAINT_TELEA)   # the «3 недели» caption taken off the thighs
+    po = cover_match(po, do)
+    s_do = 0.535; s_po = s_do * 1.505; y0, ph = 240, 1100                       # neck to knees; one scale (nipple-to-navel matched)
+    fr[y0:y0 + ph, :540] = cover_panel(do, 348, (727, 1303), s_do, ph=ph, navel_at=567)
+    fr[y0:y0 + ph, 540:] = cover_panel(po, 98, (660, 639), s_po, ph=ph, navel_at=567)
     fr[y0:y0 + ph, 539:541] = DEEP
-    g = np.clip((yy[:, :1] - 1040) / 230, 0, 1)[..., None] ** 1.1; fr[1270:] = DEEP; fr = fr * (1 - g) + DEEP * g   # both halves fade out at the same line
+    g = np.clip((yy[:, :1] - 1110) / 110, 0, 1)[..., None] ** 1.1; fr[1270:] = DEEP; fr = fr * (1 - g) + DEEP * g   # both halves fade out at the same line
     for txt, x in (("ДО", 36), ("ПОСЛЕ", 576)):
         a = alpha_img(txt, mont(26, 600)); w_, h_ = a.shape[1] + 24, 44
         blend(fr, rrect(x, y0 + 26, x + w_, y0 + 26 + h_, 4), 0, 0, NAVY, 0.9); rrect_line(fr, x, y0 + 26, x + w_, y0 + 26 + h_, 4, WHITE, 2)
         blend(fr, a, x + 12, y0 + 26 + h_ / 2 - a.shape[0] / 2 + 2, WHITE)
-    hd = Drop(["КОМПЛЕКСНАЯ *ОПЕРАЦИЯ*"], 124, 60, 0, maxw=960); hd.y = 1390 - hd.h; hd.draw(fr, 99, 0)
-    ty = Track(["подтяжка груди · абдоминопластика · липосакция 360"], 30, 60, 0, 400); ty.y = 1390 + 34 + ty.top; ty.draw(fr, 99, 0)
+    hd = Drop(["КОМПЛЕКСНАЯ *ОПЕРАЦИЯ*"], 124, 60, 0, maxw=960); hd.y = 1420 - hd.h; hd.draw(fr, 99, 0)
+    ty = Track(["подтяжка груди · абдоминопластика · липосакция 360"], 30, 60, 0, 400); ty.y = 1420 + 34 + ty.top; ty.draw(fr, 99, 0)
     cv2.imwrite(path, cv2.cvtColor((np.clip(fr, 0, 1) * 255).astype(np.uint8), cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])
 
 def to8(fr): return (np.clip(fr, 0, 1) * 255 + 0.5).astype(np.uint8)
