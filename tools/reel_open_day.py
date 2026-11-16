@@ -17,7 +17,8 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.environ.get("REEL_SRC", os.path.join(ROOT, "dl_open_day"))
 WORK = os.path.join(SRC, "_work")
-NAME = "Reels_open_day"
+MIRROR = "--mirror" in sys.argv                                       # the 2027 version: footage mirrored, a different hook
+NAME = "Reels_open_day_2027_mirror" if MIRROR else "Reels_open_day"
 W, H, FPS, SR = 1080, 1920, 30, 48000
 NAVY = np.float32([0, 12, 40]) / 255; PINK = np.float32([233, 197, 193]) / 255; WHITE = np.float32([1, 1, 1])
 DEEP = np.float32([0, 5, 20]) / 255
@@ -552,7 +553,8 @@ def gift_icon(fr, cx, cy, s, p):
     if p > 0.6: text_c(fr, "%", cx + w * 0.55, cy + 40 * s, bebas(int(80 * s)), PINK, cl((p - 0.6) / 0.3))
 
 # ---------------- the overlays, word by word
-HA = top(Drop(["*ХОТЕЛИ ПОЗНАКОМИТЬСЯ*", "*СО МНОЙ И КОМАНДОЙ?*"], 86, LX, 0, maxw=880), 280)
+HA = top(Drop(["*ПЛАНИРУЕТЕ ОПЕРАЦИЮ*", "*В 2027 ГОДУ?*"], 96, LX, 0, maxw=880), 280) if MIRROR else top(Drop(["*ХОТЕЛИ ПОЗНАКОМИТЬСЯ*", "*СО МНОЙ И КОМАНДОЙ?*"], 86, LX, 0, maxw=880), 280)
+TA = Track(["обязательно посмотрите:"], 34, LX, 0, 400)
 HN = Drop(["*ХОРОШАЯ НОВОСТЬ!*"], 110, LX, 0, maxw=900)
 HD = top(Drop(["ДЕНЬ ОТКРЫТЫХ", "*ДВЕРЕЙ*"], 96, LX, 0, maxw=560), 280)
 HP = top(Drop(["ПРЕКРАСНАЯ", "*ВОЗМОЖНОСТЬ*"], 92, LX, 0, maxw=880), 280)
@@ -562,6 +564,7 @@ HW = Drop(["*ЖДЁМ ВАС!*"], 150, LX, 0, maxw=900)
 def overlays(fr, t):
     st = t - T_PRE + T_IN
     head(fr, HA, t, 0.05, S_(9.0))                                       # the hook, typed from frame one
+    if MIRROR: TA.y = under(HA, 26) + TA.top; TA.draw(fr, t, 0.9, S_(9.0))
     if S_(7.68) <= t < S_(9.0):                                          # «с моей командой» → three people
         u = t - S_(7.68); s_ = 0.8 * eback(u / 0.35); navy_card(fr, 860, 640, 120, 105, s_, min(1, u / 0.15))
         if s_ > 0.75: people_icon(fr, 860, 655, 0.8, eo(u / 0.6))
@@ -618,9 +621,10 @@ GRAD = np.repeat(GRAD, W, 1)
 def render(t):
     if t >= T_END:
         fr = s_z(t)
-        if t < T_END + 0.5: fr = iris(np.asarray(frame_at(T_END - 0.01), np.float32), fr, (t - T_END) / 0.5, 540, 900)
+        if t < T_END + 0.5: fr = iris(np.asarray(frame_at(T_END - 0.01), np.float32)[:, ::-1 if MIRROR else 1], fr, (t - T_END) / 0.5, 540, 900)
         return fr
-    fr = np.asarray(frame_at(t), np.float32).copy(); shade(fr, GRAD, np.float32([0, 0, 0])); overlays(fr, t); subtitles(fr, t); return fr
+    fr = np.asarray(frame_at(t), np.float32)
+    fr = (fr[:, ::-1] if MIRROR else fr).copy(); shade(fr, GRAD, np.float32([0, 0, 0])); overlays(fr, t); subtitles(fr, t); return fr
 
 MUSIC = os.path.join(SRC, "music.wav"); M0 = 0.9                       # the client's track: its even part (1-33 s) covers the whole reel
 G_VO, G_GAP = 0.022, 0.075
@@ -676,7 +680,8 @@ GAIN = 1.5 if os.path.exists(MUSIC) else 1.0
 def make_cover(path):
     """her, smiling, in the upper part; the title and the date below — inside the centre 3:4"""
     CBG = np.clip(np.float32([0, 8, 28]) / 255 * (1 + 0.3 * np.exp(-(((xx - 540) / 900) ** 2 + ((yy - 520) / 900) ** 2)))[..., None], 0, 1).astype(np.float32)
-    f = V["V1"].at(26.9); b = FACE[int(26.9 * FPS)]; im, _ = cover(f, W, 960, (b[0] + b[2] / 2) / W, (b[1] + b[3] * 0.8) / H, 1.25)
+    f = V["V1"].at(26.9); b = FACE[int(26.9 * FPS)]; f = f[:, ::-1].copy() if MIRROR else f
+    im, _ = cover(f, W, 960, ((W - b[0] - b[2] / 2) if MIRROR else (b[0] + b[2] / 2)) / W, (b[1] + b[3] * 0.8) / H, 1.25)
     fr = CBG.copy(); fr[250:1210] = im; g = np.clip((yy[:, :1] - 960) / 250, 0, 1)[..., None]; fr = fr * (1 - g) + CBG * g
     calendar(fr, 860, 480, 0.95, 99, 0)
     hd = Drop(["ДЕНЬ ОТКРЫТЫХ", "*ДВЕРЕЙ*"], 128, 70, 1150, maxw=900); hd.draw(fr, 99, 0)
