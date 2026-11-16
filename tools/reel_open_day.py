@@ -81,7 +81,7 @@ class Drop:
                 if p <= 0: continue
                 sc = 1 + 0.7 * (1 - p); g = scaled(a, sc)
                 cx = s.x + dx + a.shape[1] / 2 - 4; cy = s.y + r * s.lh - s.top + a.shape[0] / 2
-                o_ = min(1, p * 1.6) * (1 - q); blend(fr, g, cx - g.shape[1] / 2 + 3, cy - g.shape[0] / 2 - q * 30 + 4, DEEP, 0.55 * o_)   # soft drop shadow: readable on skin and walls
+                o_ = min(1, p * 1.6) * (1 - q)                                # no dark outline on the letters (the client's call)
                 blend(fr, g, cx - g.shape[1] / 2, cy - g.shape[0] / 2 - q * 30, col, o_)
 
 class Track:
@@ -96,7 +96,7 @@ class Track:
         for k, ln in enumerate(s.lines):
             wtot = ln[-1][1]; sp = 14 * (1 - p); ox = s.x - (wtot + sp * len(ln)) / 2 if s.center else s.x
             for i, (a, dx) in enumerate(ln[:-1]):
-                blend(fr, a, ox + dx + i * sp - 2, s.y + k * s.lh - s.top + 2, DEEP, 0.6 * op); blend(fr, a, ox + dx + i * sp - 4, s.y + k * s.lh - s.top, s.col, op)
+                blend(fr, a, ox + dx + i * sp - 4, s.y + k * s.lh - s.top, s.col, op)
 
 class Marker:
     """Bebas line where one word sits on a pink marker bar that sweeps in (word turns navy)"""
@@ -454,9 +454,12 @@ def click():
 WORDS = [("Если", 4.60, 5.16), ("вы", 5.16, 5.42), ("давно", 5.42, 5.80), ("хотели", 5.80, 6.20), ("познакомиться", 6.20, 6.88), ("со", 6.88, 7.08), ("мной", 7.08, 7.24), ("и", 7.24, 7.46), ("с", 7.46, 7.50), ("моей", 7.50, 7.68), ("командой,", 7.68, 8.16), ("то", 8.24, 8.36), ("у", 8.36, 8.40), ("меня", 8.40, 8.64), ("для", 8.64, 8.78), ("вас", 8.78, 9.04), ("хорошая", 9.04, 9.52), ("новость.", 9.52, 10.00), ("20", 10.22, 10.64), ("ноября", 10.64, 11.36), ("мы", 11.36, 11.64), ("проводим", 11.64, 12.06), ("последний", 12.06, 12.80), ("в", 12.80, 12.96), ("этом", 12.96, 13.16), ("году", 13.16, 13.48), ("день", 13.48, 13.78), ("открытых", 13.78, 14.34), ("дверей.", 14.34, 14.80), ("Это", 15.02, 15.32), ("прекрасная", 15.32, 15.88), ("возможность", 15.88, 16.46), ("лично", 16.46, 16.96), ("познакомиться,", 16.96, 17.78), ("задать", 18.08, 18.36), ("все", 18.36, 18.56), ("интересующие", 18.56, 19.30), ("вопросы", 19.30, 19.70), ("и", 19.70, 19.82), ("рассказать", 19.82, 20.30), ("о", 20.30, 20.46), ("своих", 20.46, 20.70), ("пожеланиях.", 20.70, 21.52), ("Для", 21.62, 21.84), ("гостей", 21.84, 22.66), ("у", 22.66, 22.72), ("нас", 22.72, 22.90), ("будут", 22.90, 23.14), ("специальные", 23.14, 23.66), ("условия,", 23.66, 24.12), ("о", 24.34, 24.34), ("которых", 24.34, 24.56), ("мы", 24.56, 24.82), ("обязательно", 24.82, 25.22), ("напишем", 25.22, 25.68), ("под", 25.68, 25.94), ("этим", 25.94, 26.16), ("видео.", 26.16, 26.46), ("Ждём", 26.56, 26.82), ("вас!", 26.82, 27.06)]
 
 # ---------------- one take, kept whole; reel time = source time - T_IN. Zoom in / out on her face confirms the key words.
-T_IN = 4.5; SRC_END = 27.25; T_END = SRC_END - T_IN; DUR = T_END + 2.8
-def S_(src): return src - T_IN                                           # source second -> reel second
-V = {"V1": Src(os.path.join(WORK, "V1.mp4"))}
+T_IN = 4.5; SRC_END = 27.25
+HUG = (0.3, 2.9); ORS = (0.4, 2.0)                                       # the opening for retention: the surgeon hugs a patient, then the operating room
+T_OR = HUG[1] - HUG[0]; T_PRE = T_OR + ORS[1] - ORS[0]
+def S_(src): return src - T_IN + T_PRE                                   # source second of the talk -> reel second
+T_END = S_(SRC_END); DUR = T_END + 2.8
+V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ("V1", "HUG", "OR")}
 FACE = np.array(json.load(open(os.path.join(WORK, "V1_faces.json"))))
 FACE = np.stack([np.convolve(np.pad(FACE[:, k], 30, mode="edge"), np.ones(61) / 61, "valid") for k in range(4)], 1)   # a calm camera: the face centre smoothed over 2 s
 # (source second, zoom): the zoom glides over 1.2 s around the word
@@ -469,8 +472,19 @@ def zoom_at(st):
     for (t0, z0), (t1, z1) in zip(ZK, ZK[1:]):
         if t1 <= st < t1 + 1.2: z = lerp(z0, z1, eio((st - t1) / 1.2))      # a slow, smooth move — no snaps
     return z
+def intro(t):
+    if t < T_OR: return full(V["HUG"].at(HUG[0] + t), 0.5, 0.45, lerp(1.12, 1.0, eo(t / T_OR)))
+    u = t - T_OR; return full(V["OR"].at(ORS[0] + u), 0.45, 0.4, lerp(1.0, 1.1, eio(u / (T_PRE - T_OR))))
 def frame_at(t):
-    st = t + T_IN; f = V["V1"].at(st); b = FACE[min(int(round(st * FPS)), len(FACE) - 1)]
+    if t < T_PRE:
+        fr = intro(t)
+        for tc in (T_OR,):                                                # a quick flash on the cut to the operating room
+            if tc <= t < tc + 0.16: f_ = 1 - eo((t - tc) / 0.16); fr = fr * (1 - f_) + f_
+        return fr
+    if t < T_PRE + 0.35: return zoom_through(intro(T_PRE - 0.01), frame_at(T_PRE + 0.36) if False else _talk(t), (t - T_PRE) / 0.35)
+    return _talk(t)
+def _talk(t):
+    st = t - T_PRE + T_IN; f = V["V1"].at(st); b = FACE[min(int(round(st * FPS)), len(FACE) - 1)]
     cx, cy = b[0] + b[2] / 2, b[1] + b[3] * 0.55
     return full(f, cx / W, cy / H, zoom_at(st))
 
@@ -539,15 +553,15 @@ def gift_icon(fr, cx, cy, s, p):
     if p > 0.6: text_c(fr, "%", cx + w * 0.55, cy + 40 * s, bebas(int(80 * s)), PINK, cl((p - 0.6) / 0.3))
 
 # ---------------- the overlays, word by word
-HA = top(Drop(["ХОТЕЛИ ПОЗНАКОМИТЬСЯ", "*СО МНОЙ И КОМАНДОЙ?*"], 86, LX, 0, maxw=880), 280)
+HA = top(Drop(["*ХОТЕЛИ ПОЗНАКОМИТЬСЯ*", "*СО МНОЙ И КОМАНДОЙ?*"], 86, LX, 0, maxw=880), 280)
 HN = Drop(["*ХОРОШАЯ НОВОСТЬ!*"], 110, LX, 0, maxw=900)
-HD = top(Drop(["ДЕНЬ ОТКРЫТЫХ", "*ДВЕРЕЙ*"], 96, LX, 0, maxw=560), 280)
-HP = top(Drop(["ПРЕКРАСНАЯ", "*ВОЗМОЖНОСТЬ*"], 92, LX, 0, maxw=880), 280)
+HD = top(Drop(["*ДЕНЬ ОТКРЫТЫХ*", "*ДВЕРЕЙ*"], 96, LX, 0, maxw=560), 280)
+HP = top(Drop(["*ПРЕКРАСНАЯ*", "*ВОЗМОЖНОСТЬ*"], 92, LX, 0, maxw=880), 280)
 LIST = [("лично познакомиться", 16.46), ("задать все вопросы", 18.08), ("рассказать о пожеланиях", 19.82)]
-HG = top(Drop(["ДЛЯ ГОСТЕЙ", "*СПЕЦИАЛЬНЫЕ УСЛОВИЯ*"], 84, LX, 0, maxw=900), 280)
+HG = top(Drop(["*ДЛЯ ГОСТЕЙ*", "*СПЕЦИАЛЬНЫЕ УСЛОВИЯ*"], 84, LX, 0, maxw=900), 280)
 HW = Drop(["*ЖДЁМ ВАС!*"], 150, LX, 0, maxw=900)
 def overlays(fr, t):
-    st = t + T_IN
+    st = t - T_PRE + T_IN
     head(fr, HA, t, 0.05, S_(9.0))                                       # the hook, typed from frame one
     if S_(7.68) <= t < S_(9.0):                                          # «с моей командой» → three people
         u = t - S_(7.68); s_ = 0.8 * eback(u / 0.35); navy_card(fr, 860, 640, 120, 105, s_, min(1, u / 0.15))
@@ -593,19 +607,21 @@ def overlays(fr, t):
         plate(fr, HW.x - 30, HW.y - 24, HW.x + HW.rows[0][1] + 30, HW.y + HW.h + 28, min(1, (t - S_(26.56)) / 0.15)); HW.draw(fr, t, S_(26.56))
 
 # the closing card
-HZ = Drop(["20 НОЯБРЯ", "*ДЕНЬ ОТКРЫТЫХ ДВЕРЕЙ*"], 104, LX, 760, maxw=900)
+HZ = Drop(["*20 НОЯБРЯ*", "*ДЕНЬ ОТКРЫТЫХ ДВЕРЕЙ*"], 104, LX, 760, maxw=900)
 TZ = Track(["специальные условия для гостей — под видео"], 30, LX, 0, 400)
 def s_z(t):
     lt = t - T_END; fr = gbg(t)
     blend(fr, logo_alpha(280), 540 - 140, 470, PINK, eo((lt - 0.1) / 0.5))
     HZ.draw(fr, t, T_END + 0.2); TZ.y = HZ.y + HZ.h + 46 + TZ.top; TZ.draw(fr, t, T_END + 0.9); return fr
 
+GRAD = (np.clip(1 - (yy[:, :1] - 200) / 520, 0, 1) ** 1.4 * 0.42 + np.clip((yy[:, :1] - 1120) / 520, 0, 1) ** 1.4 * 0.38)[..., None].astype(np.float32)   # a light black gradient under the text, top and bottom
+GRAD = np.repeat(GRAD, W, 1)
 def render(t):
     if t >= T_END:
         fr = s_z(t)
         if t < T_END + 0.5: fr = iris(np.asarray(frame_at(T_END - 0.01), np.float32), fr, (t - T_END) / 0.5, 540, 900)
         return fr
-    fr = frame_at(t).copy(); overlays(fr, t); subtitles(fr, t); return fr
+    fr = np.asarray(frame_at(t), np.float32).copy(); shade(fr, GRAD, np.float32([0, 0, 0])); overlays(fr, t); subtitles(fr, t); return fr
 
 MUSIC = os.path.join(SRC, "music.wav"); M0 = 0.9                       # the client's track: its even part (1-33 s) covers the whole reel
 G_VO, G_GAP = 0.022, 0.075
@@ -624,7 +640,7 @@ def build_audio(path):
     w = wave.open(os.path.join(WORK, "V1.wav")); x = hp(np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64) / 32768, 90)
     seg = x[int(T_IN * SR):int(SRC_END * SR)].copy(); fo = int(0.12 * SR); seg[-fo:] *= np.cos(np.linspace(0, np.pi / 2, fo)) ** 2
     fr_rms = np.sqrt(np.mean(seg[:len(seg) // 960 * 960].reshape(-1, 960) ** 2, 1)); g = 1 / (np.sqrt(np.mean(np.sort(fr_rms)[-max(1, len(fr_rms) * 2 // 5):] ** 2)) + 1e-6)
-    vo = np.zeros(n); vo[:len(seg)] = seg * g; vo = np.tanh(vo * 0.16 * 1.6) / 1.6
+    vo = np.zeros(n); i0 = int(T_PRE * SR); vo[i0:i0 + len(seg)] = (seg * g)[:n - i0]; vo = np.tanh(vo * 0.16 * 1.6) / 1.6
     act = np.zeros(n)
     for _, a, e in SUBS_SRC: act[int(max(0, S_(a) - 0.25) * SR):int((S_(e) + 0.1) * SR)] = 1
     dd = np.convolve(act, np.ones(int(0.25 * SR)) / int(0.25 * SR), "same")
@@ -638,7 +654,7 @@ def build_audio(path):
     KB = load(os.path.join(SRC, "keyboard.wav")); TICK = load(os.path.join(SRC, "tick.wav")); SHOT = load(os.path.join(SRC, "shutter_client.wav"))
     def typing(hd, t0, g_=0.45):
         n_ch = sum(len(q) for q, _ in hd.rows); kl = int((n_ch * hd.stag + 0.35) * SR); kb = KB[:kl].copy(); f_ = int(0.2 * SR); kb[-f_:] *= np.linspace(1, 0, f_); put(kb, t0, g_)
-    typing(HA, 0.05)
+    typing(HA, 0.05); put(swoosh(0.4), T_OR - 0.1, 0.18); put(swoosh(0.5), T_PRE - 0.15, 0.18)
     put(TICK, S_(7.68), 0.55); put(glass(1318.5), S_(9.04), 0.12); typing(HN, S_(9.04), 0.35)
     for j in range(7): put(tick(), S_(10.32) + 0.13 * j, 0.25)           # the calendar rolling
     put(TICK, S_(11.22), 0.6); put(TICK, S_(12.06), 0.55)
@@ -663,7 +679,7 @@ def make_cover(path):
     f = V["V1"].at(26.9); b = FACE[int(26.9 * FPS)]; im, _ = cover(f, W, 960, (b[0] + b[2] / 2) / W, (b[1] + b[3] * 0.8) / H, 1.25)
     fr = CBG.copy(); fr[250:1210] = im; g = np.clip((yy[:, :1] - 960) / 250, 0, 1)[..., None]; fr = fr * (1 - g) + CBG * g
     calendar(fr, 860, 480, 0.95, 99, 0)
-    hd = Drop(["ДЕНЬ ОТКРЫТЫХ", "*ДВЕРЕЙ*"], 128, 70, 1150, maxw=900); hd.draw(fr, 99, 0)
+    hd = Drop(["*ДЕНЬ ОТКРЫТЫХ*", "*ДВЕРЕЙ*"], 128, 70, 1150, maxw=900); hd.draw(fr, 99, 0)
     ty = Track(["последний в этом году · 20 ноября"], 34, 72, 0, 400); ty.y = 1150 + hd.h + 46 + ty.top; ty.draw(fr, 99, 0)
     cv2.imwrite(path, cv2.cvtColor((np.clip(fr, 0, 1) * 255).astype(np.uint8), cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])
 
