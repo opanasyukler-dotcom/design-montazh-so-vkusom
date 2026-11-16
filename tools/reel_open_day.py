@@ -456,7 +456,8 @@ WORDS = [("Если", 4.60, 5.16), ("вы", 5.16, 5.42), ("давно", 5.42, 5.
 # ---------------- one take, kept whole; reel time = source time - T_IN. Zoom in / out on her face confirms the key words.
 T_IN = 4.5; SRC_END = 27.25
 HUG = (0.3, 2.9); ORS = (0.4, 2.0)                                       # the opening for retention: the surgeon hugs a patient, then the operating room
-T_OR = HUG[1] - HUG[0]; T_PRE = T_OR + ORS[1] - ORS[0]
+T_PRE = 0.0                                                              # the talk runs from frame one; the B-roll is laid over her voice
+B0 = 3.0; B1 = B0 + ORS[1] - ORS[0]; B2 = B1 + HUG[1] - HUG[0]           # 3 s in: the operating room, then the hug, then back to her
 def S_(src): return src - T_IN + T_PRE                                   # source second of the talk -> reel second
 T_END = S_(SRC_END); DUR = T_END + 2.8
 V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ("V1", "HUG", "OR")}
@@ -472,17 +473,15 @@ def zoom_at(st):
     for (t0, z0), (t1, z1) in zip(ZK, ZK[1:]):
         if t1 <= st < t1 + 1.2: z = lerp(z0, z1, eio((st - t1) / 1.2))      # a slow, smooth move — no snaps
     return z
-def intro(t):
-    if t < T_OR: return full(V["HUG"].at(HUG[0] + t), 0.5, 0.45, lerp(1.12, 1.0, eo(t / T_OR)))
-    u = t - T_OR; return full(V["OR"].at(ORS[0] + u), 0.45, 0.4, lerp(1.0, 1.1, eio(u / (T_PRE - T_OR))))
+def broll(t):
+    if t < B1: u = t - B0; return full(V["OR"].at(ORS[0] + u), 0.45, 0.4, lerp(1.0, 1.08, eio(u / (B1 - B0))))
+    u = t - B1; return full(V["HUG"].at(HUG[0] + u), 0.5, 0.45, lerp(1.1, 1.0, eo(u / (B2 - B1))))
 def frame_at(t):
-    if t < T_PRE:
-        fr = intro(t)
-        for tc in (T_OR,):                                                # a quick flash on the cut to the operating room
-            if tc <= t < tc + 0.16: f_ = 1 - eo((t - tc) / 0.16); fr = fr * (1 - f_) + f_
-        return fr
-    if t < T_PRE + 0.35: return zoom_through(intro(T_PRE - 0.01), frame_at(T_PRE + 0.36) if False else _talk(t), (t - T_PRE) / 0.35)
-    return _talk(t)
+    if B0 <= t < B2: fr = broll(t)
+    else: fr = _talk(t)
+    for tc in (B0, B1, B2):                                               # a soft flash on each cut
+        if tc <= t < tc + 0.14: f_ = 0.7 * (1 - eo((t - tc) / 0.14)); fr = fr * (1 - f_) + f_
+    return fr
 def _talk(t):
     st = t - T_PRE + T_IN; f = V["V1"].at(st); b = FACE[min(int(round(st * FPS)), len(FACE) - 1)]
     cx, cy = b[0] + b[2] / 2, b[1] + b[3] * 0.55
@@ -640,7 +639,7 @@ def build_audio(path):
     w = wave.open(os.path.join(WORK, "V1.wav")); x = hp(np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64) / 32768, 90)
     seg = x[int(T_IN * SR):int(SRC_END * SR)].copy(); fo = int(0.12 * SR); seg[-fo:] *= np.cos(np.linspace(0, np.pi / 2, fo)) ** 2
     fr_rms = np.sqrt(np.mean(seg[:len(seg) // 960 * 960].reshape(-1, 960) ** 2, 1)); g = 1 / (np.sqrt(np.mean(np.sort(fr_rms)[-max(1, len(fr_rms) * 2 // 5):] ** 2)) + 1e-6)
-    vo = np.zeros(n); i0 = int(T_PRE * SR); vo[i0:i0 + len(seg)] = (seg * g)[:n - i0]; vo = np.tanh(vo * 0.16 * 1.6) / 1.6
+    vo = np.zeros(n); vo[:len(seg)] = (seg * g)[:n]; vo = np.tanh(vo * 0.16 * 1.6) / 1.6
     act = np.zeros(n)
     for _, a, e in SUBS_SRC: act[int(max(0, S_(a) - 0.25) * SR):int((S_(e) + 0.1) * SR)] = 1
     dd = np.convolve(act, np.ones(int(0.25 * SR)) / int(0.25 * SR), "same")
@@ -654,7 +653,8 @@ def build_audio(path):
     KB = load(os.path.join(SRC, "keyboard.wav")); TICK = load(os.path.join(SRC, "tick.wav")); SHOT = load(os.path.join(SRC, "shutter_client.wav"))
     def typing(hd, t0, g_=0.45):
         n_ch = sum(len(q) for q, _ in hd.rows); kl = int((n_ch * hd.stag + 0.35) * SR); kb = KB[:kl].copy(); f_ = int(0.2 * SR); kb[-f_:] *= np.linspace(1, 0, f_); put(kb, t0, g_)
-    typing(HA, 0.05); put(swoosh(0.4), T_OR - 0.1, 0.18); put(swoosh(0.5), T_PRE - 0.15, 0.18)
+    typing(HA, 0.05)
+    for tc in (B0, B1, B2): put(swoosh(0.35), tc - 0.1, 0.14)
     put(TICK, S_(7.68), 0.55); put(glass(1318.5), S_(9.04), 0.12); typing(HN, S_(9.04), 0.35)
     for j in range(7): put(tick(), S_(10.32) + 0.13 * j, 0.25)           # the calendar rolling
     put(TICK, S_(11.22), 0.6); put(TICK, S_(12.06), 0.55)
