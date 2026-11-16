@@ -606,7 +606,7 @@ def render(t):
         return fr
     fr = frame_at(t).copy(); overlays(fr, t); subtitles(fr, t); return fr
 
-MUSIC = os.path.join(SRC, "music.wav"); M0 = 0.0
+MUSIC = os.path.join(SRC, "music.wav"); M0 = 0.9                       # the client's track: its even part (1-33 s) covers the whole reel
 G_VO, G_GAP = 0.022, 0.075
 def track(n):
     if not os.path.exists(MUSIC): return np.zeros((n, 2))
