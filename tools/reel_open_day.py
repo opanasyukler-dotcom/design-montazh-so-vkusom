@@ -554,10 +554,10 @@ def gift_icon(fr, cx, cy, s, p):
 # ---------------- the overlays, word by word
 HA = top(Drop(["*ХОТЕЛИ ПОЗНАКОМИТЬСЯ*", "*СО МНОЙ И КОМАНДОЙ?*"], 86, LX, 0, maxw=880), 280)
 HN = Drop(["*ХОРОШАЯ НОВОСТЬ!*"], 110, LX, 0, maxw=900)
-HD = top(Drop(["*ДЕНЬ ОТКРЫТЫХ*", "*ДВЕРЕЙ*"], 96, LX, 0, maxw=560), 280)
-HP = top(Drop(["*ПРЕКРАСНАЯ*", "*ВОЗМОЖНОСТЬ*"], 92, LX, 0, maxw=880), 280)
+HD = top(Drop(["ДЕНЬ ОТКРЫТЫХ", "*ДВЕРЕЙ*"], 96, LX, 0, maxw=560), 280)
+HP = top(Drop(["ПРЕКРАСНАЯ", "*ВОЗМОЖНОСТЬ*"], 92, LX, 0, maxw=880), 280)
 LIST = [("лично познакомиться", 16.46), ("задать все вопросы", 18.08), ("рассказать о пожеланиях", 19.82)]
-HG = top(Drop(["*ДЛЯ ГОСТЕЙ*", "*СПЕЦИАЛЬНЫЕ УСЛОВИЯ*"], 84, LX, 0, maxw=900), 280)
+HG = top(Drop(["ДЛЯ ГОСТЕЙ", "*СПЕЦИАЛЬНЫЕ УСЛОВИЯ*"], 84, LX, 0, maxw=900), 280)
 HW = Drop(["*ЖДЁМ ВАС!*"], 150, LX, 0, maxw=900)
 def overlays(fr, t):
     st = t - T_PRE + T_IN
@@ -606,14 +606,14 @@ def overlays(fr, t):
         plate(fr, HW.x - 30, HW.y - 24, HW.x + HW.rows[0][1] + 30, HW.y + HW.h + 28, min(1, (t - S_(26.56)) / 0.15)); HW.draw(fr, t, S_(26.56))
 
 # the closing card
-HZ = Drop(["*20 НОЯБРЯ*", "*ДЕНЬ ОТКРЫТЫХ ДВЕРЕЙ*"], 104, LX, 760, maxw=900)
+HZ = Drop(["20 НОЯБРЯ", "*ДЕНЬ ОТКРЫТЫХ ДВЕРЕЙ*"], 104, LX, 760, maxw=900)
 TZ = Track(["специальные условия для гостей — под видео"], 30, LX, 0, 400)
 def s_z(t):
     lt = t - T_END; fr = gbg(t)
     blend(fr, logo_alpha(280), 540 - 140, 470, PINK, eo((lt - 0.1) / 0.5))
     HZ.draw(fr, t, T_END + 0.2); TZ.y = HZ.y + HZ.h + 46 + TZ.top; TZ.draw(fr, t, T_END + 0.9); return fr
 
-GRAD = (np.clip(1 - (yy[:, :1] - 200) / 520, 0, 1) ** 1.4 * 0.42 + np.clip((yy[:, :1] - 1120) / 520, 0, 1) ** 1.4 * 0.38)[..., None].astype(np.float32)   # a light black gradient under the text, top and bottom
+GRAD = (np.clip(1 - (yy[:, :1] - 150) / 800, 0, 1) ** 1.3 * 0.55 + np.clip((yy[:, :1] - 1120) / 520, 0, 1) ** 1.4 * 0.38)[..., None].astype(np.float32)   # a light black gradient under the text, top and bottom
 GRAD = np.repeat(GRAD, W, 1)
 def render(t):
     if t >= T_END:
@@ -679,7 +679,7 @@ def make_cover(path):
     f = V["V1"].at(26.9); b = FACE[int(26.9 * FPS)]; im, _ = cover(f, W, 960, (b[0] + b[2] / 2) / W, (b[1] + b[3] * 0.8) / H, 1.25)
     fr = CBG.copy(); fr[250:1210] = im; g = np.clip((yy[:, :1] - 960) / 250, 0, 1)[..., None]; fr = fr * (1 - g) + CBG * g
     calendar(fr, 860, 480, 0.95, 99, 0)
-    hd = Drop(["*ДЕНЬ ОТКРЫТЫХ*", "*ДВЕРЕЙ*"], 128, 70, 1150, maxw=900); hd.draw(fr, 99, 0)
+    hd = Drop(["ДЕНЬ ОТКРЫТЫХ", "*ДВЕРЕЙ*"], 128, 70, 1150, maxw=900); hd.draw(fr, 99, 0)
     ty = Track(["последний в этом году · 20 ноября"], 34, 72, 0, 400); ty.y = 1150 + hd.h + 46 + ty.top; ty.draw(fr, 99, 0)
     cv2.imwrite(path, cv2.cvtColor((np.clip(fr, 0, 1) * 255).astype(np.uint8), cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])
 
