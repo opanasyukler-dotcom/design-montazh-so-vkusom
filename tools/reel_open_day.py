@@ -677,7 +677,15 @@ def build_audio(path):
         w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR); w.writeframes((mix * 32767).astype(np.int16).tobytes())
 GAIN = 1.5 if os.path.exists(MUSIC) else 1.0
 
+def make_cover_photo(path):
+    """the client's photo full bleed, the light black gradient on top, the reel's hook in pink — all inside the centre 3:4"""
+    ph = cv2.imread(os.path.join(SRC, "cover_photo.jpg"))[..., ::-1].copy()
+    fr = full(ph, 0.5, 0.42, 1.0)
+    g = (np.clip(1 - (yy[:, :1] - 240) / 700, 0, 1) ** 1.2 * 0.62)[..., None].astype(np.float32); shade(fr, np.repeat(g, W, 1), np.float32([0, 0, 0]))
+    hd = Drop(["*К ХИРУРГУ МОЖНО ПРИЙТИ,*", "*ДАЖЕ ЕСЛИ ВЫ ПОКА ПРОСТО*", "*ПРИСМАТРИВАЕТЕСЬ*"], 96, 70, 300, maxw=940); hd.draw(fr, 99, 0)
+    cv2.imwrite(path, cv2.cvtColor((np.clip(fr, 0, 1) * 255).astype(np.uint8), cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])
 def make_cover(path):
+    if os.path.exists(os.path.join(SRC, "cover_photo.jpg")) and not MIRROR: return make_cover_photo(path)
     """her, smiling, in the upper part; the title and the date below — inside the centre 3:4"""
     CBG = np.clip(np.float32([0, 8, 28]) / 255 * (1 + 0.3 * np.exp(-(((xx - 540) / 900) ** 2 + ((yy - 520) / 900) ** 2)))[..., None], 0, 1).astype(np.float32)
     f = V["V1"].at(26.9); b = FACE[int(26.9 * FPS)]; f = f[:, ::-1].copy() if MIRROR else f
