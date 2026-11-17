@@ -682,7 +682,7 @@ def make_cover_photo(path):
     ph = cv2.imread(os.path.join(SRC, "cover_photo.jpg"))[..., ::-1].copy()
     fr = full(ph, 0.5, 0.42, 1.0)
     g = (np.clip(1 - (yy[:, :1] - 240) / 700, 0, 1) ** 1.2 * 0.62)[..., None].astype(np.float32); shade(fr, np.repeat(g, W, 1), np.float32([0, 0, 0]))
-    hd = Drop(["*К ХИРУРГУ МОЖНО ПРИЙТИ,*", "*ДАЖЕ ЕСЛИ ВЫ ПОКА ПРОСТО*", "*ПРИСМАТРИВАЕТЕСЬ*"], 96, 70, 300, maxw=940); hd.draw(fr, 99, 0)
+    hd = Drop(["К ХИРУРГУ МОЖНО ПРИЙТИ,", "ДАЖЕ ЕСЛИ ВЫ ПОКА ПРОСТО", "*ПРИСМАТРИВАЕТЕСЬ*"], 96, 70, 300, maxw=940); hd.draw(fr, 99, 0)
     cv2.imwrite(path, cv2.cvtColor((np.clip(fr, 0, 1) * 255).astype(np.uint8), cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])
 def make_cover(path):
     if os.path.exists(os.path.join(SRC, "cover_photo.jpg")) and not MIRROR: return make_cover_photo(path)
