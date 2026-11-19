@@ -725,7 +725,7 @@ def track(n):
     if x.shape[1] == 1: x = np.repeat(x, 2, 1)
     seg = x[int(M0 * SR):int(M0 * SR) + n]; seg = seg / np.sqrt(np.mean(seg.mean(1) ** 2))
     return np.pad(seg, ((0, n - len(seg)), (0, 0)))
-# IMG_2831_alt.wav: ffmpeg -i IMG_2831.wav -af "rubberband=pitch=1.24:formant=preserved,equalizer=f=3000:t=q:w=1:g=2" -ar 48000 IMG_2831_alt.wav
+# IMG_2831_alt.wav: her lines re-voiced with tools/voice_knnvc.py (kNN-VC, reference: Piper ru_RU-irina-medium), pasted over the original at the ALT ranges
 ALT = {"A": [(11.30, 14.05)], "B": [(22.48, 31.85)], "D": [(70.84, 76.50)], "F": [(214.36, 223.88)], "G": [(231.80, 235.45)]}   # her lines only, not the questions
 def build_audio(path):
     n = int(DUR * SR); vo = np.zeros(n); act = np.zeros(n); srcs = {}
