@@ -483,9 +483,23 @@ FACE = np.column_stack([FACE[:, 0], FACE[:, 1], np.full(len(FACE), FW), np.full(
 def interview(t, b, z):
     """the interview, framed on her face (smoothed face track)"""
     _, _, parts, t0, d = next(x for x in SEG if x[0] == b); st = parts[0][0] + (t - t0)
-    f = V["IMG_2831"].at(max(0, st)); bx = FACE[min(int(round(st * FPS)), len(FACE) - 1)]
-    f = soft_blur(f, *bx)
-    return full(f, (bx[0] + bx[2] / 2) / W, (bx[1] + bx[3] * 0.75) / H, z)
+    f = V["IMG_2831"].at(max(0, st)); cx, cy = BLOCK_FACE[b]                # one fixed spot per block: neither the blur nor the frame moves
+    f = static_blur(f, b)
+    return full(f, cx / W, (cy + 50) / H, z)
+BLOCK_FACE = {}
+for _b, _s, _parts, _t0, _d in SEG:
+    if _s == "IMG_2831":
+        _i0, _i1 = int(_parts[0][0] * FPS), int(_parts[-1][1] * FPS); _bx = np.median(FACE[_i0:_i1], 0)
+        BLOCK_FACE[_b] = (_bx[0] + _bx[2] / 2, _bx[1] + _bx[3] / 2)
+_SBM = {}
+def static_blur(f, b):
+    """a still, soft Gaussian blur over the head: the same place and size for the whole block, a wide feather, no pixel blocks"""
+    if b not in _SBM:
+        cx, cy = BLOCK_FACE[b]; m = np.zeros(f.shape[:2], np.float32)
+        cv2.ellipse(m, (int(cx), int(cy - 10)), (130, 165), 0, 0, 360, 1, -1); _SBM[b] = cv2.GaussianBlur(m, (0, 0), 38)[..., None] ** 0.7
+    m = _SBM[b]; ys, xs = np.where(m[..., 0] > 0.01); y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+    reg = f[y0:y1, x0:x1].astype(np.float32); bl = cv2.GaussianBlur(reg, (0, 0), 28)
+    out = f.copy(); mm = m[y0:y1, x0:x1]; out[y0:y1, x0:x1] = (reg * (1 - mm) + bl * mm).astype(np.uint8); return out
 def soft_blur(f, x, y, w, h):
     """the face blurred with no visible edge: a wide box, the blur fades out through a large feather"""
     cx, cy = x + FW / 2 + (w - FW) / 2, y + FH / 2; w, h = FW, FH; rw, rh = w * 1.7, h * 1.5
@@ -566,7 +580,7 @@ KN = {"IMG_1065": (1300, 3050, 1035), "IMG_1069": (1170, 3200, 1160), "IMG_2812"
 HA = [Drop(["52 ГОДА."], 120, LX, 300, maxw=900), Drop(["МАСШТАБНАЯ ОПЕРАЦИЯ."], 92, LX, 430, maxw=900), Drop(["*ОДНО ВОССТАНОВЛЕНИЕ.*"], 92, LX, 540, maxw=900)]
 HA_T = [0.05, 0.85, 1.65]
 def s_a(t):
-    fr = dark(interview(t, "A", lerp(2.1, 1.8, eo(t / 3.0))))
+    fr = dark(interview(t, "A", 1.9))
     for hd, t0 in zip(HA, HA_T): hd.draw(fr, t, t0)
     return fr
 
@@ -649,9 +663,9 @@ def bar(fr, y, lab, frac, p, col):
     if w > 30: blend(fr, rrect(LX + 4, y + 4, LX + 4 + w - 8, y + 52, 24), 0, 0, col, min(1, p * 3))
     a = alpha_img(lab, mont(28, 600)); blend(fr, a, LX + 22, y + 28 - a.shape[0] / 2 + 2, NAVY if col is PINK and w > a.shape[1] + 30 else WHITE, min(1, p * 3))
 def s_e(t):
-    return dark(interview(t, "E", lerp(1.5, 1.6, eo((t - T_S["E"]) / 2.5))))
+    return dark(interview(t, "E", 1.55))
 def s_f(t):
-    fr = dark(interview(t, "F", lerp(1.6, 1.85, eio((t - T_S["F"]) / 9.0))))
+    fr = dark(interview(t, "F", 1.7))
     if t > Rs("F", 216.84):
         HF.draw(fr, t, Rs("F", 216.84))
         bar(fr, 1060, "химический пилинг", 0.95, (t - Rs("F", 217.36)) / 0.7, PINK)
@@ -660,17 +674,17 @@ def s_f(t):
     return fr
 
 # G — the result from every angle under her question, then her face: «сто процентов… ещё и попу сделала» and the laugh
-G_PH = ["IMG_2812", "IMG_2814", "IMG_2816", "IMG_2820"]; T_GA = Rs("G", 231.80)
+G_PH = ["IMG_2812", "IMG_2814", "IMG_2816"]; T_GA = Rs("G", 231.80)   # no back view
 TG = Track(["месяц с небольшим после операции", "реабилитация продолжается"], 28, LX, 0, 400)
 HG = Drop(["*100%*"], 220, LX, 0, maxw=900)
 def s_g(t):
     if t < T_GA:
-        lt = t - T_S["G"]; dk = (T_GA - T_S["G"]) / 4; k = min(3, int(lt / dk)); u = lt - k * dk
+        lt = t - T_S["G"]; dk = (T_GA - T_S["G"]) / 3; k = min(2, int(lt / dk)); u = lt - k * dk
         fr = neckfit(G_PH[k], 480, 1540, lerp(1.04, 1.0, eo(u / dk)), maxw=900)
         f = 1 - eo(u / 0.16) if k else 0; fr = fr * (1 - f * 0.8) + f * 0.8
         dark(fr); chip(fr, "ПОСЛЕ", LX, 270); TG.y = 340 + TG.top; TG.draw(fr, t, T_S["G"] + 0.3)
         return fr
-    fr = dark(interview(t, "G", lerp(1.6, 2.0, eo((t - T_GA) / 4.0))))
+    fr = dark(interview(t, "G", 1.8))
     HG.x = 540 - HG.rows[0][1] / 2; HG.y = 300; HG.draw(fr, t, Rs("G", 231.88), Rs("G", 234.2))
     tp = Rs("G", 234.42)                                         # «попу»
     if t > tp:
@@ -751,7 +765,7 @@ def build_audio(path):
     typing(HF, Rs("F", 216.84), 0.3)
     for j in range(10): put(tick(), Rs("F", 217.36) + 0.07 * j, 0.18)
     for j in range(5): put(tick(), Rs("F", 222.60) + 0.07 * j, 0.18)
-    for k in range(1, 4): put(SHOT, T_S["G"] + k * (T_GA - T_S["G"]) / 4, 0.4)
+    for k in range(1, 3): put(SHOT, T_S["G"] + k * (T_GA - T_S["G"]) / 3, 0.4)
     put(glass(1174.7), Rs("G", 231.88), 0.14); put(TICK, Rs("G", 234.42), 0.55)
     for k in range(3): put(pop(1300, 600, 0.08), Rs("G", 235.2) + 0.3 * k, 0.08)
     put(glass(1318.5), T_Z + 0.2, 0.1)
