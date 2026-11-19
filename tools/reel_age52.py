@@ -477,6 +477,9 @@ T_Z = vend("G") + 0.3; DUR = T_Z + 2.8
 
 V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ("IMG_2831", "IMG_1089", "IMG_1088")}
 FACE = np.array(json.load(open(os.path.join(WORK, "IMG_2831_faces.json"))))
+FACE = np.stack([np.convolve(np.pad(FACE[:, k], 75, mode="edge"), np.ones(151) / 151, "valid") for k in range(2)], 1)   # the face centre smoothed over 5 s
+FW, FH = 160.0, 220.0                                                    # one fixed blur size: the blur never pulses
+FACE = np.column_stack([FACE[:, 0], FACE[:, 1], np.full(len(FACE), FW), np.full(len(FACE), FH)])
 def interview(t, b, z):
     """the interview, framed on her face (smoothed face track)"""
     _, _, parts, t0, d = next(x for x in SEG if x[0] == b); st = parts[0][0] + (t - t0)
@@ -485,7 +488,7 @@ def interview(t, b, z):
     return full(f, (bx[0] + bx[2] / 2) / W, (bx[1] + bx[3] * 0.75) / H, z)
 def soft_blur(f, x, y, w, h):
     """the face blurred with no visible edge: a wide box, the blur fades out through a large feather"""
-    cx, cy = x + w / 2, y + h / 2; rw, rh = w * 1.7, h * 1.5
+    cx, cy = x + FW / 2 + (w - FW) / 2, y + FH / 2; w, h = FW, FH; rw, rh = w * 1.7, h * 1.5
     x0, y0, x1, y1 = int(max(0, cx - rw)), int(max(0, cy - rh)), int(min(f.shape[1], cx + rw)), int(min(f.shape[0], cy + rh))
     if x1 <= x0 or y1 <= y0: return f
     reg = f[y0:y1, x0:x1].astype(np.float32); bl = cv2.GaussianBlur(cv2.resize(cv2.resize(reg, None, fx=0.03, fy=0.03), (x1 - x0, y1 - y0)), (0, 0), 14)   # stronger
@@ -572,7 +575,7 @@ HB = top(Drop(["ВОССТАНАВЛИВАТЬСЯ", "*ТОЛЬКО ОДИН Р�
 def s_b(t):
     lt = t - T_S["B"]; tsw = T_S["B"] + 4.6
     if t < tsw: fr = full(V["IMG_1088"].at(17.8 + lt), 0.5, 0.45, lerp(1.08, 1.0, eo(lt / 4.0)))
-    else: fr = fit("IMG_1065", (100, 470, 980, 1590), lerp(1.04, 1.0, eo((t - tsw) / 3.0)))
+    else: fr = neckfit("IMG_1065", 470, 1560, lerp(1.04, 1.0, eo((t - tsw) / 3.0)), maxw=880)
     dark(fr); chip(fr, "ДО", LX, 1080); HB.draw(fr, t, T_S["B"] + 0.05)
     tk = Rs("B", 27.88); tx = Rs("B", 30.50)                     # «несколько раз» / «не мой вариант»
     for k in range(3):
@@ -603,6 +606,16 @@ ZONE_T = lambda k: Rs("C", 4.72) + 0.62 * k
 # D — the collages: ПОСЛЕ over ДО, front then 3/4; «я не хотела импланты» → the implant crossed out
 HD = top(Drop(["ГРУДЬ БЕЗ ИМПЛАНТОВ.", "*СОБСТВЕННЫЙ ЖИР.*"], 72, LX, 0, maxw=900), 245)
 NK = {"IMG_1065": (650, 3050, 1035), "IMG_1069": (330, 3200, 1150), "IMG_2812": (300, 3130, 1035), "IMG_2814": (300, 3230, 1150)}   # (neck, knee, centre x)
+NT = {"IMG_1065": (650, 2660), "IMG_1069": (330, 2900), "IMG_2812": (300, 2370), "IMG_2814": (300, 2600), "IMG_2816": (330, 2720), "IMG_2820": (280, 2500)}   # (neck, fingertips) in photo px
+def neckfit(n, y0, y1, z=1.0, pw=W, maxw=None):
+    """neck to fingertips: the neck on y0, the fingertips on y1, centred on the body; below the fingertips fades out"""
+    img, m = PHC[n]; neck, tip = NT[n]; s_ = (y1 - y0) / (tip - neck) * z
+    band = m[neck:tip] > 0.5; xs_ = np.where(band.any(0))[0]; bw = xs_.max() - xs_.min(); cx = (xs_.max() + xs_.min()) / 2
+    if maxw and bw * s_ > maxw: s_ = maxw / bw
+    tx, ty = pw / 2 - cx * s_, y0 - neck * s_ + (y1 - y0) * (1 - s_ * (tip - neck) / (y1 - y0)) / 2
+    out = cv2.warpAffine(img, np.float32([[s_, 0, tx], [0, s_, ty]]), (pw, H)).astype(np.float32) / 255
+    yt = ty + tip * s_; yn = ty + neck * s_                            # nothing above the neck, nothing below the fingertips
+    return out * (np.clip((yt + 40 - np.arange(H)) / 80, 0, 1) * np.clip((np.arange(H) - yn + 10) / 50, 0, 1))[:, None, None]
 def spanel(n, y_neck=560, y_knee=1300, pw=540):
     """ДО | ПОСЛЕ side by side, neck to knees, one scale rule for every photo"""
     neck, knee, cx = NK[n]; s_ = (y_knee - y_neck) / (knee - neck); r = cv2.resize(PH[n], None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
@@ -610,7 +623,7 @@ def spanel(n, y_neck=560, y_knee=1300, pw=540):
     xs0, ys0 = max(0, ox), max(0, oy); xs1, ys1 = min(r.shape[1], ox + pw), min(r.shape[0], oy + H)
     out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = r[ys0:ys1, xs0:xs1]
     return out * np.clip((1600 - np.arange(H)) / 90, 0, 1)[:, None, None]   # below the knees fades out (no floor)
-COLL = [np.hstack([spanel(d), spanel(p)]) for p, d in (("IMG_2812", "IMG_1065"), ("IMG_2814", "IMG_1069"))]   # ДО left, ПОСЛЕ right
+COLL = [np.hstack([neckfit(d, 500, 1460, pw=540, maxw=500), neckfit(p, 500, 1460, pw=540, maxw=500)]) for p, d in (("IMG_2812", "IMG_1065"), ("IMG_2814", "IMG_1069"))]   # ДО left, ПОСЛЕ right
 T_D = T_S["D"] - 1.4; D_SW = vstart("D") + 2.6
 def s_d(t):
     k = 0 if t < D_SW else 1; u = t - (T_D if k == 0 else D_SW)
@@ -653,7 +666,7 @@ HG = Drop(["*100%*"], 220, LX, 0, maxw=900)
 def s_g(t):
     if t < T_GA:
         lt = t - T_S["G"]; dk = (T_GA - T_S["G"]) / 4; k = min(3, int(lt / dk)); u = lt - k * dk
-        fr = fit(G_PH[k], (100, 470, 980, 1590), lerp(1.04, 1.0, eo(u / dk)))
+        fr = neckfit(G_PH[k], 480, 1540, lerp(1.04, 1.0, eo(u / dk)), maxw=900)
         f = 1 - eo(u / 0.16) if k else 0; fr = fr * (1 - f * 0.8) + f * 0.8
         dark(fr); chip(fr, "ПОСЛЕ", LX, 270); TG.y = 340 + TG.top; TG.draw(fr, t, T_S["G"] + 0.3)
         return fr
@@ -759,7 +772,7 @@ def make_cover(path):
     CBG = np.clip(np.float32([0, 8, 28]) / 255 * (1 + 0.3 * np.exp(-(((xx - 540) / 900) ** 2 + ((yy - 520) / 900) ** 2)))[..., None], 0, 1).astype(np.float32)
     fr = CBG.copy()
     for k, n in enumerate(("IMG_1065", "IMG_2812")):
-        c = kpanel(n, *KN[n], y_nip=300, y_knee=820, h=820)[:, 270:810]; fr[300:1120, k * 540:(k + 1) * 540] = c
+        c = neckfit(n, 330, 1110, pw=540, maxw=500)[300:1120]; fr[300:1120, k * 540:(k + 1) * 540] = c
     fr[300:1120, 538:542] = PINK; chip(fr, "ДО", 40, 320); chip(fr, "ПОСЛЕ", 580, 320)
     g = np.clip((yy[:, :1] - 940) / 200, 0, 1)[..., None]; fr = fr * (1 - g) + CBG * g
     hd = Drop(["МНЕ 52. И Я ХОТЕЛА", "*СДЕЛАТЬ ВСЁ ЗА ОДИН РАЗ*"], 100, 70, 1150, maxw=920); hd.draw(fr, 99, 0)
