@@ -481,9 +481,24 @@ def interview(t, b, z):
     """the interview, framed on her face (smoothed face track)"""
     _, _, parts, t0, d = next(x for x in SEG if x[0] == b); st = parts[0][0] + (t - t0)
     f = V["IMG_2831"].at(max(0, st)); bx = FACE[min(int(round(st * FPS)), len(FACE) - 1)]
+    f = soft_blur(f, *bx)
     return full(f, (bx[0] + bx[2] / 2) / W, (bx[1] + bx[3] * 0.75) / H, z)
+def soft_blur(f, x, y, w, h):
+    """the face blurred with no visible edge: a wide box, the blur fades out through a large feather"""
+    cx, cy = x + w / 2, y + h / 2; rw, rh = w * 1.25, h * 1.15
+    x0, y0, x1, y1 = int(max(0, cx - rw)), int(max(0, cy - rh)), int(min(f.shape[1], cx + rw)), int(min(f.shape[0], cy + rh))
+    if x1 <= x0 or y1 <= y0: return f
+    reg = f[y0:y1, x0:x1].astype(np.float32); bl = cv2.GaussianBlur(cv2.resize(cv2.resize(reg, None, fx=0.06, fy=0.06), (x1 - x0, y1 - y0)), (0, 0), 6)
+    m = np.zeros((y1 - y0, x1 - x0), np.float32); cv2.ellipse(m, (int(cx - x0), int(cy - y0)), (int(w * 0.62), int(h * 0.62)), 0, 0, 360, 1, -1)
+    m = cv2.GaussianBlur(m, (0, 0), w * 0.28)[..., None]; m = np.clip(m * 1.6, 0, 1)
+    out = f.copy(); out[y0:y1, x0:x1] = (reg * (1 - m) + bl * m).astype(np.uint8); return out
+def head_blur(img, y):
+    """photos: everything above `y` (the face) softly blurred, fading out over 160 px"""
+    top = img[:y + 160].astype(np.float32); bl = cv2.GaussianBlur(cv2.resize(cv2.resize(top, None, fx=0.05, fy=0.05), (img.shape[1], y + 160)), (0, 0), 8)
+    m = np.clip((y + 80 - np.arange(y + 160)) / 160, 0, 1)[:, None, None]; out = img.copy(); out[:y + 160] = (top * (1 - m) + bl * m).astype(np.uint8); return out
 def photo(n): return cv2.imread(os.path.join(WORK, n + ".png"))[..., ::-1].copy()
-PH = {n: photo(n) for n in ("IMG_1065", "IMG_1069", "IMG_1073", "IMG_2812", "IMG_2814", "IMG_2816", "IMG_2820")}
+FACE_Y = {"IMG_1065": 560, "IMG_1069": 300, "IMG_1073": 330, "IMG_2812": 270, "IMG_2814": 270, "IMG_2816": 330, "IMG_2820": 0}
+PH = {n: (head_blur(photo(n), y) if y else photo(n)) for n, y in FACE_Y.items()}
 
 # ---------------- subtitles from the recogniser's word timings (hand fixes)
 FIX = {"полиса.": "полюса.", "скажите.": "скажу я вам,", "сделал": "сделала"}
@@ -658,7 +673,7 @@ def render(t):
     if t < T_Z: subtitles(fr, t)
     return fr
 
-MUSIC = os.path.join(SRC, "music.wav"); M0 = 0.0
+MUSIC = os.path.join(SRC, "music.wav"); M0 = 13.5                      # the client's track: skips its near-silent intro
 G_VO, G_GAP = 0.022, 0.075
 def track(n):
     if not os.path.exists(MUSIC): return np.zeros((n, 2))
@@ -666,12 +681,19 @@ def track(n):
     if x.shape[1] == 1: x = np.repeat(x, 2, 1)
     seg = x[int(M0 * SR):int(M0 * SR) + n]; seg = seg / np.sqrt(np.mean(seg.mean(1) ** 2))
     return np.pad(seg, ((0, n - len(seg)), (0, 0)))
+ALT = {"A": [(11.30, 14.05)], "B": [(22.48, 31.85)], "D": [(70.84, 76.50)], "F": [(214.36, 223.88)], "G": [(231.80, 235.45)]}   # her lines only, not the questions
 def build_audio(path):
     n = int(DUR * SR); vo = np.zeros(n); act = np.zeros(n); srcs = {}
+    w = wave.open(os.path.join(WORK, "IMG_2831_alt.wav")); alt = hp(np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64) / 32768, 90)
     for b, s_, parts, t0, d in SEG:
         if s_ not in srcs:
             w = wave.open(os.path.join(WORK, f"{s_}.wav")); srcs[s_] = hp(np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64) / 32768, 90)
         x = srcs[s_]; seg = x[int(parts[0][0] * SR):int(parts[0][1] * SR)].copy()
+        for a_, o_ in ALT.get(b, []):                                    # the patient's lines with a changed (lighter, not rough) voice
+            xa = alt[int(a_ * SR):int(o_ * SR)]; i_ = int((a_ - parts[0][0]) * SR); f_ = int(0.012 * SR); r_ = np.linspace(0, 1, f_)
+            xa = xa[:len(seg) - i_].copy(); xa[:f_] = seg[i_:i_ + f_] * (1 - r_) + xa[:f_] * r_
+            if i_ + len(xa) < len(seg): xa[-f_:] = xa[-f_:] * (1 - r_) + seg[i_ + len(xa) - f_:i_ + len(xa)] * r_
+            seg[i_:i_ + len(xa)] = xa
         fi, fo = int(0.03 * SR), int(0.12 * SR)
         seg[:fi] *= np.sin(np.linspace(0, np.pi / 2, fi)) ** 2; seg[-fo:] *= np.cos(np.linspace(0, np.pi / 2, fo)) ** 2
         fr_rms = np.sqrt(np.mean(seg[:len(seg) // 960 * 960].reshape(-1, 960) ** 2, 1)); g = 1 / (np.sqrt(np.mean(np.sort(fr_rms)[-max(1, len(fr_rms) * 2 // 5):] ** 2)) + 1e-6)
