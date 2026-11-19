@@ -454,7 +454,7 @@ def click():
 
 
 # ---------------- voice edit: (block, source, [(in, out), …]) — whole sentences
-VO = [("A", "IMG_2831", [(11.30, 14.05)]),                    # мне 52 года, я живу в Москве
+VO = [("A", "IMG_2831", [(11.30, 14.30)]),                    # мне 52 года, я живу в Москве
       ("B", "IMG_2831", [(22.48, 31.85)]),                    # я искала, чтобы мне сделали комплекс, потому что тратить время несколько раз на восстановление — не мой вариант вообще
       ("C", "IMG_1089", [(1.50, 6.10)]),                      # (хирург) сегодня у нас комплексная операция, мы будем делать подтяжку груди
       ("D", "IMG_2831", [(70.84, 76.50)]),                    # большая часть предлагают всё-таки импланты, а я не хотела импланты
@@ -726,7 +726,7 @@ def track(n):
     seg = x[int(M0 * SR):int(M0 * SR) + n]; seg = seg / np.sqrt(np.mean(seg.mean(1) ** 2))
     return np.pad(seg, ((0, n - len(seg)), (0, 0)))
 # IMG_2831_alt.wav: her lines re-voiced with tools/voice_knnvc.py (kNN-VC, reference: Piper ru_RU-irina-medium), pasted over the original at the ALT ranges
-ALT = {"A": [(11.30, 14.05)], "B": [(22.48, 31.85)], "D": [(70.84, 76.50)], "F": [(214.36, 223.88)], "G": [(231.80, 235.45)]}   # her lines only, not the questions
+ALT = {"A": [(11.30, 14.30)], "B": [(22.48, 31.85)], "D": [(70.84, 76.50)], "F": [(214.36, 223.88)], "G": [(231.80, 235.45)]}   # her lines only, not the questions
 def build_audio(path):
     n = int(DUR * SR); vo = np.zeros(n); act = np.zeros(n); srcs = {}
     w = wave.open(os.path.join(WORK, "IMG_2831_alt.wav")); alt = hp(np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64) / 32768, 90)
