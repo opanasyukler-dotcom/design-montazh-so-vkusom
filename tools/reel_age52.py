@@ -496,9 +496,9 @@ def static_blur(f, b):
     """a still, soft Gaussian blur over the head: the same place and size for the whole block, a wide feather, no pixel blocks"""
     if b not in _SBM:
         cx, cy = BLOCK_FACE[b]; m = np.zeros(f.shape[:2], np.float32)
-        cv2.ellipse(m, (int(cx), int(cy - 10)), (130, 165), 0, 0, 360, 1, -1); _SBM[b] = cv2.GaussianBlur(m, (0, 0), 38)[..., None] ** 0.7
+        cv2.ellipse(m, (int(cx), int(cy - 15)), (175, 220), 0, 0, 360, 1, -1); _SBM[b] = np.clip(cv2.GaussianBlur(m, (0, 0), 45)[..., None] * 1.5, 0, 1) ** 0.7   # wider, solid in the middle
     m = _SBM[b]; ys, xs = np.where(m[..., 0] > 0.01); y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
-    reg = f[y0:y1, x0:x1].astype(np.float32); bl = cv2.GaussianBlur(reg, (0, 0), 28)
+    reg = f[y0:y1, x0:x1].astype(np.float32); bl = cv2.GaussianBlur(reg, (0, 0), 45)
     out = f.copy(); mm = m[y0:y1, x0:x1]; out[y0:y1, x0:x1] = (reg * (1 - mm) + bl * mm).astype(np.uint8); return out
 def soft_blur(f, x, y, w, h):
     """the face blurred with no visible edge: a wide box, the blur fades out through a large feather"""
@@ -589,7 +589,7 @@ HB = top(Drop(["ВОССТАНАВЛИВАТЬСЯ", "*ТОЛЬКО ОДИН Р�
 def s_b(t):
     lt = t - T_S["B"]; tsw = T_S["B"] + 4.6
     if t < tsw: fr = full(V["IMG_1088"].at(17.8 + lt), 0.5, 0.45, lerp(1.08, 1.0, eo(lt / 4.0)))
-    else: fr = neckfit("IMG_1065", 470, 1560, lerp(1.04, 1.0, eo((t - tsw) / 3.0)), maxw=880)
+    else: fr = neckfit("IMG_1065", 440, 1600, lerp(1.04, 1.0, eo((t - tsw) / 3.0)), maxw=880)
     dark(fr); chip(fr, "ДО", LX, 1080); HB.draw(fr, t, T_S["B"] + 0.05)
     tk = Rs("B", 27.88); tx = Rs("B", 30.50)                     # «несколько раз» / «не мой вариант»
     for k in range(3):
@@ -620,7 +620,7 @@ ZONE_T = lambda k: Rs("C", 4.72) + 0.62 * k
 # D — the collages: ПОСЛЕ over ДО, front then 3/4; «я не хотела импланты» → the implant crossed out
 HD = top(Drop(["ГРУДЬ БЕЗ ИМПЛАНТОВ.", "*СОБСТВЕННЫЙ ЖИР.*"], 72, LX, 0, maxw=900), 245)
 NK = {"IMG_1065": (650, 3050, 1035), "IMG_1069": (330, 3200, 1150), "IMG_2812": (300, 3130, 1035), "IMG_2814": (300, 3230, 1150)}   # (neck, knee, centre x)
-NT = {"IMG_1065": (650, 2660), "IMG_1069": (330, 2900), "IMG_2812": (300, 2370), "IMG_2814": (300, 2600), "IMG_2816": (330, 2720), "IMG_2820": (280, 2500)}   # (neck, fingertips) in photo px
+NT = {"IMG_1065": (570, 3170), "IMG_1069": (250, 3260), "IMG_2812": (220, 3140), "IMG_2814": (220, 3200), "IMG_2816": (250, 3160), "IMG_2820": (200, 3100)}   # (a little above the neck, below the knees) in photo px
 def neckfit(n, y0, y1, z=1.0, pw=W, maxw=None):
     """neck to fingertips: the neck on y0, the fingertips on y1, centred on the body; below the fingertips fades out"""
     img, m = PHC[n]; neck, tip = NT[n]; s_ = (y1 - y0) / (tip - neck) * z
@@ -637,7 +637,7 @@ def spanel(n, y_neck=560, y_knee=1300, pw=540):
     xs0, ys0 = max(0, ox), max(0, oy); xs1, ys1 = min(r.shape[1], ox + pw), min(r.shape[0], oy + H)
     out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = r[ys0:ys1, xs0:xs1]
     return out * np.clip((1600 - np.arange(H)) / 90, 0, 1)[:, None, None]   # below the knees fades out (no floor)
-COLL = [np.hstack([neckfit(d, 500, 1460, pw=540, maxw=500), neckfit(p, 500, 1460, pw=540, maxw=500)]) for p, d in (("IMG_2812", "IMG_1065"), ("IMG_2814", "IMG_1069"))]   # ДО left, ПОСЛЕ right
+COLL = [np.hstack([neckfit(d, 460, 1600, pw=540, maxw=520), neckfit(p, 460, 1600, pw=540, maxw=520)]) for p, d in (("IMG_2812", "IMG_1065"), ("IMG_2814", "IMG_1069"))]   # ДО left, ПОСЛЕ right
 T_D = T_S["D"] - 1.4; D_SW = vstart("D") + 2.6
 def s_d(t):
     k = 0 if t < D_SW else 1; u = t - (T_D if k == 0 else D_SW)
@@ -680,7 +680,7 @@ HG = Drop(["*100%*"], 220, LX, 0, maxw=900)
 def s_g(t):
     if t < T_GA:
         lt = t - T_S["G"]; dk = (T_GA - T_S["G"]) / 3; k = min(2, int(lt / dk)); u = lt - k * dk
-        fr = neckfit(G_PH[k], 480, 1540, lerp(1.04, 1.0, eo(u / dk)), maxw=900)
+        fr = neckfit(G_PH[k], 430, 1600, lerp(1.04, 1.0, eo(u / dk)), maxw=900)
         f = 1 - eo(u / 0.16) if k else 0; fr = fr * (1 - f * 0.8) + f * 0.8
         dark(fr); chip(fr, "ПОСЛЕ", LX, 270); TG.y = 340 + TG.top; TG.draw(fr, t, T_S["G"] + 0.3)
         return fr
