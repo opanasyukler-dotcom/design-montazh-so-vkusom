@@ -577,7 +577,7 @@ def kpanel(n, nip, knee, cx, y_nip=470, y_knee=935, h=960):
 KN = {"IMG_1065": (1300, 3050, 1035), "IMG_1069": (1170, 3200, 1160), "IMG_2812": (1010, 3130, 1035), "IMG_2814": (1110, 3230, 1160)}
 
 # A — the hook on her face: three lines drop one by one
-HA = [Drop(["52 ГОДА."], 120, LX, 300, maxw=900), Drop(["МАСШТАБНАЯ ОПЕРАЦИЯ."], 92, LX, 430, maxw=900), Drop(["*ОДНО ВОССТАНОВЛЕНИЕ.*"], 92, LX, 540, maxw=900)]
+HA = [Drop(["52 ГОДА."], 120, LX, 300, maxw=900), Drop(["2 ОПЕРАЦИИ ЗА 1 РАЗ."], 92, LX, 430, maxw=900), Drop(["*ОДНО ВОССТАНОВЛЕНИЕ.*"], 92, LX, 540, maxw=900)]
 HA_T = [0.05, 0.85, 1.65]
 def s_a(t):
     fr = dark(interview(t, "A", 1.9))
@@ -585,7 +585,7 @@ def s_a(t):
     return fr
 
 # B — her reason over the ДО: «несколько раз на восстановление» — three calendars, crossed; «не мой вариант» → 1 РАЗ
-HB = top(Drop(["ВОССТАНАВЛИВАТЬСЯ", "*ТОЛЬКО ОДИН РАЗ*"], 92, LX, 0, maxw=900), 280)
+HB = top(Drop(["*ОДНА РЕАБИЛИТАЦИЯ*"], 100, LX, 0, maxw=900), 280)
 def s_b(t):
     lt = t - T_S["B"]; tsw = T_S["B"] + 4.6
     if t < tsw: fr = full(V["IMG_1088"].at(17.8 + lt), 0.5, 0.45, lerp(1.08, 1.0, eo(lt / 4.0)))
