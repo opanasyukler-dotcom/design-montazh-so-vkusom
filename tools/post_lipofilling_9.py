@@ -301,19 +301,15 @@ def s9():
     for i, r in enumerate(rows): sl.text((hx, y + i * 42), r, f, WHITE)
     heart(sl, hx + f.getlength(rows[-1]) / S + 26, y + (len(rows) - 1) * 42 + 20, 16)
     y += len(rows) * 42 + 40
-    # contact card: Direct, then the WhatsApp/Telegram number and the separate MAX number
+    # contact card: the WhatsApp/Telegram number and the separate MAX number
     x, y0 = 100, y
     t1 = ("По всем вопросам, пожалуйста, сразу пишите в WhatsApp, Telegram по удобным контактам "
           "в шапке профиля, оставляю номер и здесь:")
     n1 = len(wrap(t1, mont(26, 300), 840))
-    y_t1 = y0 + 172; y_p1 = y_t1 + n1 * 26 * 1.3 + 10
+    y_t1 = y0 + 44; y_p1 = y_t1 + n1 * 26 * 1.3 + 10
     y_t2 = y_p1 + 92; y_p2 = y_t2 + 26 * 1.32 + 10
     box = (60, y0, 1020, int(y_p2 + 96))
     sl.shadow(box, 30, 20, 110); sl.rrect(box, 30, WHITE, 22, outline=POWDER, w=1.2)
-    icon_circle(sl, (x + 34, y0 + 70), "chat", 32)
-    sl.text((x + 90, y0 + 40), "Для записи напишите в Direct", mont(28, 300), WHITE)
-    sl.text((x + 90, y0 + 76), "«КОНСУЛЬТАЦИЯ»", bebas(50), POWDER)
-    sl.poly([(box[0] + 40, y0 + 150), (box[2] - 40, y0 + 150)], POWDER, 1, 120)
     para(sl, x, y_t1, t1, 26, 300, WHITE, 840, 1.3)
     sl.text((x, y_p1), "+7 926 636-30-00", mont(44, 600), WHITE)
     sl.text((box[2] - 40, y_p1 + 22), "WhatsApp · Telegram", mont(24, 400), POWDER, "ra")
