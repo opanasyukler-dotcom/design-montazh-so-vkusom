@@ -5,7 +5,7 @@ navy slides, powder Bebas headlines, thin Montserrat, before/after photos in rou
   02 shins: front and back result, stacked, with 'спереди' / 'сзади' labels
   03 lower eyelids: straight-on and three-quarter result
   04 hands: the hands result
-  (a hips slide is added when HIPS files are given)
+  02 hips (when HIPS files are given): back and side result (IMG_0612, IMG_0614)
 
 usage: python3 post_lipofilling_zones.py MATERIALS_DIR OUT_DIR [HIPS_1.jpg HIPS_2.jpg]
 """
@@ -111,7 +111,7 @@ def main():
     out = [cover(1, total)]
     k = 2
     if HIPS:
-        out.append(two_stacked(k, total, ["КОРРЕКЦИЯ БЁДЕР"], [("результат 1", HIPS[0], 1.345, 0.5), ("результат 2", HIPS[1], 1.345, 0.5)],
+        out.append(two_stacked(k, total, ["КОРРЕКЦИЯ БЁДЕР"], [("сзади", HIPS[0], 1.0, 0.5), ("сбоку", HIPS[1], 1.0, 0.5)],
                                f"{k:02d}_hips.jpg")); k += 1
     out.append(two_stacked(k, total, ["ЛИПОФИЛИНГ ГОЛЕНЕЙ"],
                            [("спереди", "IMG_0668.JPG", 1024 / 761, 0.5), ("сзади", "IMG_0669.JPG", 1024 / 761, 0.5)],
