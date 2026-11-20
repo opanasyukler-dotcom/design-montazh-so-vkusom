@@ -1,134 +1,127 @@
 """Carousel 'Липофилинг — это не только про грудь' (1080x1350) in the reference post style:
-dark cinematic cover, powder Bebas headlines, thin Montserrat, light powder collage with arch /
-circle frames and a dotted path, one slide per zone with the before/after photo in a card.
+navy slides, powder Bebas headlines, thin Montserrat, before/after photos in rounded cards.
 
-usage: python3 post_lipofilling_zones.py MATERIALS_DIR OUT_DIR
-MATERIALS_DIR holds the Drive files (IMG_0668 thighs, IMG_0669 shins, IMG_0671-0673 lower lids,
-IMG_0678 hands, clip.mp4 face marking).
+  01 cover: breast lipofilling result (front + three-quarter) under the headline
+  02 shins: front and back result, stacked, with 'спереди' / 'сзади' labels
+  03 lower eyelids: straight-on and three-quarter result
+  04 hands: the hands result
+  (a hips slide is added when HIPS files are given)
+
+usage: python3 post_lipofilling_zones.py MATERIALS_DIR OUT_DIR [HIPS_1.jpg HIPS_2.jpg]
 """
-import os, sys, subprocess, tempfile
-import numpy as np
+import os, sys
 from PIL import Image, ImageDraw, ImageOps
 
 SRC, OUT = sys.argv[1:3]
-TMP = tempfile.mkdtemp()
-cover_png = os.path.join(TMP, "cover.png")
-subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "15", "-i", os.path.join(SRC, "clip.mp4"), "-frames:v", "1", cover_png], check=True)
-# the clip carries burnt-in subtitles (y 925-1022 of 720x1280); they sit under the dark cover shade but
-# would still ghost through, so the band is inpainted before the frame becomes the cover background
-import cv2  # noqa: E402
-_f = cv2.imread(cover_png); _m = np.zeros(_f.shape[:2], np.uint8); _m[922:1026, 110:610] = 255
-cv2.imwrite(cover_png, cv2.inpaint(_f, _m, 9, cv2.INPAINT_TELEA))
-sys.argv = [sys.argv[0], cover_png, OUT]
+HIPS = sys.argv[3:5]
+sys.argv = [sys.argv[0], os.path.join(SRC, "IMG_0665.JPG"), OUT]
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import surgeon_style as ss  # noqa: E402
-from surgeon_style import (Slide, bebas, mont, logo, vshade, icon_circle, POWDER, NAVY, DEEP, WHITE, INK, MAUVE, S)  # noqa: E402
+from surgeon_style import Slide, bebas, mont, logo, vshade, POWDER, NAVY, DEEP, WHITE, S  # noqa: E402
 
 PW, PH = 1080, 1350
-TOTAL = 6
 
 
 def photo(name):
-    return ImageOps.exif_transpose(Image.open(os.path.join(SRC, name))).convert("RGB")
+    p = name if os.path.isabs(name) else os.path.join(SRC, name)
+    return ImageOps.exif_transpose(Image.open(p)).convert("RGB")
 
 
-def cover_fit(im, w, h, cx=0.5, cy=0.5):
+def fit(im, w, h, cx=0.5, cy=0.5):
     s = max(w / im.width, h / im.height)
     im = im.resize((max(w, round(im.width * s)), max(h, round(im.height * s))), Image.LANCZOS)
     x, y = int((im.width - w) * cx), int((im.height - h) * cy)
     return im.crop((x, y, x + w, y + h))
 
 
-def place(sl, im, box, shape="rect", cx=0.5, cy=0.5, r=28, shadow=True):
-    """photo into a frame: rect (rounded), arch (round top) or circle"""
+def card(sl, im, box, r=26, cx=0.5, cy=0.5):
     x0, y0, x1, y1 = box; w, h = int((x1 - x0) * S), int((y1 - y0) * S)
-    ph = cover_fit(im, w, h, cx, cy)
-    m = Image.new("L", (w, h), 0); dm = ImageDraw.Draw(m)
-    if shape == "circle": dm.ellipse((0, 0, w - 1, h - 1), fill=255)
-    elif shape == "arch": dm.rounded_rectangle((0, 0, w - 1, h - 1 + w // 2), radius=w // 2, fill=255)
-    else: dm.rounded_rectangle((0, 0, w - 1, h - 1), radius=r * S, fill=255)
-    if shadow: sl.shadow(box, (x1 - x0) // 2 if shape != "rect" else r, 20, 110)
-    sl.im.paste(ph, (int(x0 * S), int(y0 * S)), m)
+    m = Image.new("L", (w, h), 0); ImageDraw.Draw(m).rounded_rectangle((0, 0, w - 1, h - 1), radius=r * S, fill=255)
+    sl.shadow(box, r, 20, 120)
+    sl.im.paste(fit(im, w, h, cx, cy), (int(x0 * S), int(y0 * S)), m)
 
 
-def counter(sl, n, col=WHITE, a=170):
-    sl.text((PW - 80, 1286), f"{n:02d} / {TOTAL:02d}", mont(24, 400), col, "rs", a=a, spacing=2)
+def base():
+    sl = Slide(PW, PH); sl.rrect((0, 0, PW, PH), 0, NAVY); vshade(sl, 0, PH, 0.0, 0.5, DEEP)
+    logo(sl, 92); return sl
+
+
+def counter(sl, n, total):
+    sl.text((PW - 80, 1300), f"{n:02d} / {total:02d}", mont(24, 400), WHITE, "rs", a=170, spacing=2)
 
 
 def swipe(sl, x, y, col=POWDER):
-    """'>>>' hint as three chevrons, the way the reference posts lead to the next slide"""
     for i in range(3):
         cx = x + i * 26; sl.poly([(cx, y - 13), (cx + 13, y), (cx, y + 13)], col, 2.4, 255 - i * 60)
 
 
-# ------------------------------------------------------------------ 1 cover
-def s1():
-    bg = ss.photo_bg(PW, PH, blur=0, tint=NAVY, k=0.4, dark=0.2, cx=1.0, cy=0.736, zoom=1.2, gray=0.25)
-    sl = Slide(PW, PH, bg)
-    vshade(sl, 0, 260, 0.6, 0.0, DEEP); vshade(sl, 560, 960, 0.0, 0.97, DEEP)
-    logo(sl, 92)
-    y = sl.lines((80, 760), ["А ВЫ ЗНАЛИ,", "ЧТО ЛИПОФИЛИНГ"], bebas(108), POWDER, lh=0.9)
-    y = sl.lines((84, y + 14), ["(увеличение жировой тканью)"], mont(36, 300), WHITE, lh=1.2)
-    y = sl.lines((80, y + 26), ["ЭТО НЕ ТОЛЬКО ПРО ГРУДЬ."], bebas(84), WHITE, lh=0.92)
-    swipe(sl, 86, y + 56)
-    counter(sl, 1)
-    return sl.save("01_cover.jpg")
+def cover(n, total):
+    sl = base()
+    y = sl.lines((80, 160), ["А ВЫ ЗНАЛИ, ЧТО ЛИПОФИЛИНГ"], bebas(92), POWDER, lh=0.9)
+    y = sl.lines((84, y + 10), ["(увеличение жировой тканью)"], mont(34, 300), WHITE, lh=1.2)
+    y = sl.lines((80, y + 18), ["ЭТО НЕ ТОЛЬКО ПРО ГРУДЬ."], bebas(78), WHITE, lh=0.92)
+    swipe(sl, 940, y - 34)
+    top = y + 40
+    h = 1270 - top; w = int(h * 720 / 1280)          # the breast collages are 9:16 (after on top, before below)
+    gap = 30; x0 = (PW - 2 * w - gap) // 2
+    card(sl, photo("IMG_0665.JPG"), (x0, top, x0 + w, top + h))
+    card(sl, photo("IMG_0666.JPG"), (x0 + w + gap, top, x0 + 2 * w + gap, top + h))
+    sl.text((x0 + 18, top + h - 20), "липофилинг груди", mont(26, 400), WHITE, "ls", a=220)
+    counter(sl, n, total)
+    return sl.save(f"{n:02d}_cover.jpg")
 
 
-# ------------------------------------------------------------------ 2 list collage (light)
-ZONES = [("Коррекция бёдер", "IMG_0668.JPG", (0.25, 0.45)),
-         ("Липофилинг голеней", "IMG_0669.JPG", (0.25, 0.75)),
-         ("Липофилинг нижних век", "IMG_0673.JPG", (0.5, 0.2)),
-         ("Липофилинг кистей рук", "IMG_0678.JPG", (0.25, 0.5))]
+def pill(sl, x, y, text):
+    f = mont(26, 400); tw = f.getlength(text) / S
+    sl.rrect((x, y, x + tw + 36, y + 46), 23, NAVY, 225)
+    sl.text((x + 18, y + 23), text, f, WHITE, "lm")
 
 
-def s2():
-    sl = Slide(PW, PH); sl.rrect((0, 0, PW, PH), 0, POWDER); sl.rrect((0, 0, PW, PH), 0, (238, 228, 229), a=110)
-    logo(sl, 92, MAUVE, 0.8)
-    y = sl.lines((76, 190), ["А ТАКЖЕ", "ЭТО ЕЩЁ:"], bebas(124), NAVY, lh=0.88)
-    # list on the left with short rules, like the reference
-    yy = y + 50
-    for i, (t, *_) in enumerate(ZONES):
-        sl.poly([(78, yy), (156, yy)], MAUVE, 1.8)
-        sl.text((78, yy + 26), f"0{i + 1}", mont(26, 500), MAUVE, spacing=2)
-        rows = t.split(" ", 1) if len(t) > 16 else [t]
-        sl.lines((78, yy + 66), rows, mont(38, 300), INK, lh=1.15)
-        yy += 210
-    # frames on the right connected by a dotted path
-    frames = [((600, 120, 980, 470), "arch"), ((660, 520, 920, 780), "circle"),
-              ((560, 830, 860, 1110), "rect"), ((790, 1010, 1010, 1230), "circle")]
-    sl.dashed(ss.bez((560, 330), (480, 520), (640, 560), (660, 650)), MAUVE, 1.6, 4, 9, 200)
-    sl.dashed(ss.bez((700, 780), (560, 820), (520, 900), (560, 960)), MAUVE, 1.6, 4, 9, 200)
-    sl.dashed(ss.bez((860, 980), (920, 975), (930, 990), (900, 1012)), MAUVE, 1.6, 4, 9, 200)
-    for (box, shape), (t, f, (cx, cy)) in zip(frames, ZONES):
-        im = photo(f)
-        place(sl, im, box, shape, cx, cy, r=26)
-    for p in ((560, 330), (660, 650), (560, 960)): sl.dot(p, 6, MAUVE)
-    counter(sl, 2, MAUVE, 200)
-    return sl.save("02_list.jpg")
+def two_stacked(n, total, title, items, name):
+    """one-line title, two results stacked and centred, each labelled with a small pill on the card"""
+    sl = base()
+    sl.lines((80, 170), title, bebas(104), POWDER, lh=0.9)
+    gap, top, bottom = 26, 300, 1265
+    y = top
+    for label, fname, aspect, cy in items:
+        h = int((bottom - top - gap) / 2); w = int(min(h * aspect, 960)); h = int(w / aspect)
+        x = (PW - w) // 2
+        card(sl, photo(fname), (x, y, x + w, y + h), cy=cy)
+        pill(sl, x + 18, y + 18, label)
+        y += h + gap
+    counter(sl, n, total)
+    return sl.save(name)
 
 
-# ------------------------------------------------------------------ 3-6 one zone per slide
-def zone(n, title, fname, box, kicker="липофилинг", cy=0.5):
-    sl = Slide(PW, PH); sl.rrect((0, 0, PW, PH), 0, NAVY); vshade(sl, 0, PH, 0.0, 0.5, DEEP)
-    logo(sl, 92)
-    sl.text((82, 200), f"0{n - 2}", mont(30, 500), POWDER, spacing=3)
-    sl.poly([(140, 216), (230, 216)], POWDER, 1.6)
-    y = sl.lines((80, 236), title, bebas(118), POWDER, lh=0.9)
-    place(sl, photo(fname), box, "rect", 0.5, cy, r=28)
-    counter(sl, n)
-    return sl.save(f"0{n}_{os.path.splitext(fname)[0]}.jpg")
+def single(n, total, title, fname, name):
+    sl = base()
+    sl.lines((80, 170), title, bebas(104), POWDER, lh=0.9)
+    im = photo(fname); w = 960; h = int(w * im.height / im.width)
+    y = 300 + (1265 - 300 - h) // 2
+    card(sl, im, (60, y, 60 + w, y + h))
+    counter(sl, n, total)
+    return sl.save(name)
 
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    out = [s1(), s2(),
-           zone(3, ["КОРРЕКЦИЯ", "БЁДЕР"], "IMG_0668.JPG", (60, 500, 1020, 1213)),
-           zone(4, ["ЛИПОФИЛИНГ", "ГОЛЕНЕЙ"], "IMG_0669.JPG", (60, 500, 1020, 1213)),
-           zone(5, ["ЛИПОФИЛИНГ", "НИЖНИХ ВЕК"], "IMG_0673.JPG", (190, 480, 890, 1180)),
-           zone(6, ["ЛИПОФИЛИНГ", "КИСТЕЙ РУК"], "IMG_0678.JPG", (60, 520, 1020, 1160))]
-    ss.sheet(out, 3, 540, "00_overview.jpg")
-    print("ok")
+    for f in os.listdir(OUT):
+        if f.endswith(".jpg"): os.remove(os.path.join(OUT, f))
+    total = 5 if HIPS else 4
+    out = [cover(1, total)]
+    k = 2
+    if HIPS:
+        out.append(two_stacked(k, total, ["КОРРЕКЦИЯ БЁДЕР"], [("результат 1", HIPS[0], 1.345, 0.5), ("результат 2", HIPS[1], 1.345, 0.5)],
+                               f"{k:02d}_hips.jpg")); k += 1
+    out.append(two_stacked(k, total, ["ЛИПОФИЛИНГ ГОЛЕНЕЙ"],
+                           [("спереди", "IMG_0668.JPG", 1024 / 761, 0.5), ("сзади", "IMG_0669.JPG", 1024 / 761, 0.5)],
+                           f"{k:02d}_shins.jpg")); k += 1
+    out.append(two_stacked(k, total, ["ЛИПОФИЛИНГ НИЖНИХ ВЕК"],
+                           [("анфас", "IMG_0673.JPG", 1.0, 0.5), ("в три четверти", "IMG_0671.JPG", 1.0, 0.5)],
+                           f"{k:02d}_eyelids.jpg")); k += 1
+    out.append(single(k, total, ["ЛИПОФИЛИНГ КИСТЕЙ РУК"], "IMG_0678.JPG", f"{k:02d}_hands.jpg"))
+    ss.sheet(out, len(out), 432, "00_overview.jpg")
+    print("ok", len(out))
 
 
 if __name__ == "__main__":
