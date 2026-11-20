@@ -655,11 +655,11 @@ def s_h(t):
     return fr
 
 # Z — the question to the viewer and the consultation
-HZ = Drop(["А ВАМ УЖЕ МОЖНО", "*ДЕЛАТЬ АБДОМИНОПЛАСТИКУ*", "*ИЛИ СТОИТ ЕЩЁ ПОХУДЕТЬ?*"], 84, LX, 700, maxw=920, stag=0.02)
+HZ = Drop(["А МОЖНО ЛИ ВАМ", "*ДЕЛАТЬ АБДОМИНОПЛАСТИКУ?*", "РАЗБЕРЁМ ЛИЧНО", "НА КОНСУЛЬТАЦИИ"], 84, LX, 700, maxw=920, stag=0.02)
 TZ = Track(["это можно выяснить даже на онлайн-консультации"], 32, LX, 0, 400)
 def s_z(t):
     lt = t - T_Z; fr = gbg(t); blend(fr, logo_alpha(260), 540 - 130, 440, PINK, eo((lt - 0.1) / 0.5))
-    HZ.draw(fr, t, T_Z + 0.2); TZ.y = HZ.y + HZ.h + 46 + TZ.top; TZ.draw(fr, t, T_Z + 1.2); return fr
+    HZ.draw(fr, t, T_Z + 0.2); return fr
 
 SCENES = [(0, s_a), (T_S["B"], s_b), (T_S["C"], s_c), (T_S["D"], s_d), (T_S["E"], s_ef), (T_S["G"], s_g), (T_S["H"], s_h), (T_Z, s_z)]
 TRANS = {T_S["B"]: ("zoom", 0.35), T_S["C"]: ("diag", 0.45), T_S["D"]: ("zoom", 0.35), T_S["E"]: ("iris", 0.5), T_S["G"]: ("zoom", 0.35), T_S["H"]: ("diag", 0.45), T_Z: ("iris", 0.5)}
