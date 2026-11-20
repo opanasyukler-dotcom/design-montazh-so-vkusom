@@ -580,7 +580,10 @@ def check(fr, cx, cy, r, p, col=PINK): path_draw(fr, [(cx - r, cy), (cx - r * 0.
 HA = top(Drop(["ПОЧЕМУ Я ПОКА", "*НЕ РЕКОМЕНДУЮ*", "*ОПЕРИРОВАТЬСЯ?*"], 96, LX, 0, maxw=900), 270)
 def s_a(t):
     lt = t - T_S["A"]
-    if lt < 4.6: fr = surgeon(t, "A", lerp(1.15, 1.0, eo(lt / 4.0)), 0.45, 0.45)
+    if lt < 2.6: fr = full(V["IMG_6655"].at(60.6 + lt), 0.62, 0.44, lerp(1.45, 1.35, eo(lt / 2.6)))   # the opening on her face
+    elif lt < 4.6:
+        fr = surgeon(t, "A", lerp(1.15, 1.08, eo((lt - 2.6) / 2.0)), 0.45, 0.45)                         # then over her shoulder at the tablet
+        if lt < 2.75: f_ = 0.7 * (1 - eo((lt - 2.6) / 0.15)); fr = fr * (1 - f_) + f_
     else: fr = tablet(2.0, lerp(1.25, 1.15, eo((lt - 4.6) / 3.5)), 0.5, 0.42)
     fr = dark(fr); HA.draw(fr, t, 0.05)
     tk = Rs("A", 39.18)                                                   # «5–10 килограмм»
