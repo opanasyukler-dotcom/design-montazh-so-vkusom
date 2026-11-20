@@ -490,19 +490,52 @@ def home(t, st0):
     """her home video: the face under a still blur"""
     f = V["IMG_6583"].at(st0 + t); return full(f, 0.5, 0.5, 1.0)   # no face blur (the client's call)
 SR_BOX = (352, 30, 928, 840)                                               # the photo inside the tablet recording (x0, y0, x1, y1)
-def tablet(st, zoom=1.0, fx=0.5, fy=0.5):
+def tablet(st, zoom=1.0, fx=0.5, fy=0.5, P=None):
     """the surgeon's tablet: the marked photo, zoomed on a point; around it a blurred copy of itself"""
-    f = V["SR"].at(st); x0, y0, x1, y1 = SR_BOX; P = f[y0:y1, x0:x1]
+    if P is None: f = V["SR"].at(st); x0, y0, x1, y1 = SR_BOX; P = f[y0:y1, x0:x1]
     bg = cv2.resize(cv2.GaussianBlur(cv2.resize(P, (54, 96)), (0, 0), 3), (W, H)).astype(np.float32) / 255 * 0.55
     s_ = W / P.shape[1] * zoom; tx = W / 2 - fx * P.shape[1] * s_; ty = H / 2 - fy * P.shape[0] * s_
     tx = min(0, max(W - P.shape[1] * s_, tx)) if P.shape[1] * s_ >= W else tx
+    ty = min(0, max(H - P.shape[0] * s_, ty)) if P.shape[0] * s_ >= H else ty
     fg = cv2.warpAffine(P, np.float32([[s_, 0, tx], [0, s_, ty]]), (W, H), flags=cv2.INTER_LINEAR, borderValue=(0, 0, 0)).astype(np.float32) / 255
     m = cv2.warpAffine(np.ones(P.shape[:2], np.float32), np.float32([[s_, 0, tx], [0, s_, ty]]), (W, H))[..., None]
     return fg * m + bg * (1 - m)
+# ---- the marking redrawn stroke by stroke with a white stylus (strokes taken from the surgeon's own tablet drawing)
+SR_CLEAN = cv2.imread(os.path.join(WORK, "SR_clean.png"))[..., ::-1].copy(); SR_FINAL = cv2.imread(os.path.join(WORK, "SR_final.png"))[..., ::-1].copy()
+_STK = json.load(open(os.path.join(WORK, "SR_strokes.json")))
+_LAB = cv2.connectedComponents((cv2.imread(os.path.join(WORK, "SR_mask.png"), 0) > 0).astype(np.uint8))[1]
+_PAR = {}                                                                 # per stroke: every mask pixel's position along the stroke (0..1)
+for _k, _v in _STK.items():
+    _ch = np.float32(_v["chain"]); _ys, _xs = np.where(_LAB == int(_k)); _p = np.stack([_xs, _ys], 1).astype(np.float32)
+    _idx = np.array([np.argmin(((_ch - q) ** 2).sum(1)) for q in _p]); _PAR[_k] = (_ys, _xs, _idx / (len(_ch) - 1), _ch)
+def marked(prog):
+    """the tablet photo with the strokes revealed: prog = {stroke id: 0..1}; returns the image and the pen tip (photo px) of the stroke in progress"""
+    P = SR_CLEAN.copy(); tip = None
+    for k_, p_ in prog.items():
+        if p_ <= 0: continue
+        ys, xs, par, ch = _PAR[k_]; sel = par <= p_; P[ys[sel], xs[sel]] = SR_FINAL[ys[sel], xs[sel]]
+        if p_ < 1: j = min(len(ch) - 1, int(p_ * (len(ch) - 1))); tip = ch[max(0, j - 3):j + 1].mean(0)
+    return P, tip
+def stylus(fr, x, y, s=1.0):
+    """a white stylus, its nib on (x, y), the body going up and to the right"""
+    a = np.deg2rad(-58); ux, uy = np.cos(a), np.sin(a); nx, ny = -uy, ux; L, w, tl = 330 * s, 13 * s, 46 * s
+    def quad(d0, d1, w0, w1): return [(x + ux * d0 + nx * w0, y + uy * d0 + ny * w0), (x + ux * d1 + nx * w1, y + uy * d1 + ny * w1), (x + ux * d1 - nx * w1, y + uy * d1 - ny * w1), (x + ux * d0 - nx * w0, y + uy * d0 - ny * w0)]
+    sh = [(px + 10 * s, py + 14 * s) for px, py in quad(0, L, 3 * s, w)]; fill_poly(fr, sh, np.float32([0, 0, 0]), 0.25)
+    fill_poly(fr, quad(0, tl, 2.5 * s, w), np.float32([0.86, 0.86, 0.88]))                          # the cone
+    fill_poly(fr, quad(tl, L, w, w), np.float32([0.98, 0.98, 0.98]))                                # the body
+    path_draw(fr, quad(0, L, 2.5 * s, w), 1, np.float32([0.72, 0.72, 0.75]), 2, True)
+    fill_poly(fr, quad(tl + 4 * s, tl + 70 * s, w * 0.35, w * 0.35), np.float32([0.9, 0.9, 0.92]))  # a flat side
+    dot(fr, x, y, 3.5 * s, np.float32([0.3, 0.3, 0.32]))
+def draw_marking(t, prog, zoom, fx, fy, pen=True):
+    P, tip = marked(prog); fr = tablet(0, zoom, fx, fy, P=P)
+    if pen and tip is not None: X, Y = sr_pt(0, zoom, fx, fy, tip[0], tip[1]); stylus(fr, X, Y, 1.0)
+    return fr
+def ramp_(t, t0, d): return cl((t - t0) / d)
 def sr_pt(st, zoom, fx, fy, px, py):
     """screen position of a point (px, py) of the tablet photo under tablet(..., zoom, fx, fy)"""
     x0, y0, x1, y1 = SR_BOX; pw, ph = x1 - x0, y1 - y0; s_ = W / pw * zoom; tx = W / 2 - fx * pw * s_; ty = H / 2 - fy * ph * s_
     if pw * s_ >= W: tx = min(0, max(W - pw * s_, tx))
+    if ph * s_ >= H: ty = min(0, max(H - ph * s_, ty))
     return tx + px * s_, ty + py * s_
 PROF = cv2.imread(os.path.join(WORK, "IMG_0733.jpg"))[..., ::-1].copy()
 
@@ -573,8 +606,12 @@ ZONES = [("абдоминопластика", 30.10), ("подтяжка рук"
 HC = top(Drop(["*РАЗБОР ФИГУРЫ*"], 104, LX, 0, maxw=900), 270)
 def s_c(t):
     lt = t - T_S["C"]; tb = Rs("C", 31.80) - T_S["C"]
-    if lt < tb: fr = tablet(12.0 + lt * 3.2, lerp(1.0, 1.5, eio(lt / tb)), 0.5, 0.62)                  # the lines on the belly being drawn, zooming in
-    else: u = lt - tb; fr = tablet(min(78.0, 58.0 + u * 5.5), lerp(1.0, 0.92, eo(u / 2.0)), 0.5, 0.45)  # the arm lines
+    if lt < tb:                                                           # the belly: left flank, the lower line and right flank, the navel, zooming in
+        d0 = tb - 0.3; prog = {"5": ramp_(lt, 0.2, d0 * 0.18), "4": ramp_(lt, 0.2 + d0 * 0.2, d0 * 0.55), "6": ramp_(lt, 0.2 + d0 * 0.78, d0 * 0.2)}
+        fr = draw_marking(t, prog, lerp(1.28, 1.6, eio(lt / tb)), 0.5, 0.66)
+    else:                                                                 # the arms
+        u = lt - tb; prog = {"5": 1, "4": 1, "6": 1, "1": ramp_(u, 0.1, 1.3), "2": ramp_(u, 1.5, 1.3)}
+        fr = draw_marking(t, prog, lerp(1.0, 0.92, eo(u / 2.0)), 0.5, 0.45)
     fr = dark(fr); HC.draw(fr, t, T_S["C"] + 0.05)
     for k, (lab, w0) in enumerate(ZONES):
         u = t - Rs("C", w0)
@@ -641,7 +678,8 @@ def s_g(t):
         if t > ts:
             x0, y0 = mp(700, 1700); x1, y1 = mp(780, 1480); arrow(fr, (x0, y0), (x1, y1), eo((t - ts) / 0.4), WHITE, 6)
     else:
-        u = t - tsw; fr = dark(tablet(45.0, lerp(1.3, 1.6, eo(u / 2.0)), 0.5, 0.58))
+        u = t - tsw; prog = {"5": 1, "4": 1, "6": 1, "1": 1, "2": 1, "3": ramp_(u, 0.15, 1.6)}      # the upper belly: the visceral zone circled and hatched
+        fr = dark(draw_marking(t, prog, lerp(1.3, 1.55, eo(u / 2.0)), 0.5, 0.6))
     HG.draw(fr, t, T_S["G"] + 0.05); return fr
 
 # H — the surgeon: first lose weight, then abdominoplasty
@@ -732,7 +770,7 @@ GAIN = 1.5 if os.path.exists(MUSIC) else 1.0
 
 def make_cover(path):
     """the tablet with her marked photo, the surgeon's question, «разбираю фигуру на онлайн-консультации»"""
-    fr = dark(tablet(45.0, 1.15, 0.5, 0.5)); shade(fr, np.repeat((np.clip((yy[:, :1] - 900) / 400, 0, 1) * 0.75)[..., None], W, 1).astype(np.float32), DEEP)
+    fr = dark(tablet(0, 1.15, 0.5, 0.5, P=SR_FINAL)); shade(fr, np.repeat((np.clip((yy[:, :1] - 900) / 400, 0, 1) * 0.75)[..., None], W, 1).astype(np.float32), DEEP)
     blend(fr, logo_alpha(240), 540 - 120, 262, PINK)
     hd = Drop(["СНАЧАЛА ПОХУДЕТЬ", "*ИЛИ СРАЗУ*", "*НА ОПЕРАЦИЮ?*"], 112, 70, 1060, maxw=940); hd.draw(fr, 99, 0)
     ty = Track(["разбираю фигуру на онлайн-консультации"], 34, 72, 0, 400); ty.y = 1060 + hd.h + 44 + ty.top; ty.draw(fr, 99, 0)
