@@ -488,11 +488,11 @@ def surgeon(t, b, z=1.0, fx=0.5, fy=0.45, src=None):
     return full(V["IMG_6655"].at(st), fx, fy, z)
 def home(t, st0):
     """her home video: the face under a still blur"""
-    f = V["IMG_6583"].at(st0 + t); return full(blur_spot(f, 575, 480, 175, 215), 0.5, 0.5, 1.0)
+    f = V["IMG_6583"].at(st0 + t); return full(f, 0.5, 0.5, 1.0)   # no face blur (the client's call)
 SR_BOX = (352, 30, 928, 840)                                               # the photo inside the tablet recording (x0, y0, x1, y1)
 def tablet(st, zoom=1.0, fx=0.5, fy=0.5):
     """the surgeon's tablet: the marked photo, zoomed on a point; around it a blurred copy of itself"""
-    f = V["SR"].at(st); f = blur_spot(f, 636, 262, 70, 85); x0, y0, x1, y1 = SR_BOX; P = f[y0:y1, x0:x1]
+    f = V["SR"].at(st); x0, y0, x1, y1 = SR_BOX; P = f[y0:y1, x0:x1]
     bg = cv2.resize(cv2.GaussianBlur(cv2.resize(P, (54, 96)), (0, 0), 3), (W, H)).astype(np.float32) / 255 * 0.55
     s_ = W / P.shape[1] * zoom; tx = W / 2 - fx * P.shape[1] * s_; ty = H / 2 - fy * P.shape[0] * s_
     tx = min(0, max(W - P.shape[1] * s_, tx)) if P.shape[1] * s_ >= W else tx
@@ -504,7 +504,7 @@ def sr_pt(st, zoom, fx, fy, px, py):
     x0, y0, x1, y1 = SR_BOX; pw, ph = x1 - x0, y1 - y0; s_ = W / pw * zoom; tx = W / 2 - fx * pw * s_; ty = H / 2 - fy * ph * s_
     if pw * s_ >= W: tx = min(0, max(W - pw * s_, tx))
     return tx + px * s_, ty + py * s_
-PROF = cv2.imread(os.path.join(WORK, "IMG_0733.jpg"))[..., ::-1].copy(); PROF = blur_spot(PROF, 643, 615, 190, 230)
+PROF = cv2.imread(os.path.join(WORK, "IMG_0733.jpg"))[..., ::-1].copy()
 
 # ---------------- subtitles: one word at a time, the key words in pink
 FIX = {"девушке,": "девушки,", "5": "5–10", "-10": ""}
