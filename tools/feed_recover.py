@@ -9,6 +9,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 HERE = os.path.dirname(os.path.abspath(__file__)); FD = os.path.join(HERE, "..", "fonts", "stories")
 TW, TH, K = 438, 584, 3
 COLS = [(0, 438), (441, 879), (882, 1320)]; ROW0 = (191, 207); STEP = 587
+HAZE, CAPS_W = 0.45, 200
 WHITE, INK, MOCHA, MILK = (255, 255, 255), (43, 31, 26), (107, 74, 56), (243, 236, 228)
 
 def mont(size, w=200, it=False):
@@ -36,10 +37,10 @@ def overlay(bg, caps, it, y=0.74, haze=True, kicker=None, col=WHITE):
     W, H = bg.size; cv = bg.convert("RGBA"); y0 = int(H * y)
     if haze:
         g = Image.new("L", (1, H)); c = y0 + 60; r = 330
-        for yy in range(H): g.putpixel((0, yy), int(255 * 0.45 * max(0.0, 1 - abs(yy - c) / r) ** 1.2))
+        for yy in range(H): g.putpixel((0, yy), int(255 * HAZE * max(0.0, 1 - abs(yy - c) / r) ** 1.2))
         hz = Image.new("RGBA", (W, H), (20, 13, 10, 0)); hz.putalpha(g.resize((W, H))); cv.alpha_composite(hz)
     txt = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(txt); sh = Image.new("L", (W, H), 0); ds = ImageDraw.Draw(sh)
-    fc = mont(118 if max(len(l) for l in caps) <= 9 else 92, 200); fi = mont(56, 250, True); yy = y0
+    fc = mont(118 if max(len(l) for l in caps) <= 9 else 92, CAPS_W); fi = mont(56, 300, True); yy = y0
     if kicker:
         for dd, fill in ((ds, 160), (d, col + (255,))): spaced(dd, W / 2, yy - 150, kicker, mont(34, 400), fill, 8)
     for l in caps:
