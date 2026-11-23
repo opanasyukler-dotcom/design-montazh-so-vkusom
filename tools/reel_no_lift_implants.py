@@ -471,7 +471,7 @@ def vend(b): return next(s[3] + s[4] for s in SEG if s[0] == b)
 def Rs(b, src):
     _, _, parts, t0, d = next(x for x in SEG if x[0] == b); return t0 + src - parts[0][0]
 T_S = {b: vstart(b) - 0.1 for b, *_ in VO}; T_S["A"] = 0.0
-T_Q = vend("E") + 0.3; T_K = T_Q + 2.6; K_D = 1.9; DUR = T_K + 3 * K_D + 0.6
+T_Q = vend("E") + 0.3; T_K = T_Q + 2.6; K_D = 1.9; DUR = T_K + 3 * K_D + 1.6
 
 V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ("IMG_2742", "IMG_2740", "IMG_2743", "VS", "OR")}
 FACE_SPOT = {"IMG_2743": (420, 30, 230, 130), "IMG_2742": (420, 20, 220, 120)}    # the patient's chin at the top edge of the marking shots
@@ -542,16 +542,34 @@ def _sub_words():
                 if a <= (ws + we) / 2 <= o and w: out.append((w, t0 + max(ws, a) - a, t0 + min(we, o) - a))
     return [(w, a, min(e + 0.3, out[i + 1][1] - 0.04) if i + 1 < len(out) else e + 0.3) for i, (w, a, e) in enumerate(out)]
 SUB_WORDS = _sub_words(); SUB_Y = 1420
-def subtitles(fr, t):
+# phrase captions (idea from the reference reel): 2–4 words at a time, centred, the spoken word lights up, key words in a pink italic
+_FI = {}
+def mont_i(size, wght=700):
+    k = ("mi", size, wght)
+    if k not in _FI:
+        f_ = ImageFont.truetype(os.path.join(ROOT, "fonts", "Montserrat-Italic-VariableFont_wght.ttf"), size); f_.set_variation_by_axes([wght]); _FI[k] = f_
+    return _FI[k]
+def _phrases():
+    out, cur = [], []
     for w, a, e in SUB_WORDS:
-        t0 = a - 0.04
-        if not (t0 <= t < e): continue
-        key = w in KEY; ww = w.strip(",.?!")
-        p = eo((t - t0) / 0.12); im = scaled(alpha_img(ww, mont(48 if key else 44, 500 if key else 300)), 0.85 + 0.15 * p)
-        h = 66; bw = im.shape[1] + 34; op = min(1, (e - t) / 0.06)
-        box = np.zeros((h, int(bw)), np.uint8); cv2.rectangle(box, (0, 0), (box.shape[1] - 1, h - 1), 255, -1)
-        blend(fr, cv2.GaussianBlur(box, (0, 0), 1.2).astype(np.float32) / 255, 500 - bw / 2, SUB_Y - h / 2, DEEP, 0.82 * op)
-        blend(fr, im, 500 - im.shape[1] / 2, SUB_Y - im.shape[0] / 2 + 3, PINK if key else WHITE, op)
+        cur.append((w, a, e))
+        if len(cur) >= 3 or w[-1:] in ",.?!" or len(" ".join(x[0] for x in cur)) > 18: out.append(cur); cur = []
+    if cur: out.append(cur)
+    return [(ph, ph[0][1] - 0.06, (out[k + 1][0][1] - 0.04) if k + 1 < len(out) else ph[-1][2] + 0.3) for k, ph in enumerate(out)]
+PHRASES = _phrases(); CAP_Y = 1310
+def subtitles(fr, t):
+    for ph, t0, t1 in PHRASES:
+        if not (t0 <= t < t1): continue
+        p = eo((t - t0) / 0.18); op = min(1, (t1 - t) / 0.08) * min(1, (t - t0) / 0.1)
+        ims = []
+        for w, a, e in ph:
+            ww = w.strip(",.?!"); key = w in KEY
+            ims.append((alpha_img(ww, mont_i(54, 700) if key else mont(50, 500)), PINK if key else WHITE, a))
+        sp = 16; tw = sum(a_.shape[1] for a_, _, _ in ims) + sp * (len(ims) - 1); x = 500 - tw / 2; y = CAP_Y + 18 * (1 - p)
+        for a_, col, a in ims:
+            lit = 1.0 if t >= a - 0.04 else 0.42                          # karaoke: the word lights up as she says it
+            blend(fr, a_, x + 2, y - a_.shape[0] / 2 + 3, DEEP, 0.45 * op); blend(fr, a_, x, y - a_.shape[0] / 2, col, op * lit)
+            x += a_.shape[1] + sp
 
 # ---------------- blocks (safe zone: x 72-1018, y 234-1600, not x > 864 below y 1347)
 LX = 80; BLK = np.float32([0, 0, 0])
@@ -581,7 +599,7 @@ def s_a(t):
     tsw = 3.0                                                             # the surgeon held 3 s, then the ДО photo
     if t < tsw: fr = clip("IMG_2742", 1.3 + t, lerp(1.12, 1.0, eo(t / 2.5)), 0.62, 0.42)
     else: fr = FULL["do_front"].copy()
-    fr = dark(fr); HA.draw(fr, t, 0.05, tsw - 0.45)                      # the hook leaves just before the cut
+    fr = dark(fr); hook(fr, t, 0.05, tsw - 0.45)                          # the hook leaves just before the cut
     tp = max(Rs("A", 10.48), tsw + 0.2)                                                   # «птоз первой степени»
     if t > tp:
         s_ = 0.75 * pop_s(t, tp); navy_card(fr, 820, 1000, 150, 150, s_)
@@ -591,6 +609,16 @@ def s_a(t):
         u = t - tr; pillx(fr, "без подтяжки и рубцов", LX, 1180, eo(u / 0.3), 0.0, 32)
     return fr
 
+_EMB = ImageFont.truetype(os.path.join(ROOT, "fonts", "Lora-BoldItalic.ttf"), 128)   # OFL serif italic with Cyrillic
+HK1 = Drop(["ТОЛЬКО БЕЗ ПОДТЯЖКИ,"], 96, LX, 0, maxw=900); HK2 = alpha_img("получится?", _EMB)
+def hook(fr, t, t0, t1, y=880):
+    """the reference reel's two-voice hook: a bold sans line, then a large serif italic word sliding in"""
+    if t < t0 or t > t1 + 0.4: return
+    q = 1 - eio((t - t1) / 0.3) if t > t1 else 1.0
+    HK1.y = y; HK1.draw(fr, t, t0, t1)
+    u = t - t0 - 0.45
+    if u > 0:
+        p = eo(u / 0.5); blend(fr, HK2, LX - 10 + 60 * (1 - p), y + 70, PINK, min(1, u / 0.25) * q)
 # B — the question over the three ДО angles; «3+ размер» counts up
 HB = top(Drop(["А МОЖНО ЛИ", "*ОБОЙТИСЬ БЕЗ ПОДТЯЖКИ?*"], 96, LX, 0, maxw=900), 270)
 def s_b(t):
@@ -655,8 +683,12 @@ def s_k(t):
     fr = COLLS[k].copy(); fr[958:962] = PINK; chip(fr, "ДО", LX, 260); chip(fr, "ПОСЛЕ", LX, 1000)
     f = 1 - eo(u / 0.18); return fr * (1 - f) + f * 0.9
 
-SCENES = [(0, s_a), (T_S["B"], s_b), (T_S["C"], s_c), (T_S["D"], s_d), (T_S["E"], s_e), (T_Q, s_q), (T_K, s_k)]
-TRANS = {T_S["B"]: ("zoom", 0.35), T_S["C"]: ("diag", 0.45), T_S["D"]: ("zoom", 0.35), T_S["E"]: ("iris", 0.5), T_Q: ("iris", 0.5)}
+T_L = T_K + 3 * K_D
+def s_loop(t):
+    """the ending loops back to the first shot with the hook (as in the reference reel), so the reel replays seamlessly"""
+    lt = t - T_L; fr = dark(clip("IMG_2742", 1.3 + lt, lerp(1.0, 1.12, eo(lt / 1.6)), 0.62, 0.42)); hook(fr, t, T_L + 0.1, 1e9); return fr
+SCENES = [(0, s_a), (T_S["B"], s_b), (T_S["C"], s_c), (T_S["D"], s_d), (T_S["E"], s_e), (T_Q, s_q), (T_K, s_k), (T_L, s_loop)]
+TRANS = {T_L: ("zoom", 0.3), T_S["B"]: ("zoom", 0.35), T_S["C"]: ("diag", 0.45), T_S["D"]: ("zoom", 0.35), T_S["E"]: ("iris", 0.5), T_Q: ("iris", 0.5)}
 def base(t):
     k = max(i for i, (s0, _) in enumerate(SCENES) if t >= s0); s0, fn = SCENES[k]
     kind, d = TRANS.get(s0, ("none", 0))
@@ -708,7 +740,7 @@ def build_audio(path):
         if len(KEYS) == 1: kl = int((n_ch * hd.stag + 0.35) * SR); kb = KEYS[0][:kl].copy(); f_ = int(0.2 * SR); kb[-f_:] *= np.linspace(1, 0, f_); put(kb, t0, g_)
         else:
             for j in range(n_ch): put(KEYS[j % len(KEYS)], t0 + j * hd.stag, g_ * 0.8)
-    typing(HA, 0.05, 0.45); put(TICK, max(Rs("A", 10.48), 3.2), 0.6); put(TICK, Rs("A", 15.86), 0.55)
+    typing(HK1, 0.05, 0.45); put(TICK, max(Rs("A", 10.48), 3.2), 0.6); put(TICK, Rs("A", 15.86), 0.55)
     typing(HB, T_S["B"] + 0.05, 0.3)
     for j in range(3): put(tick(), Rs("B", 20.76) + 0.25 * j, 0.3)
     put(TICK, Rs("B", 18.04), 0.55)
