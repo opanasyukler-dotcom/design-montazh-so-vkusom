@@ -513,14 +513,14 @@ KNEE = {"do_front": 3225, "do_34": 3200, "do_side": 3270, "po_front": 1775, "po_
 def panel(n, pw=W, ph=960, top=30, bottom=30):
     """from the jaw to the knees: the jaw on `top`, one true scale (nipple stickers) for every photo, nothing above the jaw"""
     sh, sth, cx = ALIGN[n]; s_ = (ph - top - bottom) / 26.0 / sth; ch = CHIN[n]
-    out = np.zeros((ph, pw, 3), np.float32); ox, oy = int(cx * s_ - pw / 2), int(ch * s_ - top)
-    r = cv2.resize(PH[n], None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
-    xs0, ys0 = max(0, ox), max(0, oy); xs1, ys1 = min(r.shape[1], ox + pw), min(r.shape[0], oy + ph)
-    out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = r[ys0:ys1, xs0:xs1]
-    m = np.zeros((ph, pw), np.float32); m[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = 1
-    yk = KNEE[n] * s_ - oy; rows = np.arange(ph)
+    if FILL: s_ = ph / ((KNEE[n] - ch) * 1.0)                                  # full screen: the jaw on the top edge, the knees on the bottom edge
+    ox, oy = cx * s_ - pw / 2, ch * s_ - (0 if FILL else top)
+    out = cv2.warpAffine(PH[n], np.float32([[s_, 0, -ox], [0, s_, -oy]]), (pw, ph), flags=cv2.INTER_AREA, borderMode=cv2.BORDER_REPLICATE).astype(np.float32) / 255
+    if FILL: return out                                                   # the studio backdrop kept, the sides continued with it
+    m = np.ones((ph, pw), np.float32); yk = KNEE[n] * s_ - oy; rows = np.arange(ph)
     m *= np.clip((rows - top + 2) / 6, 0, 1)[:, None] * np.clip((yk + 30 - rows) / 50, 0, 1)[:, None]
-    return out * cv2.GaussianBlur(cv2.erode(m, np.ones((15, 15), np.uint8)), (0, 0), 5)[..., None]
+    return out * cv2.GaussianBlur(m, (0, 0), 5)[..., None]
+FILL = True
 def _unused(n, pw=W, ph=960, sh_at=110, nav_at=560):
     sh, sth, cx = ALIGN[n]; s_ = (nav_at - sh_at) / (1353 / 124 * sth); r = cv2.resize(PH[n], None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
     out = np.zeros((ph, pw, 3), np.float32); ox, oy = int(cx * s_ - pw / 2), int(sh * s_ - sh_at)
