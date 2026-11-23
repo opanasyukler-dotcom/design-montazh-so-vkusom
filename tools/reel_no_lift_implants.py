@@ -461,7 +461,7 @@ VO = [("A", "IMG_2742", [(8.76, 16.48)]),     # у нас есть неболь�
       ("C", "IMG_2742", [(27.94, 34.34)]),    # наша основная задача — заполнить это пространство и вытянуть железу
       ("D", "VS", [(6.02, 11.88)]),           # поставили нашей девочке импланты анатомические 395, высокий профиль
       ("E", "VS", [(23.14, 33.16)])]          # и хочу отметить, что в будущем ей всё равно придётся делать подтяжку… эти же импланты оставим
-GAP = {"B": 0.3, "C": 0.35, "D": 1.2, "E": 0.4}   # the operating room starts a beat before her voice
+GAP = {"B": 0.3, "C": 0.35, "D": 0.45, "E": 0.4}
 SEG = []; _t = 0.04
 for _b, _s, _parts in VO:
     if SEG: _t += GAP[_b]
@@ -576,7 +576,7 @@ def breast_icon(fr, cx, cy, s, sag, imp=0.0, col=WHITE):
     nx, ny = pts[16]; dot(fr, nx + 6 * s, ny, 7 * s, PINK)
 
 # A — the hook: the surgeon at the consultation, then the ДО photo; «птоз первой степени» → a sagging breast scheme; «рубцы» → a scar line crossed
-HA = top(Drop(["Я ХОЧУ ГРУДЬ,", "*НО НЕ ХОЧУ РУБЦЫ*", "*ОТ ПОДТЯЖКИ*"], 96, LX, 0, maxw=900), 270)
+HA = top(Drop(["ТОЛЬКО БЕЗ ПОДТЯЖКИ,", "*ПОЛУЧИТСЯ?*"], 104, LX, 0, maxw=900), 270)
 def s_a(t):
     tsw = Rs("A", 9.80)                                                   # «птоз» → the ДО photo
     if t < tsw: fr = clip("IMG_2742", 1.3 + t, lerp(1.12, 1.0, eo(t / 2.5)), 0.62, 0.42)
@@ -625,7 +625,7 @@ def s_d(t):
     for k, (lab, w0) in enumerate((("анатомические", 8.40), ("высокий профиль", 10.62))):
         if t > Rs("D", w0): pillx(fr, lab, LX, 1120 + k * 80, eo((t - Rs("D", w0)) / 0.3), 0.0, 32)
     return fr
-OR_D = 5.4                                                                # the breast on the table, long enough to look at
+OR_D = 0.0                                                                # no operating-table shot (the client's call): the surgeon only
 def Rs_inv_D(t): _, _, parts, t0, d = next(x for x in SEG if x[0] == "D"); return parts[0][0] + (t - t0)
 
 # E — the result, angle by angle (ДО → ПОСЛЕ with a slider), under the nuance about a future lift
