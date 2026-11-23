@@ -637,8 +637,7 @@ def s_e(t):
     if xs < W: fr[:, max(0, xs):] = FULL["do_" + a][:, max(0, xs):]
     if 0 < p < 1:
         fr[:, max(0, xs - 3):min(W, xs + 3)] = PINK; hx = min(max(xs, 112), 978); dot(fr, hx, 820, 32, PINK); dot(fr, hx, 820, 26, WHITE)
-    f = 1 - eo(u / 0.15) if k else 0; fr = fr * (1 - f * 0.7) + f * 0.7
-    fr = dark(fr)
+    fr = dark(fr)                                                         # no flash between the angles (the client's call)
     if xs < 820: chip(fr, "ДО", min(max(xs + 20, LX), 860), 1180, 1 - cl((xs - 700) / 120))
     if xs > 300: chip(fr, "ПОСЛЕ", LX, 1180, cl((xs - 300) / 120))
     if t > Rs("E", 24.48): HE.draw(fr, t, Rs("E", 24.48))
