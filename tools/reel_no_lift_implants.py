@@ -461,7 +461,7 @@ VO = [("A", "IMG_2742", [(8.76, 16.48)]),     # у нас есть неболь�
       ("C", "IMG_2742", [(27.94, 34.34)]),    # наша основная задача — заполнить это пространство и вытянуть железу
       ("D", "VS", [(6.02, 11.88)]),           # поставили нашей девочке импланты анатомические 395, высокий профиль
       ("E", "VS", [(23.14, 33.16)])]          # и хочу отметить, что в будущем ей всё равно придётся делать подтяжку… эти же импланты оставим
-GAP = {"B": 0.3, "C": 0.35, "D": 0.45, "E": 0.4}
+GAP = {"B": 0.3, "C": 0.35, "D": 1.2, "E": 0.4}   # the operating room starts a beat before her voice
 SEG = []; _t = 0.04
 for _b, _s, _parts in VO:
     if SEG: _t += GAP[_b]
@@ -620,11 +620,12 @@ def s_c(t):
 HD = top(Drop(["*395 МЛ.*", "БЕЗ ПОДТЯЖКИ"], 120, LX, 0, maxw=900), 270)
 def s_d(t):
     lt = t - T_S["D"]
-    fr = on_white(3.0 + lt, lerp(1.0, 1.06, eo(lt / 2.5))) if lt < 2.6 else dark(clip("VS", Rs_inv_D(t), lerp(1.0, 1.08, eo((lt - 2.6) / 3.0)), 0.5, 0.42))
+    fr = dark(on_white(1.5 + lt, lerp(1.0, 1.08, eo(lt / 5.0)))) if lt < OR_D else dark(clip("VS", Rs_inv_D(t), lerp(1.0, 1.08, eo((lt - OR_D) / 3.0)), 0.5, 0.42))
     if t > Rs("D", 9.28): HD.draw(fr, t, Rs("D", 9.28))
     for k, (lab, w0) in enumerate((("анатомические", 8.40), ("высокий профиль", 10.62))):
         if t > Rs("D", w0): pillx(fr, lab, LX, 1120 + k * 80, eo((t - Rs("D", w0)) / 0.3), 0.0, 32)
     return fr
+OR_D = 5.4                                                                # the breast on the table, long enough to look at
 def Rs_inv_D(t): _, _, parts, t0, d = next(x for x in SEG if x[0] == "D"); return parts[0][0] + (t - t0)
 
 # E — the result, angle by angle (ДО → ПОСЛЕ with a slider), under the nuance about a future lift
@@ -671,11 +672,11 @@ def render(t):
     fr = np.asarray(base(t), np.float32).copy()
     if t < T_Q:
         subtitles(fr, t)
-        white = T_S["D"] <= t < T_S["D"] + 2.6                            # on the white page the logo goes navy
+        white = T_S["D"] <= t < T_S["D"] + OR_D                            # on the white page the logo goes navy
         blend(fr, LOGO_W, 470 - 115, 1535, NAVY if white else WHITE, 0.85)
     return fr
 
-MUSIC = os.path.join(SRC, "music.wav"); M0 = 0.0
+MUSIC = os.path.join(SRC, "music.wav"); M0 = 0.5
 G_VO, G_GAP = 0.022, 0.075
 def track(n):
     if not os.path.exists(MUSIC): return np.zeros((n, 2))
@@ -718,8 +719,7 @@ def build_audio(path):
     for k in range(3): put(swoosh(1.0), T_S["E"] + k * dE + 0.5, 0.15)
     typing(HE, Rs("E", 24.48), 0.25); typing(HQ, T_Q + 0.2, 0.35); put(glass(1318.5), T_Q + 0.2, 0.1)
     for k in range(3):
-        if SHOT is not None: put(SHOT, T_K + k * K_D, 0.45)
-        else: put(pop(1300, 600, 0.08), T_K + k * K_D, 0.2)
+        pass                                                              # no sound on the collage cuts (the client's call)
     sfx[:n] *= 1 - 0.55 * np.clip(dd, 0, 1)
     tt = np.arange(n) / SR; fade = np.clip((DUR - tt) / 2.5, 0, 1) ** 1.5 * np.clip(tt / 1.2, 0, 1)
     mus = track(n) * ((G_GAP - (G_GAP - G_VO) * np.clip(dd, 0, 1)) * fade)[:, None]
