@@ -474,7 +474,21 @@ T_S = {b: vstart(b) - 0.1 for b, *_ in VO}; T_S["A"] = 0.0
 T_Q = vend("E") + 0.3; T_K = T_Q + 2.6; K_D = 1.9; DUR = T_K + 3 * K_D + 0.6
 
 V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ("IMG_2742", "IMG_2740", "IMG_2743", "VS", "OR")}
-def clip(k, st, z=1.0, fx=0.5, fy=0.5): return full(V[k].at(st), fx, fy, z)
+FACE_SPOT = {"IMG_2743": (420, 30, 230, 130), "IMG_2742": (420, 20, 220, 120)}    # the patient's chin at the top edge of the marking shots
+def soft_spot(f, cx, cy, rx, ry):
+    m = np.zeros(f.shape[:2], np.float32); cv2.ellipse(m, (int(cx), int(cy)), (int(rx), int(ry)), 0, 0, 360, 1, -1)
+    m = np.clip(cv2.GaussianBlur(m, (0, 0), rx * 0.3) * 1.5, 0, 1)[..., None]
+    return (f * (1 - m) + cv2.GaussianBlur(f, (0, 0), 30) * m).astype(np.uint8)
+def clip(k, st, z=1.0, fx=0.5, fy=0.5):
+    f = V[k].at(st)
+    if k in FACE_SPOT and (k != "IMG_2742" or st > 20): f = soft_spot(f, *FACE_SPOT[k])
+    return full(f, fx, fy, z)
+OR_WIDE = Src(os.path.join(WORK, "OR_wide.mp4"))
+def on_white(st, z=1.0):
+    """the horizontal operating-room shot kept whole, on a white page"""
+    f = OR_WIDE.at(st).astype(np.float32) / 255; h, w = f.shape[:2]; s_ = z; fw, fh = int(W * s_), int(h * W / w * s_)
+    fr = np.ones((H, W, 3), np.float32) * np.float32([0.97, 0.96, 0.95]); im = cv2.resize(f, (fw, fh)); x0, y0 = (W - fw) // 2, 720 - fh // 2
+    fr[y0:y0 + fh, max(0, x0):max(0, x0) + min(fw, W)] = im[:, max(0, -x0):max(0, -x0) + min(fw, W)]; return fr
 
 # ---------------- photos: ДО and ПОСЛЕ, one skin tone for all six
 def photo(n): return cv2.imread(os.path.join(WORK, n))[..., ::-1].copy()
@@ -494,15 +508,27 @@ def grade(rgb, st, tgt):
     return (rgb * (1 - k) + out * k).astype(np.uint8)                     # only the skin is graded: jeans, stockings, backdrop keep their colour
 RAW = {k: photo(v) for k, v in NAMES.items()}; ST = {k: skin_stats(v) for k, v in RAW.items()}; TGT = np.mean(list(ST.values()), 0)
 PH = {k: grade(v, ST[k], TGT) for k, v in RAW.items()}
-def panel(n, pw=W, ph=960, sh_at=110, nav_at=560):
-    """shoulders at sh_at; the scale from the nipple sticker (ДО shoulder→navel spans nav_at − sh_at); soft edges into black"""
+CHIN = {"do_front": 0, "do_34": 246, "do_side": 380, "po_front": 0, "po_34": 115, "po_side": 100}          # below the jaw: the start of the neck
+KNEE = {"do_front": 3225, "do_34": 3200, "do_side": 3270, "po_front": 1775, "po_34": 1800, "po_side": 1830}
+def panel(n, pw=W, ph=960, top=30, bottom=30):
+    """from the jaw to the knees: the jaw on `top`, one true scale (nipple stickers) for every photo, nothing above the jaw"""
+    sh, sth, cx = ALIGN[n]; s_ = (ph - top - bottom) / 26.0 / sth; ch = CHIN[n]
+    out = np.zeros((ph, pw, 3), np.float32); ox, oy = int(cx * s_ - pw / 2), int(ch * s_ - top)
+    r = cv2.resize(PH[n], None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+    xs0, ys0 = max(0, ox), max(0, oy); xs1, ys1 = min(r.shape[1], ox + pw), min(r.shape[0], oy + ph)
+    out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = r[ys0:ys1, xs0:xs1]
+    m = np.zeros((ph, pw), np.float32); m[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = 1
+    yk = KNEE[n] * s_ - oy; rows = np.arange(ph)
+    m *= np.clip((rows - top + 2) / 6, 0, 1)[:, None] * np.clip((yk + 30 - rows) / 50, 0, 1)[:, None]
+    return out * cv2.GaussianBlur(cv2.erode(m, np.ones((15, 15), np.uint8)), (0, 0), 5)[..., None]
+def _unused(n, pw=W, ph=960, sh_at=110, nav_at=560):
     sh, sth, cx = ALIGN[n]; s_ = (nav_at - sh_at) / (1353 / 124 * sth); r = cv2.resize(PH[n], None, fx=s_, fy=s_, interpolation=cv2.INTER_AREA).astype(np.float32) / 255
     out = np.zeros((ph, pw, 3), np.float32); ox, oy = int(cx * s_ - pw / 2), int(sh * s_ - sh_at)
     xs0, ys0 = max(0, ox), max(0, oy); xs1, ys1 = min(r.shape[1], ox + pw), min(r.shape[0], oy + ph)
     out[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = r[ys0:ys1, xs0:xs1]
     m = np.zeros((ph, pw), np.float32); m[ys0 - oy:ys1 - oy, xs0 - ox:xs1 - ox] = 1
     return out * cv2.GaussianBlur(cv2.erode(m, np.ones((21, 21), np.uint8)), (0, 0), 7)[..., None]
-FULL = {n: panel(n, W, H, 330, 1130) for n in NAMES}                         # full-screen version, the same framing for ДО and ПОСЛЕ
+FULL = {n: panel(n, W, H, 300, 300) for n in NAMES}                         # full-screen version, the same framing for ДО and ПОСЛЕ
 
 # ---------------- subtitles
 FIX = {"наши": "нашей", "девочки": "девочке", "3": "3+", "плюс": "", "кожаную": "кожную"}
@@ -594,8 +620,7 @@ def s_c(t):
 HD = top(Drop(["*395 МЛ.*", "БЕЗ ПОДТЯЖКИ"], 120, LX, 0, maxw=900), 270)
 def s_d(t):
     lt = t - T_S["D"]
-    fr = clip("OR", 3.0 + lt, lerp(1.1, 1.0, eo(lt / 2.5))) if lt < 2.6 else clip("VS", Rs_inv_D(t), lerp(1.0, 1.08, eo((lt - 2.6) / 3.0)), 0.5, 0.42)
-    fr = dark(fr)
+    fr = on_white(3.0 + lt, lerp(1.0, 1.06, eo(lt / 2.5))) if lt < 2.6 else dark(clip("VS", Rs_inv_D(t), lerp(1.0, 1.08, eo((lt - 2.6) / 3.0)), 0.5, 0.42))
     if t > Rs("D", 9.28): HD.draw(fr, t, Rs("D", 9.28))
     for k, (lab, w0) in enumerate((("анатомические", 8.40), ("высокий профиль", 10.62))):
         if t > Rs("D", w0): pillx(fr, lab, LX, 1120 + k * 80, eo((t - Rs("D", w0)) / 0.3), 0.0, 32)
@@ -624,7 +649,7 @@ def s_q(t):
     lt = t - T_Q; fr = gbg(t); blend(fr, logo_alpha(320), 540 - 160, 470, PINK, eo((lt - 0.1) / 0.5)); HQ.draw(fr, t, T_Q + 0.2); return fr
 
 # K — collages: ДО on top, ПОСЛЕ below, one per angle
-COLLS = [np.vstack([panel("do_" + a, W, 960, 120, 600), panel("po_" + a, W, 960, 120, 600)]) for a in E_ANG]
+COLLS = [np.vstack([panel("do_" + a, W, 960, 40, 30), panel("po_" + a, W, 960, 40, 30)]) for a in E_ANG]
 def s_k(t):
     lt = t - T_K; k = min(2, int(lt / K_D)); u = lt - k * K_D
     fr = COLLS[k].copy(); fr[958:962] = PINK; chip(fr, "ДО", LX, 260); chip(fr, "ПОСЛЕ", LX, 1000)
@@ -641,9 +666,13 @@ def base(t):
         if kind == "zoom": return zoom_through(old, new, p)
         if kind == "diag": return diag_wipe(old, new, p)
     return fn(t)
+LOGO_W = logo_alpha(230)
 def render(t):
     fr = np.asarray(base(t), np.float32).copy()
-    if t < T_Q: subtitles(fr, t)
+    if t < T_Q:
+        subtitles(fr, t)
+        white = T_S["D"] <= t < T_S["D"] + 2.6                            # on the white page the logo goes navy
+        blend(fr, LOGO_W, 470 - 115, 1535, NAVY if white else WHITE, 0.85)
     return fr
 
 MUSIC = os.path.join(SRC, "music.wav"); M0 = 0.0
@@ -707,7 +736,7 @@ def make_cover(path):
     """ДО | ПОСЛЕ fronts side by side, the patient's fear as the title"""
     CBG = np.clip(np.float32([0, 8, 28]) / 255 * (1 + 0.3 * np.exp(-(((xx - 540) / 900) ** 2 + ((yy - 520) / 900) ** 2)))[..., None], 0, 1).astype(np.float32)
     fr = CBG.copy()
-    for k, n in enumerate(("do_front", "po_front")): fr[300:1140, k * 540:(k + 1) * 540] = panel(n, 540, 840, 90, 520)
+    for k, n in enumerate(("do_front", "po_front")): fr[300:1140, k * 540:(k + 1) * 540] = panel(n, 540, 840, 30, 20)
     fr[300:1140, 539:541] = DEEP; chip(fr, "ДО", 36, 322); chip(fr, "ПОСЛЕ", 576, 322)
     g = np.clip((yy[:, :1] - 900) / 240, 0, 1)[..., None]; fr = fr * (1 - g) + CBG * g
     blend(fr, logo_alpha(300), 540 - 150, 250, PINK)
