@@ -576,13 +576,13 @@ def breast_icon(fr, cx, cy, s, sag, imp=0.0, col=WHITE):
     nx, ny = pts[16]; dot(fr, nx + 6 * s, ny, 7 * s, PINK)
 
 # A — the hook: the surgeon at the consultation, then the ДО photo; «птоз первой степени» → a sagging breast scheme; «рубцы» → a scar line crossed
-HA = top(Drop(["ТОЛЬКО БЕЗ ПОДТЯЖКИ,", "*ПОЛУЧИТСЯ?*"], 104, LX, 0, maxw=900), 270)
+HA = lift(Drop(["ТОЛЬКО БЕЗ ПОДТЯЖКИ,", "*ПОЛУЧИТСЯ?*"], 104, LX, 0, maxw=900), 1280)   # low: off her face and the breast
 def s_a(t):
-    tsw = Rs("A", 9.80)                                                   # «птоз» → the ДО photo
+    tsw = 3.0                                                             # the surgeon held 3 s, then the ДО photo
     if t < tsw: fr = clip("IMG_2742", 1.3 + t, lerp(1.12, 1.0, eo(t / 2.5)), 0.62, 0.42)
     else: fr = FULL["do_front"].copy()
-    fr = dark(fr); HA.draw(fr, t, 0.05)
-    tp = Rs("A", 10.48)                                                   # «птоз первой степени»
+    fr = dark(fr); HA.draw(fr, t, 0.05, tsw - 0.45)                      # the hook leaves just before the cut
+    tp = max(Rs("A", 10.48), tsw + 0.2)                                                   # «птоз первой степени»
     if t > tp:
         s_ = 0.75 * pop_s(t, tp); navy_card(fr, 820, 1000, 150, 150, s_)
         if s_ > 0.6: breast_icon(fr, 800, 990, 0.9, eo((t - tp - 0.1) / 0.6)); text_c(fr, "ПТОЗ I", 820, 1110, bebas(46), PINK) if t > tp + 0.5 else None
@@ -708,7 +708,7 @@ def build_audio(path):
         if len(KEYS) == 1: kl = int((n_ch * hd.stag + 0.35) * SR); kb = KEYS[0][:kl].copy(); f_ = int(0.2 * SR); kb[-f_:] *= np.linspace(1, 0, f_); put(kb, t0, g_)
         else:
             for j in range(n_ch): put(KEYS[j % len(KEYS)], t0 + j * hd.stag, g_ * 0.8)
-    typing(HA, 0.05, 0.45); put(TICK, Rs("A", 10.48), 0.6); put(TICK, Rs("A", 15.86), 0.55)
+    typing(HA, 0.05, 0.45); put(TICK, max(Rs("A", 10.48), 3.2), 0.6); put(TICK, Rs("A", 15.86), 0.55)
     typing(HB, T_S["B"] + 0.05, 0.3)
     for j in range(3): put(tick(), Rs("B", 20.76) + 0.25 * j, 0.3)
     put(TICK, Rs("B", 18.04), 0.55)
