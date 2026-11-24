@@ -106,7 +106,7 @@ def captions(fr, t):
         p = eo((t - a0) / 0.18); op = min(1, (a1 - t) / 0.08) * min(1, (t - a0) / 0.1); ims = []
         for w_, s, e in ph:
             ww = w_.strip(",.?!"); key = w_ in KEY or ww in KEY
-            ims.append((alpha_img(ww, mont(58 if key else 56, 600 if key else 500)), PINK if key else WHITE, s))
+            ims.append((alpha_img(ww, mont(44 if key else 42, 400 if key else 300)), PINK if key else WHITE, s))
         sp = 16; tw = sum(a.shape[1] for a, _, _ in ims) + sp * (len(ims) - 1); x = 468 - tw / 2; y = CAP_Y + 16 * (1 - p)
         for a, col, s in ims:
             lit = 1.0 if t >= s - 0.04 else 0.45
