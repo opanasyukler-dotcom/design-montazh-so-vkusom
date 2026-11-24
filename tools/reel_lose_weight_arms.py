@@ -512,7 +512,7 @@ def marked(prog):
             ft = _FIRST[ys, xs]; near = sel & (ft > cur - 0.12)
             if near.any(): tip = np.float32([xs[near].mean(), ys[near].mean()]) if near.sum() < 40 else np.float32([xs[near][np.argmax(ft[near])], ys[near][np.argmax(ft[near])]])
     return P, tip
-VIEW = (16, 40, 576, 792)                                                  # the photo without the app's white strip, its title and bottom bar
+VIEW = (16, 40, 562, 792)                                                  # the photo without the app's white strip, its title and bottom bar
 def tab_geo(zoom, fx, fy):
     pw, ph = VIEW[2] - VIEW[0], VIEW[3] - VIEW[1]; s_ = W / pw * zoom; tx = W / 2 - fx * pw * s_; ty = H / 2 - fy * ph * s_
     if pw * s_ >= W: tx = min(0, max(W - pw * s_, tx))
@@ -661,14 +661,14 @@ def s_b(t):
     return fr
 
 # C — the plan: «СДЕЛАЛИ БЫ:» and the list grows as she names each step; the tablet marking alternates with her face
-HC = Drop(["СДЕЛАЛИ БЫ:"], 76, LX, 1128, maxw=900)
+HC = Drop(["СДЕЛАЛИ БЫ:"], 76, LX, 262, maxw=900)
 LIST = [("абдоминопластика", None), ("ушивание диастаза", 34.02), ("липосакция 360", 36.82)]
-TZ = dict(zoom=0.95, fx=0.5, fy=0.697)                                       # the belly close: her face out of the frame, the list over the shoulders
+TZ = dict(zoom=1.0, fx=0.5, fy=0.5)                                        # the whole recorded photo, centred; blur above and below                                       # the belly close: her face out of the frame, the list over the shoulders
 def c_list(fr, t):
     HC.draw(fr, t, T_S["C"] + 0.05, vend("C") + 0.1)
     if t > vend("C") + 0.5: return
     q = 1 - eio((t - vend("C") - 0.1) / 0.3) if t > vend("C") + 0.1 else 1.0
-    x, y = LX, 1206
+    x, y = LX, 336
     for k, (lab, w0) in enumerate(LIST):
         t0 = T_S["C"] + 0.35 if w0 is None else Rs("C", w0)
         a = alpha_img(lab, mont(30, 600)); w = a.shape[1] + 90
@@ -680,7 +680,7 @@ def s_c(t):
     if t < t1:                                                            # «перенести пупок»: the navel ring is drawn
         p7 = ramp_(t, Rs("C", 31.30), 0.6); z_ = TZ["zoom"]; fr = draw_marking({7: p7}, z_, TZ["fx"], TZ["fy"])
         x, y = sr_pt(z_, TZ["fx"], TZ["fy"], 284, 603)
-        if p7 >= 1: leader(fr, x + 30, y, 760, y + 90, eo((t - Rs("C", 31.95)) / 0.3)); label(fr, "перенос пупка", 760, y + 90, eo((t - Rs("C", 32.05)) / 0.3), 28)
+        if p7 >= 1: leader(fr, x + 30, y - 10, 700, y - 130, eo((t - Rs("C", 31.95)) / 0.3)); label(fr, "перенос пупка", 700, y - 130, eo((t - Rs("C", 32.05)) / 0.3), 28)
     elif t < t2: fr = flash(surgeon(t, "C", 1.28, 0.5, 0.31), t - t1)                 # «нужно обязательно сделать» — her face
     elif t < t3:                                                          # «ушивание диастаза»: the upper belly circled and hatched
         fr = flash(draw_marking({7: 1, 4: ramp_(t, t2 + 0.1, t3 - t2 - 0.2)}, TZ["zoom"], 0.5, TZ["fy"]), t - t2)
@@ -699,7 +699,7 @@ def s_c(t):
     fr = dark(fr); c_list(fr, t); return fr
 
 # D — the new turn: the arms. The raised-arms photo, both upper arms outlined; then the tablet draws the arm zones
-HD = low(Drop(["А С *РУКАМИ* ЧТО ДЕЛАТЬ?"], 96, LX, 0, maxw=900), HB_ - 60)
+HD = top(Drop(["А С *РУКАМИ* ЧТО ДЕЛАТЬ?"], 88, LX, 0, maxw=900), 262)        # top: over the wall above her head
 TD = Track(["липосакция или подтяжка?"], 34, LX, 0, 400)
 def s_d(t):
     lt = t - T_S["D"]; tsw = Rs("D", 55.0)
@@ -714,11 +714,11 @@ def s_d(t):
     else:
         u = t - tsw; fr = flash(draw_marking({**BELLY, 2: ramp_(u, 0.1, 0.9), 3: ramp_(u, 0.95, 0.35), 1: ramp_(u, 1.35, 0.8)}, TA["zoom"], 0.5, TA["fy"]), u)
     fr = dark(fr); HD.draw(fr, t, T_S["D"] + 0.05)
-    TD.y = HB_ - 20 + TD.top - 34; TD.draw(fr, t, T_S["D"] + 0.6); return fr
+    TD.y = 262 + HD.h + 18; TD.draw(fr, t, T_S["D"] + 0.6); return fr
 
 # E — the interesting part: she is young → a small liposuction of the shoulders, maybe no brachioplasty
-HE = low(Drop(["ВОЗМОЖНО, ПОЛУЧИТСЯ ОБОЙТИСЬ", "*БЕЗ ПОДТЯЖКИ РУК*"], 84, LX, 0, maxw=920))
-TA = dict(zoom=0.95, fx=0.5, fy=0.697)                                       # the arm close-up on the tablet
+HE = top(Drop(["ВОЗМОЖНО, ПОЛУЧИТСЯ ОБОЙТИСЬ", "*БЕЗ ПОДТЯЖКИ РУК*"], 76, LX, 0, maxw=920), 262)
+TA = TZ                                       # the arm close-up on the tablet
 _am = np.zeros(_LAB.shape, np.uint8); _am[(_LAB == 2) | (_LAB == 3)] = 1
 _cnt = max(cv2.findContours(_am, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0], key=cv2.contourArea)
 ARM_ZONE = cv2.convexHull(_cnt)[:, 0].astype(np.float32)                     # the marked zone on her right upper arm (photo px)
@@ -738,13 +738,13 @@ def s_e(t):
         fr = flash(tablet(marked(ALL)[0], z_, fx_, fy_), u)
         zone_fill(fr, z_, fx_, fy_, eo((t - Rs("E", 61.0)) / 0.5) * (1 - eio((t - Rs("E", 63.4)) / 0.4)), t)
         tl = Rs("E", 60.66)                                               # «липосакция в области плеч»
-        if t > tl: label(fr, "липосакция плеч", LX, 330, eo((t - tl) / 0.3), 32)
+        if t > tl: label(fr, "липосакция плеч", 735, 985, eo((t - tl) / 0.3), 26)
         tn = Rs("E", 63.40)                                               # «не придётся делать брахиопластику» → crossed out
-        if t > tn: strike(fr, "брахиопластика", LX, 420, cl((t - tn) / 1.4), 32)
+        if t > tn: strike(fr, "брахиопластика", 735, 1060, cl((t - tn) / 1.4), 26)
     fr = dark(fr); HE.draw(fr, t, T_S["E"] + 0.05); return fr
 
 # F — honestly: otherwise the lift, and the cut runs from the armpit almost to the elbow (drawn on the tablet with the stylus)
-HF = low(Drop(["НО ЕСЛИ КОЖА НЕ СОКРАТИТСЯ,", "МОЖЕТ ПОТРЕБОВАТЬСЯ *ПОДТЯЖКА*"], 80, LX, 0, maxw=920))
+HF = top(Drop(["НО ЕСЛИ КОЖА НЕ СОКРАТИТСЯ,", "МОЖЕТ ПОТРЕБОВАТЬСЯ *ПОДТЯЖКА*"], 72, LX, 0, maxw=920), 262)
 CUT = [(403, 396), (425, 399), (450, 401.5), (475, 402.5), (500, 403), (525, 402), (546, 400)]   # inner arm, armpit → elbow (photo px)
 def s_f(t):
     lt = t - T_S["F"]; tsw = Rs("F", 67.90)
