@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"><title>Хуки и сценарии — памятка @mcg.va</title>
+<style>
+@font-face{font-family:"Playfair";src:url("../fonts/user/PlayfairDisplay-Variable.ttf");font-weight:400 900}
+@font-face{font-family:"Playfair";src:url("../fonts/user/PlayfairDisplay-Italic-Variable.ttf");font-style:italic;font-weight:400 900}
+@font-face{font-family:"Inter";src:url("../fonts/user/Inter-Variable.ttf");font-weight:100 900}
+:root{--milk:#FBF8F4;--cream:#F6F0E6;--pink:#F0CCD5;--rose:#D7A0AF;--berry:#A64B64;--wine:#6B303E;--cocoa:#795A4A;--coffee:#332B28}
+@page{size:A4;margin:0}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--milk);color:var(--coffee);font-family:"Inter",sans-serif;font-size:10.2pt;line-height:1.45;letter-spacing:-0.01em}
+.page{width:210mm;height:297mm;padding:17mm 18mm 16mm;position:relative;page-break-after:always;overflow:hidden;background:var(--milk)}
+.page:last-child{page-break-after:auto}
+.kicker{font-size:7.6pt;letter-spacing:.22em;text-transform:uppercase;color:var(--berry);font-weight:600;margin-bottom:5mm}
+h1{font-family:"Playfair";font-weight:500;color:var(--wine);font-size:33pt;line-height:1.04;margin:0 0 5mm;letter-spacing:-0.01em}
+h2{font-family:"Playfair";font-weight:500;color:var(--wine);font-size:16pt;margin:6mm 0 2.5mm}
+h3{font-size:10.5pt;margin:0 0 1.2mm;color:var(--wine);font-weight:650}
+p{margin:0 0 2.6mm}
+.lead{font-size:11.2pt;color:#5b4c47;margin-bottom:6mm}
+.foot{position:absolute;left:18mm;right:18mm;bottom:9mm;border-top:1px solid #e4dcd5;padding-top:2mm;display:flex;justify-content:space-between;font-size:7pt;letter-spacing:.14em;text-transform:uppercase;color:var(--cocoa)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:3.5mm}
+.card{background:#fff;border:1px solid #eee3dc;border-radius:4mm;padding:3.6mm 4.2mm}
+.card.pink{background:var(--pink);border-color:var(--pink)}
+.card.cream{background:var(--cream);border-color:var(--cream)}
+.card.wine{background:var(--wine);border-color:var(--wine);color:var(--milk)}
+.card.wine h3{color:var(--milk)}
+.num{font-family:"Playfair";color:var(--rose);font-size:20pt;line-height:1;margin-right:3mm}
+.row{display:flex;align-items:flex-start;padding:2.6mm 0;border-bottom:1px solid #ebe2da}
+.row:last-child{border-bottom:none}
+.ex{color:var(--wine);font-weight:600}
+.ex::before{content:"→ ";color:var(--rose)}
+.f{font-size:8.6pt;color:var(--cocoa)}
+.f b{color:var(--coffee)}
+.quote{font-family:"Playfair";font-style:italic;font-size:17pt;color:var(--wine);line-height:1.25}
+table{width:100%;border-collapse:collapse;font-size:8.8pt}
+th{text-align:left;font-size:7.4pt;letter-spacing:.12em;text-transform:uppercase;color:var(--berry);padding:1.5mm 2mm;border-bottom:1px solid var(--rose)}
+td{padding:2mm;border-bottom:1px solid #ebe2da;vertical-align:top}
+td.t{color:var(--berry);font-weight:600;white-space:nowrap}
+.acc{font-family:"Playfair";font-style:italic;color:var(--berry);font-size:10.5pt}
+.tag{display:inline-block;background:var(--pink);color:var(--wine);border-radius:10mm;padding:.4mm 2.4mm;font-size:7.6pt;margin-right:1.5mm;font-weight:600}
+ul{margin:0;padding-left:4.5mm} li{margin-bottom:1.3mm}
+.cover{background:var(--cream);padding:0;display:flex}
+.cover .l{width:56%;padding:24mm 18mm 18mm;display:flex;flex-direction:column}
+.cover .r{width:44%;background:repeating-linear-gradient(90deg,var(--rose) 0 7mm,var(--pink) 7mm 14mm);position:relative}
+.cover .r .note{position:absolute;left:10mm;right:10mm;top:70mm;background:var(--milk);border-radius:3mm;padding:9mm 8mm;box-shadow:0 2mm 6mm rgba(107,48,62,.12)}
+.big{font-family:"Playfair";font-weight:500;color:var(--wine);font-size:35pt;line-height:1.05;margin:22mm 0 8mm}
+.line{width:28mm;height:1px;background:var(--berry);margin:0 0 7mm}
+.pill{display:inline-block;border:1px solid var(--rose);border-radius:10mm;padding:1.4mm 3.4mm;font-size:8pt;margin-right:2mm;color:var(--wine)}
+.cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm}
+.mini td{font-size:8.4pt;padding:1.6mm 2mm}
+.check li{list-style:none;margin-left:-4.5mm}
+.check li::before{content:"☐ ";color:var(--berry)}
+</style></head><body>
+
+<!-- 1. Cover -->
+<section class="page cover">
+ <div class="l">
+  <div class="kicker">Памятка · личный блог · 2026</div>
+  <div class="big">Заголовок<br>останавливает.<br><i>История</i><br>удерживает.</div>
+  <div class="line"></div>
+  <p class="lead">Хуки, структура сценария, речь, заголовки обложек и монтаж&nbsp;— с примерами из материнства.</p>
+  <div style="margin-top:auto"><span class="pill">motherhood diary</span><span class="pill">Reels · сторис · карусели</span>
+  <p class="f" style="margin-top:8mm">Для @mcg.va. Основано на разборе разговорных роликов @anastasi.great<br>и бренд-гайде «Мама, но я всё ещё я».</p></div>
+ </div>
+ <div class="r"><div class="note">
+  <div class="kicker" style="margin-bottom:3mm">Главная формула</div>
+  <div class="quote">Один ролик = одна мысль + одно чувство + одна история.</div>
+  <p class="f" style="margin-top:5mm">Зритель решает за 1–2 секунды. Всё остальное в этой памятке — о том, как не потерять его дальше.</p>
+ </div></div>
+</section>
+
+<!-- 2. Why it works -->
+<section class="page">
+ <div class="kicker">01 / Разбор</div>
+ <h1>Почему эти ролики<br>досматривают</h1>
+ <p class="lead">Четыре ролика по 24–52 секунды, говорящая голова и ни одной лишней секунды. Цепляет не тема, а конструкция.</p>
+ <div class="grid2">
+  <div class="card"><h3>1. Крючок без разгона</h3><p>Первая фраза&nbsp;— уже конфликт: запретное знание, эксперимент над зрителем или загадка. Нет «привет, сегодня расскажу».</p><p class="f">«Самый грязный способ быстро стать популярным…»</p></div>
+  <div class="card"><h3>2. Зритель становится участником</h3><p>Обращение на «ты/вы», вопрос посреди ролика, проверка реакции: «Что почувствовали?»</p><p class="f">Человек начинает отвечать в голове&nbsp;— и остаётся.</p></div>
+  <div class="card"><h3>3. Явление получает имя</h3><p>«Альтер-эго», «эффект доминирования». Термин делает мысль запоминаемой и даёт чувство «я узнала секрет».</p></div>
+  <div class="card"><h3>4. Доказательство цифрой</h3><p>90&nbsp;% звёзд, уверенность «на 200&nbsp;%», скрин просмотров, список примеров. Цифра звучит убедительнее слов.</p></div>
+  <div class="card"><h3>5. Переворот смысла</h3><p>«Проблема не в том, что вам говорят „дорого“, а в том, что вы боитесь…» Зритель видит знакомую ситуацию под новым углом.</p></div>
+  <div class="card"><h3>6. Контраст и выбор</h3><p>«Не подписчиками, а фанатами», «не у слабых, а у сильных», финальный выбор из двух вариантов → комментарии.</p></div>
+  <div class="card"><h3>7. Предмет-метафора</h3><p>Два яблока = две девушки, игрушечная Lamborghini = цена. Абстракция превращается в картинку, которую видно без звука.</p></div>
+  <div class="card"><h3>8. Ясный призыв</h3><p>Слово в комментарии («напиши ЭГО»), «читай в описании», «добро пожаловать». Одно действие, без перечня.</p></div>
+ </div>
+ <div class="card pink" style="margin-top:4mm"><h3>Как берём это в твой блог</h3><p>Конструкцию&nbsp;— полностью. Тон&nbsp;— твой: вместо дерзости честное признание, вместо ярлыков вопрос, вместо давления узнавание. Без страшилок про безопасность ребёнка и без вины.</p></div>
+ <div class="foot"><span>Хуки и сценарии · mcg.va</span><span>02</span></div>
+</section>
+
+<!-- 3. Structure -->
+<section class="page">
+ <div class="kicker">02 / Структура</div>
+ <h1>Скелет ролика<br>на 30–45 секунд</h1>
+ <p class="lead">Семь шагов. Не обязательно использовать все, но порядок лучше не менять.</p>
+ <table>
+  <tr><th>Время</th><th>Шаг</th><th>Что происходит</th><th>Пример (материнство)</th></tr>
+  <tr><td class="t">0–3 с</td><td><b>Хук</b></td><td>Конфликт, признание, цифра или вопрос. Сразу в кадре предмет или действие.</td><td class="ex">«Я отдала за манеж 40 тысяч и три дня думала, что это ошибка»</td></tr>
+  <tr><td class="t">3–8 с</td><td><b>Боль / страх</b></td><td>Конкретная ситуация, в которой зритель узнаёт себя.</td><td class="ex">«Казалось, можно в три раза дешевле. И я боялась, что обманут»</td></tr>
+  <tr><td class="t">8–15 с</td><td><b>Почему это важно</b></td><td>Твой реальный опыт, детали, цифры.</td><td class="ex">«Она дважды упала с кровати — от неё нельзя было отойти»</td></tr>
+  <tr><td class="t">15–18 с</td><td><b>Имя явлению</b></td><td>Короткий тёплый термин.</td><td class="ex">«Я назвала это налогом на спокойствие»</td></tr>
+  <tr><td class="t">18–28 с</td><td><b>Поворот / вау</b></td><td>Демонстрация, неожиданный результат, смена картинки.</td><td class="ex">Щелчок — загорается гирлянда, манеж превращается в домик</td></tr>
+  <tr><td class="t">28–35 с</td><td><b>Переворот смысла</b></td><td>Что на самом деле стоит за ситуацией.</td><td class="ex">«Я платила не за манеж, а за десять минут спокойного кофе»</td></tr>
+  <tr><td class="t">35–40 с</td><td><b>Вопрос + призыв</b></td><td>Выбор из двух или вопрос, одно действие.</td><td class="ex">«Одна дорогая вещь или три дешёвые? Напишите „манеж“»</td></tr>
+ </table>
+ <h2>Правила текста</h2>
+ <div class="cols3">
+  <div class="card cream"><h3>Коротко</h3><p>Фраза&nbsp;— до 12 слов. Одна мысль на фразу. Читай вслух: где сбилась дыхание, режь.</p></div>
+  <div class="card cream"><h3>Конкретно</h3><p>«29 минут», «1300&nbsp;₽», «2 раза», «в 3 часа ночи». Числа и время вместо «часто», «дорого», «долго».</p></div>
+  <div class="card cream"><h3>Как подруге</h3><p>Разговорные слова, «ты», «скажите честно». Ни одного «рекомендую ознакомиться».</p></div>
+ </div>
+ <div class="foot"><span>Хуки и сценарии · mcg.va</span><span>03</span></div>
+</section>
+
+<!-- 4. Hooks 1 -->
+<section class="page">
+ <div class="kicker">03 / Хуки</div>
+ <h1>12 видов хука<br>с примерами</h1>
+ <p class="lead">Хук&nbsp;— это первая фраза и первый кадр вместе. Пиши 3–5 вариантов и выбирай самый живой.</p>
+ <div class="row"><span class="num">01</span><div><h3>Неудобная правда</h3><p class="f"><b>Формула:</b> «Об этом не принято говорить, но…» / «Неприятная правда о…»</p><p class="ex">«Об этом не говорят на курсах для беременных: первые недели я не чувствовала любви. Только страх»</p></div></div>
+ <div class="row"><span class="num">02</span><div><h3>Признание с цифрой</h3><p class="f"><b>Формула:</b> «Я [сделала/потратила] [цифра], и [чувство]»</p><p class="ex">«Я потратила 18 тысяч на детские вещи, которые Агата не надела ни разу»</p></div></div>
+ <div class="row"><span class="num">03</span><div><h3>Эксперимент над зрителем</h3><p class="f"><b>Формула:</b> скажи фразу → «Что почувствовали?» → скажи противоположную</p><p class="ex">«Я кормлю ребёнка смесью. Что почувствовали? А если так: я кормлю грудью. Почему отношение поменялось?»</p></div></div>
+ <div class="row"><span class="num">04</span><div><h3>Загадка-аналогия</h3><p class="f"><b>Формула:</b> «Если бы [понятная ситуация из другой жизни]… [вопрос]»</p><p class="ex">«Если бы на работе у вас не было ни одного выходного 6 месяцев, вы бы называли это „сидеть дома“?»</p></div></div>
+ <div class="row"><span class="num">05</span><div><h3>Контраст ожидания и реальности</h3><p class="f"><b>Формула:</b> «Я думала [ожидание]. А получилось [реальность]»</p><p class="ex">«Думала, дорогая бутылочка точно будет удобнее. Нет»</p></div></div>
+ <div class="row"><span class="num">06</span><div><h3>Вопрос конкретной ситуацией</h3><p class="f"><b>Формула:</b> «У кого ещё [очень узнаваемая деталь]?»</p><p class="ex">«У кого ещё ребёнок просыпается ровно в тот момент, когда вы сели есть?»</p></div></div>
+ <div class="foot"><span>Хуки и сценарии · mcg.va</span><span>04</span></div>
+</section>
+
+<!-- 5. Hooks 2 -->
+<section class="page">
+ <div class="kicker">03 / Хуки · продолжение</div>
+ <div class="row"><span class="num">07</span><div><h3>Самый «грязный» лайфхак</h3><p class="f"><b>Формула:</b> «Самый [нечестный / ленивый / простой] способ [результат]»</p><p class="ex">«Самый ленивый способ уложить ребёнка днём, который реально работает у нас»</p></div></div>
+ <div class="row"><span class="num">08</span><div><h3>Ты делаешь это неправильно</h3><p class="f"><b>Формула:</b> «Ты [привычное действие] вместо того, чтобы [другое]» — мягко, про себя</p><p class="ex">«Я выбирала бутылочки по цене, а надо было — по тому, как ест ребёнок»</p></div></div>
+ <div class="row"><span class="num">09</span><div><h3>Желание без оправданий</h3><p class="f"><b>Формула:</b> «Я хочу [обычное человеческое желание], и это нормально»</p><p class="ex">«Я хочу гулять с коляской и выглядеть так, как нравится мне»</p></div></div>
+ <div class="row"><span class="num">10</span><div><h3>Список-обещание</h3><p class="f"><b>Формула:</b> «[Число] вещей / ошибок / фраз, которые…»</p><p class="ex">«3 детские покупки, о которых я жалею. Третья стоила дороже всех»</p></div></div>
+ <div class="row"><span class="num">11</span><div><h3>«До и после»</h3><p class="f"><b>Формула:</b> «Я пришла от [было] к [стало], и вот что поменялось»</p><p class="ex">«Я пришла от сна по 40 минут к двум часам днём. Без чудо-методик»</p></div></div>
+ <div class="row"><span class="num">12</span><div><h3>Цитата, которую все слышали</h3><p class="f"><b>Формула:</b> «„[Фраза, которую говорят мамам]“. [Твой ответ]»</p><p class="ex">«„Ты же целый день дома“. Ага. Дома, где у меня нет времени даже сходить в туалет»</p></div></div>
+ <h2>Первый кадр важнее первой фразы</h2>
+ <div class="grid2">
+  <div class="card"><h3>Покажи предмет или действие</h3><p>Бутылочка в руке, ценник «40&nbsp;000&nbsp;₽», недопитый кофе, взгляд на часы, коробка с доставкой. Не начинай с «привет».</p></div>
+  <div class="card"><h3>Текст на экране = хук</h3><p>Первые 2 секунды на экране одна крупная фраза. Её видят те, кто смотрит без звука.</p></div>
+ </div>
+ <div class="card pink" style="margin-top:3.5mm"><h3>Проверка хука</h3><p>1) Есть конкретная ситуация? 2) Мама узнает себя? 3) Ролик действительно отвечает на обещание? 4) Звучит как ты, а не как реклама?</p></div>
+ <div class="foot"><span>Хуки и сценарии · mcg.va</span><span>05</span></div>
+</section>
+
+<!-- 6. Middle tools -->
+<section class="page">
+ <div class="kicker">04 / Середина ролика</div>
+ <h1>Как удержать<br>после хука</h1>
+ <h2>Дай явлению имя</h2>
+ <p>Термин превращает твою историю в «понятие», которое запоминают и пересказывают подругам. Тёплое, своё, из 2–3 слов.</p>
+ <div class="cols3">
+  <div class="card cream"><span class="acc">налог на спокойствие</span><p class="f">дорогая вещь, которая даёт маме минуты свободы</p></div>
+  <div class="card cream"><span class="acc">правило 29 минут</span><p class="f">сколько длится дневной сон, когда ты всё запланировала</p></div>
+  <div class="card cream"><span class="acc">мамина невидимая смена</span><p class="f">всё, что ты делаешь, а со стороны «сидишь дома»</p></div>
+  <div class="card cream"><span class="acc">синдром второй чашки</span><p class="f">кофе, который ты разогреваешь в третий раз</p></div>
+  <div class="card cream"><span class="acc">тишина с подвохом</span><p class="f">когда стало слишком тихо в детской</p></div>
+  <div class="card cream"><span class="acc">я-до-мамы</span><p class="f">рубрика про себя прежнюю</p></div>
+ </div>
+ <h2>Переверни смысл</h2>
+ <p class="f"><b>Формула:</b> «Проблема не в том, что [поверхностная причина]. Проблема в том, что [настоящая]»</p>
+ <p class="ex">«Проблема не в том, что ребёнок плохо спит. Проблема в том, что я жду от себя, что буду бодрой»</p>
+ <p class="ex">«Я платила не за манеж. Я платила за десять минут, когда могу просто выпить кофе»</p>
+ <h2>Контрастные пары</h2>
+ <p class="f"><b>Формула:</b> «не [А], а [Б]» — ритм, который хочется повторить</p>
+ <p class="ex">«Не идеальная мама, а интересная женщина»</p>
+ <p class="ex">«Агате нужна не дорогая игрушка, а мама, которая не на пределе»</p>
+ <h2>Предмет-метафора</h2>
+ <p>Держи в руках то, что объясняет мысль без звука:</p>
+ <ul><li><b>Две бутылочки</b> (500&nbsp;₽ и 1300&nbsp;₽)&nbsp;— «дорого не значит лучше».</li><li><b>Песочные часы / таймер на 29 минут</b>&nbsp;— дневной сон.</li><li><b>Остывшая кружка</b>&nbsp;— «время для себя».</li><li><b>Ценник на бумажке</b>&nbsp;— честный разговор о деньгах.</li><li><b>Список дел, который ты рвёшь</b>&nbsp;— «план был красивее реальности».</li></ul>
+ <div class="foot"><span>Хуки и сценарии · mcg.va</span><span>06</span></div>
+</section>
+
+<!-- 7. Endings -->
+<section class="page">
+ <div class="kicker">05 / Финал</div>
+ <h1>Как закончить,<br>чтобы писали</h1>
+ <div class="grid2">
+  <div class="card"><h3>Выбор из двух</h3><p class="ex">«Одна дорогая вещь или три дешёвые?»</p><p class="ex">«Режим по часам или по ребёнку?»</p><p class="f">Отвечать легко&nbsp;— одним словом. Комментарии поднимают ролик.</p></div>
+  <div class="card"><h3>Узнавание</h3><p class="ex">«Мамы коротких снов, вы тут?»</p><p class="ex">«Скажите, что я не одна»</p></div>
+  <div class="card"><h3>Слово-призыв</h3><p class="ex">«Напишите „манеж“ — пришлю, где заказывала»</p><p class="ex">«Напиши „ИВ“ — скину список, что мы купили»</p><p class="f">Обещай только то, что реально пришлёшь.</p></div>
+  <div class="card"><h3>Тёплое «добро пожаловать»</h3><p class="ex">«Если узнала себя — оставайся, тут без идеальных мам»</p></div>
+ </div>
+ <h2>Чего не делать</h2>
+ <div class="card wine"><ul>
+  <li>Не пугать опасностью для ребёнка там, где её нет, и не давить на чувство вины.</li>
+  <li>Не делить мам на «хороших и плохих», «сильных и слабых» — провокация через признание, а не через ярлык.</li>
+  <li>Не обещать в хуке то, чего нет в ролике.</li>
+  <li>Прикорм, сон, здоровье&nbsp;— как личный опыт, а не медицинская рекомендация.</li>
+  <li>Подарок или бартер&nbsp;— пометка «реклама» и данные рекламодателя.</li>
+ </ul></div>
+ <div class="foot"><span>Хуки и сценарии · mcg.va</span><span>07</span></div>
+</section>
+
+<!-- 8. Speech -->
+<section class="page">
+ <div class="kicker">06 / Подача</div>
+ <h1>Как говорить<br>в камеру</h1>
+ <div class="grid2">
+  <div class="card"><h3>Взгляд и голос</h3><ul><li>Смотри в объектив, а не на экран.</li><li>Спокойно и уверенно, на полтона ниже обычного.</li><li>Перед главным словом&nbsp;— пауза полсекунды и лёгкая мимика (бровь, полуулыбка).</li></ul></div>
+  <div class="card"><h3>Ритм</h3><ul><li>Короткие фразы, без «ну», «как бы», «в общем».</li><li>Каждую фразу можно записать отдельным дублем&nbsp;— на монтаже склеим.</li><li>Ошиблась&nbsp;— просто повтори фразу, паузу вырежу.</li></ul></div>
+  <div class="card"><h3>Руки и предмет</h3><ul><li>Жесты на цифрах: «2» пальцами&nbsp;— цифра на весь экран.</li><li>Предмет в кадре работает за тебя: показала&nbsp;— не объясняй.</li></ul></div>
+  <div class="card"><h3>Образ под тему</h3><ul><li>Мягкий трикотаж&nbsp;— личные темы.</li><li>Пиджак / собранные волосы&nbsp;— «неудобная правда», деньги.</li><li>Пижама в полоску&nbsp;— утро, «30 минут тишины».</li></ul></div>
+ </div>
+ <h2>Свет и картинка</h2>
+ <p>Вечер, тёплый практический свет за спиной (гирлянда, торшер, свеча)&nbsp;— фон размыт, лицо мягко подсвечено сбоку. Камера стоит, план по пояс. Фон не идеальный, но спокойный.</p>
+ <div class="card pink"><h3>Перед записью</h3><p>Прочитай сценарий вслух один раз. Подчеркни в каждой фразе одно главное слово&nbsp;— на него сделаешь паузу, а на монтаже оно станет крупным.</p></div>
+ <div class="foot"><span>Хуки и сценарии · mcg.va</span><span>08</span></div>
+</section>
+
+<!-- 9. Headlines -->
+<section class="page">
+ <div class="kicker">07 / Заголовки обложек</div>
+ <h1>Заголовок —<br>это хук в 3–6 словах</h1>
+ <p class="lead">На обложке не пересказ, а обещание. Максимум 2–3 строки, одна фраза, ближе к центру кадра.</p>
+ <table class="mini">
+  <tr><th>Рубрика</th><th>Слабо</th><th>Сильно</th></tr>
+  <tr><td>Проверено дома</td><td>Обзор манежа</td><td class="ex">40&nbsp;000 за манеж. Оправдал?</td></tr>
+  <tr><td>Проверено дома</td><td>Мои покупки</td><td class="ex">Покупки, о которых я жалею</td></tr>
+  <tr><td>ИВ без оправданий</td><td>Почему мы на ИВ</td><td class="ex">Я не оправдываюсь за ИВ</td></tr>
+  <tr><td>ИВ без оправданий</td><td>Наши бутылочки</td><td class="ex">500&nbsp;₽ победила 1300&nbsp;₽</td></tr>
+  <tr><td>30 минут тишины</td><td>Дневной сон</td><td class="ex">Она поспала 29 минут</td></tr>
+  <tr><td>30 минут тишины</td><td>Усталость</td><td class="ex">Устала ещё до начала дня</td></tr>
+  <tr><td>Я всё ещё я</td><td>Мой стиль</td><td class="ex">Не хочу выглядеть «только мамой»</td></tr>
+  <tr><td>Я всё ещё я</td><td>Про материнство</td><td class="ex">Люблю дочь. Не всегда люблю материнство</td></tr>
+  <tr><td>Прикорм без спектакля</td><td>Первый прикорм</td><td class="ex">Прикорм без идеальной картинки</td></tr>
+  <tr><td>Красиво в обычный день</td><td>Моё утро</td><td class="ex">Утро начинается не с кофе</td></tr>
+  <tr><td>Мама за ноутбуком</td><td>Как я работаю</td><td class="ex">Работаю, пока она спит. 29 минут</td></tr>
+ </table>
+ <h2>Формулы заголовка</h2>
+ <div class="cols3">
+  <div class="card cream"><h3>Цифра + вопрос</h3><p class="ex">40&nbsp;000 за манеж. Оправдал?</p></div>
+  <div class="card cream"><h3>Признание</h3><p class="ex">Я не оправдываюсь за ИВ</p></div>
+  <div class="card cream"><h3>Контраст</h3><p class="ex">Думала, дорогое — лучше</p></div>
+  <div class="card cream"><h3>Цитата</h3><p class="ex">«Ты же целый день дома»</p></div>
+  <div class="card cream"><h3>Список</h3><p class="ex">3 покупки, о которых жалею</p></div>
+  <div class="card cream"><h3>Узнавание</h3><p class="ex">Мамы коротких снов, вы тут?</p></div>
+ </div>
+ <div class="foot"><span>Хуки и сценарии · mcg.va</span><span>09</span></div>
+</section>
+
+<!-- 10. Montage -->
+<section class="page">
+ <div class="kicker">08 / Монтаж</div>
+ <h1>Как это собирается<br>на монтаже</h1>
+ <div class="grid2">
+  <div class="card"><h3>Склейки</h3><p>Без пауз. Склейка на каждой фразе, кадр через раз чуть крупнее. 30–45 секунд.</p></div>
+  <div class="card"><h3>Субтитры</h3><p>По словам, по центру нижней трети. Служебные слова мелко молочным Inter, <span class="acc">одно главное слово</span>&nbsp;— крупно (Playfair italic или Inter SemiBold).</p></div>
+  <div class="card"><h3>Вставки</h3><p>Цифра на весь экран, карточки-фото примеров, скрин переписки или трека доставки, зачёркивание.</p></div>
+  <div class="card"><h3>Кульминация</h3><p>Один красивый момент: включается свет, медленный проезд, смена цвета на тёплое золото.</p></div>
+  <div class="card"><h3>Цвет</h3><p>Тёплые тени, персиковые света, приглушённая насыщенность, лёгкая виньетка. Фон тёмный, лицо светлое.</p></div>
+  <div class="card"><h3>Финал</h3><p>Затемнение 3 секунды: @mcg.va по центру и слово-призыв.</p></div>
+ </div>
+ <h2>Звук</h2>
+ <p>Голос&nbsp;— чистый, без пауз. Живые звуки: щелчок выключателя, кофемашина, крышка бутылочки. Тихая музыка после первой фразы. Плач ребёнка&nbsp;— не эффект.</p>
+ <div class="card pink"><h3>Что прислать на монтаж</h3><p>Ролик «говорящей головы» целиком (можно с ошибками), 5–10 коротких кадров-деталей по 3–5 секунд, фото предметов для вставок, если есть&nbsp;— скрины (переписка, трек-номер, ценник).</p></div>
+ <div class="foot"><span>Хуки и сценарии · mcg.va</span><span>10</span></div>
+</section>
+
+<!-- 11. Example manezh -->
+<section class="page">
+ <div class="kicker">09 / Готовый пример</div>
+ <h1>«Манеж за 40 000 ₽»</h1>
+ <p class="lead">Рубрика «Проверено дома». Не обзор, а история страха, решения и вывода.</p>
+ <table class="mini">
+  <tr><th>Время</th><th>Голос</th><th>Кадр и акцент</th></tr>
+  <tr><td class="t">0–3</td><td>Я отдала за манеж сорок тысяч. И три дня боялась, что это самая глупая покупка года.</td><td>Ценник в руке → <b>40&nbsp;000&nbsp;₽</b> на весь экран</td></tr>
+  <tr><td class="t">3–8</td><td>Мне казалось, можно взять в три раза дешевле. А ещё он ехал из другого города — я была уверена, что меня обманут.</td><td>Карточки «дешевле» зачёркиваются, трек-номер. <b>обманут</b></td></tr>
+  <tr><td class="t">8–15</td><td>Но выбора не было. В полгода Агата превратилась в маленький ураган: билась головой, дважды упала с кровати — от неё нельзя было отвести взгляд.</td><td>Жест «2» → <b>2</b> на весь экран. <b>ураган</b></td></tr>
+  <tr><td class="t">15–18</td><td>Я назвала это налогом на спокойствие.</td><td>Пауза, взгляд в камеру. <span class="acc">налог на спокойствие</span></td></tr>
+  <tr><td class="t">18–28</td><td>А теперь смотрите. Ручная работа. Огромный. И он превращается в домик: гирлянды, подсветка. Таких я больше нигде не видела.</td><td>Щелчок — свет загорается, медленный проезд, золото</td></tr>
+  <tr><td class="t">28–34</td><td>Я поняла: я платила не за манеж. Я платила за десять минут, когда она в безопасности, а я просто пью кофе рядом.</td><td>Ты с кружкой у манежа. <b>10 минут</b></td></tr>
+  <tr><td class="t">34–38</td><td>Скажите честно: одна дорогая вещь — или три дешёвые?</td><td>Взгляд в камеру</td></tr>
+  <tr><td class="t">38–41</td><td>Напишите «манеж» — пришлю, где заказывала.</td><td>Затемнение, @mcg.va</td></tr>
+ </table>
+ <h2>Какие приёмы здесь работают</h2>
+ <p><span class="tag">признание + цифра</span><span class="tag">страх «обманут»</span><span class="tag">конкретика</span><span class="tag">имя явлению</span><span class="tag">вау-поворот</span><span class="tag">переворот смысла</span><span class="tag">выбор из двух</span><span class="tag">слово-призыв</span></p>
+ <p class="f"><b>Обложка:</b> «40&nbsp;000 за манеж» + <i>оправдал?</i> · <b>Подпись:</b> «Купили Агате манеж за 40&nbsp;000, и я до последнего думала, что зря… А вы — за одну дорогую вещь или за несколько дешёвых?»</p>
+ <div class="foot"><span>Хуки и сценарии · mcg.va</span><span>11</span></div>
+</section>
+
+<!-- 12. More examples -->
+<section class="page">
+ <div class="kicker">10 / Ещё два сценария</div>
+ <h1>Тот же скелет —<br>другие темы</h1>
+ <h2>«Я не оправдываюсь за ИВ» · 30 с</h2>
+ <table class="mini">
+  <tr><td class="t">0–3</td><td><b>Эксперимент:</b> «Я кормлю дочь смесью. Что почувствовали? Уже захотелось спросить, почему?»</td></tr>
+  <tr><td class="t">3–10</td><td><b>Опыт:</b> «Я знала, что не буду кормить грудью, ещё до родов. И долго ждала вопросов».</td></tr>
+  <tr><td class="t">10–14</td><td><b>Имя:</b> «Я называю это „экзаменом на хорошую маму“ — его сдают все, кто кормит не так, как ждут».</td></tr>
+  <tr><td class="t">14–24</td><td><b>Переворот:</b> «Но способ кормления не делает меня более или менее любящей. Агата сыта, спокойна, и я — тоже».</td></tr>
+  <tr><td class="t">24–30</td><td><b>Финал:</b> «Вас спрашивали, почему вы кормите именно так? Напишите — мне правда интересно».</td></tr>
+ </table>
+ <h2>«Успеть всё за 30 минут» · 25 с</h2>
+ <table class="mini">
+  <tr><td class="t">0–3</td><td><b>Хук-лайфхак:</b> «Самый честный тайм-менеджмент мамы. Пока она спит, я успею всё».</td></tr>
+  <tr><td class="t">3–9</td><td><b>Список мечты:</b> кофе, ноутбук, стирка, душ — быстрые склейки, каждая с галочкой.</td></tr>
+  <tr><td class="t">9–14</td><td><b>Реальность:</b> тишина, звук из детской. Цифра <b>29:00</b> на весь экран.</td></tr>
+  <tr><td class="t">14–20</td><td><b>Имя:</b> «Это правило 29 минут: сон длится ровно столько, сколько ты успела запланировать».</td></tr>
+  <tr><td class="t">20–25</td><td><b>Узнавание:</b> «Мамы коротких снов, вы тут?»</td></tr>
+ </table>
+ <div class="card pink" style="margin-top:4mm"><h3>Шаблон для своих сценариев</h3><p>Хук: ______ · Боль: ______ · Мой опыт с цифрой: ______ · Имя явлению: ______ · Вау-кадр: ______ · Переворот «не… а…»: ______ · Вопрос из двух: ______ · Слово-призыв: ______</p></div>
+ <div class="foot"><span>Хуки и сценарии · mcg.va</span><span>12</span></div>
+</section>
+
+<!-- 13. Checklist -->
+<section class="page">
+ <div class="kicker">11 / Чек-лист</div>
+ <h1>Перед публикацией</h1>
+ <div class="grid2">
+  <div class="card"><h3>Сценарий</h3><ul class="check"><li>Хук в первые 2 секунды, без «привет»</li><li>В хуке конкретная ситуация или цифра</li><li>Одна мысль, одно чувство, одна история</li><li>Есть имя явлению или переворот смысла</li><li>Ролик выполняет обещание хука</li><li>Финал: вопрос из двух или слово-призыв</li><li>Звучит как я, а не как реклама</li></ul></div>
+  <div class="card"><h3>Монтаж и обложка</h3><ul class="check"><li>Первый кадр — предмет или действие</li><li>Нет пауз и «эээ»</li><li>Одно главное слово в каждом субтитре</li><li>Есть вставка-цифра или вау-кадр</li><li>Обложка: 3–6 слов, ближе к центру</li><li>Проверила обложку в сетке профиля</li><li>Затемнение с @mcg.va в конце</li></ul></div>
+ </div>
+ <div class="card wine" style="margin-top:5mm"><h3>Границы</h3><p>Без страха за ребёнка ради охватов, без вины, без деления мам на правильных и неправильных. Опыт — не медицинский совет. Подарок или бартер — с пометкой «реклама».</p></div>
+ <div style="margin-top:14mm" class="quote">Не нужно жить красиво ради блога.<br>Можно красиво рассказывать свою жизнь.</div>
+ <div class="foot"><span>Хуки и сценарии · mcg.va</span><span>13</span></div>
+</section>
+</body></html>
