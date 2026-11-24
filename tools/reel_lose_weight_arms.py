@@ -458,10 +458,15 @@ def click():
 VO = [("A", "IMG_3153", [(8.62, 12.52)]),                              # девушка у нас худеет, сбрасывает вес очень успешно
       ("B", "IMG_3153", [(17.82, 18.84), (19.24, 21.50), (23.40, 25.36)]),   # но что мы тут видим? в любом случае, даже когда она сбросит, ей нужно делать абдоминопластику
       ("C", "IMG_3153", [(30.54, 38.82)]),                             # также нужно перенести пупок. нужно обязательно сделать ушивание диастаза и сделать липосакцию 360 по кругу
+      ("V1", "V23", [(44.88, 49.06)]),                                 # в области живота здесь есть не только подкожный жир, но ещё и висцеральный
+      ("V2", "V23", [(49.26, 50.98)]),                                 # подкожный жир мы можем убрать
+      ("V3", "V23", [(54.32, 58.56)]),                                 # но если есть висцеральный жир, мы, к сожалению, над ним работать не можем
+      ("V4", "V23", [(60.76, 66.14)]),                                 # и этот плюс в области живота, особенно выше пупка, висцеральный жир как раз и будет давать
+      ("V5", "V23", [(66.88, 71.40)]),                                 # поэтому лучше, конечно, сбросить вес и только потом делать уже абдоминопластику
       ("D", "IMG_3153", [(52.58, 56.32)]),                             # также девушка отмечала, что ей не нравятся руки
       ("E", "IMG_3153", [(56.98, 59.40), (60.10, 65.38)]),             # так как она молодая, я очень надеюсь, что небольшая липосакция в области плеч ей поможет, ей не придётся делать брахиопластику
       ("F", "IMG_3153", [(65.58, 67.98), (68.90, 73.36)])]             # в противном случае придётся делать её, и разрез в таком случае у нас идёт от подмышки до практически локтевого сгиба
-GAP = {"B": 0.35, "C": 0.35, "D": 0.4, "E": 0.2, "F": 0.3}
+GAP = {"B": 0.35, "C": 0.35, "V1": 0.45, "V2": 0.3, "V3": 0.25, "V4": 0.4, "V5": 0.35, "D": 0.45, "E": 0.2, "F": 0.3}
 SEG = []; _t = 0.04
 for _b, _s, _parts in VO:
     if SEG: _t += GAP[_b]
@@ -538,18 +543,18 @@ def draw_marking(prog, zoom, fx, fy, pen=False):                        # no sty
     if pen and tip is not None: stylus(fr, *sr_pt(zoom, fx, fy, tip[0], tip[1]))
     return fr
 def ramp_(t, t0, d): return cl((t - t0) / d)
-BELLY = {5: 1, 6: 1, 7: 1, 4: 1}; ALL = {**BELLY, 1: 1, 2: 1, 3: 1}
+BELLY = {5: 1, 6: 1, 7: 1, 4: 1}; ALL = {**BELLY, 1: 1, 2: 1, 3: 1}; BELLY0 = {5: 1, 6: 1, 7: 1}
 
 # ---------------- subtitles: phrases of 2–3 words, the spoken word lights up, key words in a pink italic
-FIX = {"пупок.": "пупок,", "придется": "придётся", "идет": "идёт", "ее,": "её,"}
-KEY = {"худеет,", "успешно.", "абдоминопластику,", "пупок,", "ушивание", "диастаза", "липосакцию", "360", "руки,", "молодая,", "липосакция", "плеч", "брахиопластику.", "разрез", "подмышки", "локтевого", "сгиба,"}
-_W = [(FIX.get(w, w), a, e) for w, a, e in eval(open(os.path.join(SRC, "tr_IMG_3153.txt")).read().replace("np.float64", ""))]
+FIX = {"кубка,": "пупка,", "еще": "ещё", "конечно": "конечно,", "-таки": "", "пупок.": "пупок,", "придется": "придётся", "идет": "идёт", "ее,": "её,"}
+KEY = {"подкожный", "Подкожный", "висцеральный.", "висцеральный", "убрать,", "плюс", "выше", "пупка,", "сбросить", "вес", "абдоминопластику.", "худеет,", "успешно.", "абдоминопластику,", "пупок,", "ушивание", "диастаза", "липосакцию", "360", "руки,", "молодая,", "липосакция", "плеч", "брахиопластику.", "разрез", "подмышки", "локтевого", "сгиба,"}
+_W = {k: [(FIX.get(w, w), a, e) for w, a, e in eval(open(os.path.join(SRC, f"tr_{k}.txt")).read().replace("np.float64", ""))] for k in ("IMG_3153", "V23")}
 def _sub_words():
     out = []
     for b, s_, parts, t0, d in SEG:
         acc = 0.0
         for a, o in parts:
-            for w, ws, we in _W:
+            for w, ws, we in _W[s_]:
                 if a <= (ws + we) / 2 <= o and w: out.append((w, t0 + acc + max(ws, a) - a, t0 + acc + min(we, o) - a, b))
             acc += o - a
     return [(w, a, min(e + 0.3, out[i + 1][1] - 0.04) if i + 1 < len(out) else e + 0.3, b) for i, (w, a, e, b) in enumerate(out)]
@@ -683,9 +688,9 @@ def s_c(t):
         if p7 >= 1: leader(fr, x + 30, y - 10, 700, y - 130, eo((t - Rs("C", 31.95)) / 0.3)); label(fr, "перенос пупка", 700, y - 130, eo((t - Rs("C", 32.05)) / 0.3), 28)
     elif t < t2: fr = flash(surgeon(t, "C", 1.28, 0.5, 0.31), t - t1)                 # «нужно обязательно сделать» — her face
     elif t < t3:                                                          # «ушивание диастаза»: the upper belly circled and hatched
-        fr = flash(draw_marking({7: 1, 4: ramp_(t, t2 + 0.1, t3 - t2 - 0.2)}, TZ["zoom"], 0.5, TZ["fy"]), t - t2)
+        fr = flash(draw_marking({7: 1}, TZ["zoom"], 0.5, TZ["fy"]), t - t2); diastasis(fr, t, t2 + 0.15)
     else:                                                                 # «липосакцию 360 по кругу»: the flanks, then an orbit round the waist
-        u = t - t3; fr = draw_marking({7: 1, 4: 1, 6: ramp_(u, 0.0, 0.25), 5: ramp_(u, 0.2, 1.5)}, TZ["zoom"], 0.5, TZ["fy"])
+        u = t - t3; fr = draw_marking({7: 1, 6: ramp_(u, 0.0, 0.25), 5: ramp_(u, 0.2, 1.5)}, TZ["zoom"], 0.5, TZ["fy"])
         z_ = TZ["zoom"]; fy_ = TZ["fy"]; to = Rs("C", 38.34) - t3
         if u > to - 0.3:                                                  # «по кругу»
             cx, cy = sr_pt(z_, 0.5, fy_, 288, 560); s_ = tab_geo(z_, 0.5, fy_)[0]; p = eio((u - to + 0.3) / 0.9)
@@ -697,6 +702,90 @@ def s_c(t):
                     (xa, ya), (xb, yb) = pts[-2], pts[-1]; ang = np.arctan2(yb - ya, xb - xa)
                     fill_poly(fr, [(xb + 18 * np.cos(ang), yb + 18 * np.sin(ang)), (xb + 14 * np.cos(ang + 2.2), yb + 14 * np.sin(ang + 2.2)), (xb + 14 * np.cos(ang - 2.2), yb + 14 * np.sin(ang - 2.2))], PINK)
     fr = dark(fr); c_list(fr, t); return fr
+
+
+# C helper — «ушивание диастаза»: the midline drawn, the two muscle edges pulled together
+def diastasis(fr, t, t0):
+    u = t - t0
+    if u <= 0: return
+    top_, bot_ = sr_pt(TZ["zoom"], 0.5, TZ["fy"], 287, 470), sr_pt(TZ["zoom"], 0.5, TZ["fy"], 287, 585)
+    dashed(fr, [top_, bot_], eo(u / 0.6), PINK, 6, 18)
+    s_ = tab_geo(TZ["zoom"], 0.5, TZ["fy"])[0]
+    for k in range(3):
+        y = lerp(top_[1], bot_[1], 0.2 + 0.3 * k); q = eo((u - 0.5 - 0.12 * k) / 0.5)
+        if q > 0:
+            for sx in (-1, 1):
+                x0 = top_[0] + sx * 60 * s_; x1 = top_[0] + sx * 18 * s_; arrow(fr, (x0, y), (lerp(x0, x1, q), y), 1.0, WHITE, 5)
+
+# V1–V3 — the voice over an animation: the belly in cross-section, subcutaneous fat (can be removed) vs visceral (can't)
+HV1 = top(Drop(["НЕ ТОЛЬКО *ПОДКОЖНЫЙ* ЖИР,", "НО И *ВИСЦЕРАЛЬНЫЙ*"], 80, LX, 0, maxw=920), 262)
+HV2 = top(Drop(["ПОДКОЖНЫЙ ЖИР", "*МОЖНО УБРАТЬ*"], 84, LX, 0, maxw=920), 262)
+HV3 = top(Drop(["С ВИСЦЕРАЛЬНЫМ ЖИРОМ", "*ХИРУРГ НЕ РАБОТАЕТ*"], 84, LX, 0, maxw=920), 262)
+_rng2 = np.random.default_rng(3); BLOBS = [(_rng2.uniform(-150, 150), _rng2.uniform(-80, 90), _rng2.uniform(22, 38)) for _ in range(13)]
+def check(fr, cx, cy, r, p, col=PINK): path_draw(fr, [(cx - r, cy), (cx - r * 0.3, cy + r * 0.7), (cx + r, cy - r * 0.7)], p, col, 9)
+def section(fr, t, sub_p, sub_hi, vis_hi, cx=540, cy=900):
+    """a belly in cross-section: skin, the subcutaneous fat layer (shrinks with sub_p), the muscle wall, the organs with visceral fat"""
+    k = 1 - 0.75 * sub_p; rx_o, ry_o = 380, 300; rx_m, ry_m = 270, 210; rx_s, ry_s = rx_m + (rx_o - rx_m) * k, ry_m + (ry_o - ry_m) * k
+    fill_poly(fr, ellipse_pts(cx, cy, rx_s + 8, ry_s + 8), np.float32([0.93, 0.78, 0.72]))
+    fill_poly(fr, ellipse_pts(cx, cy, rx_s, ry_s), np.float32([0.98, 0.86, 0.55]) * (1 + 0.06 * sub_hi * np.sin(t * 7)))
+    fill_poly(fr, ellipse_pts(cx, cy, rx_m, ry_m), np.float32([0.62, 0.25, 0.25]))
+    fill_poly(fr, ellipse_pts(cx, cy, rx_m - 28, ry_m - 26), np.float32([0.93, 0.66, 0.66]))
+    for j in range(5): path_draw(fr, [(cx - 170 + 70 * j + 18 * np.sin(a_ * 3), cy - 110 + a_ * 70) for a_ in np.linspace(0, 3.2, 30)], 1, np.float32([0.78, 0.45, 0.45]), 10)
+    for j, (dx, dy, r) in enumerate(BLOBS):
+        pul = 1 + 0.08 * np.sin(t * 6 + j) * vis_hi
+        fill_poly(fr, ellipse_pts(cx + dx, cy + dy, r * pul, r * 0.8 * pul), np.float32([0.98, 0.82, 0.35]), 0.55 + 0.45 * vis_hi)
+def s_v(t):
+    fr = gbg(t); blk = "V1" if t < T_S["V2"] else "V2" if t < T_S["V3"] else "V3"
+    sub_hi = cl((t - Rs("V1", 47.12)) / 0.3) * (1 - cl((t - Rs("V1", 48.40)) / 0.3)) if blk == "V1" else 0.0
+    vis_hi = cl((t - Rs("V1", 48.40)) / 0.3) if blk == "V1" else (cl((t - Rs("V3", 55.24)) / 0.4) if blk == "V3" else 0.0)
+    sub_p = eio((t - Rs("V2", 50.30)) / 0.9) if t > Rs("V2", 50.30) else 0.0     # «убрать» → the layer shrinks (and stays thin)
+    section(fr, t, sub_p, sub_hi, vis_hi)
+    if blk == "V1":
+        HV1.draw(fr, t, T_S["V1"] + 0.05, T_S["V2"] - 0.25)
+        if t > Rs("V1", 47.12):                                           # the layer named: a leader to the yellow ring
+            leader(fr, 250, 1290, 230, 1000, eo((t - Rs("V1", 47.12)) / 0.35)); label(fr, "подкожный — под кожей", LX, 1300, eo((t - Rs("V1", 47.12)) / 0.3), 28)
+        if t > Rs("V1", 48.40):
+            ring(fr, 540, 905, 215 + 8 * np.sin(t * 5), 0.9 * vis_hi, 5); label(fr, "висцеральный — вокруг органов", LX, 1375, eo((t - Rs("V1", 48.40)) / 0.3), 28)
+    elif blk == "V2":
+        HV2.draw(fr, t, T_S["V2"] + 0.05, T_S["V3"] - 0.25)
+        for j in range(4):                                                # suction arrows outward through the fat
+            a_ = -np.pi / 2 + (j - 1.5) * 0.5; u = (t - Rs("V2", 50.0) - 0.1 * j)
+            if u > 0: arrow(fr, (540 + 300 * np.cos(a_), 900 + 240 * np.sin(a_)), (540 + 430 * np.cos(a_), 900 + 340 * np.sin(a_)), eo(u / 0.4), PINK, 6)
+        if t > Rs("V2", 50.5): check(fr, 900, 620, 34, eo((t - Rs("V2", 50.5)) / 0.35))
+        label(fr, "убирается липосакцией", LX, 1320, eo((t - Rs("V2", 50.5)) / 0.3), 28)
+    else:
+        HV3.draw(fr, t, T_S["V3"] + 0.05, vend("V3") + 0.2)
+        if vis_hi > 0: ring(fr, 540, 905, 215 + 8 * np.sin(t * 5), 0.9 * vis_hi, 5)
+        if t > Rs("V3", 58.06): xmark(fr, 900, 620, 36, eo((t - Rs("V3", 58.06)) / 0.4), PINK, 10)
+        label(fr, "висцеральный жир — вокруг органов", LX, 1320, eo((t - Rs("V3", 55.24)) / 0.3), 28)
+    return fr
+
+# V4 — «этот плюс… выше пупка»: the profile photo, the bulge ringed; then the tablet, the upper belly circled and hatched
+HV4 = top(Drop(["ИМЕННО ОН ДАЁТ", "*ОБЪЁМ ВЫШЕ ПУПКА*"], 84, LX, 0, maxw=920), 262)
+def s_v4(t):
+    tsw = Rs("V4", 64.20)
+    if t < tsw:
+        fr, mp = onphoto(PROF, 0.5, 0.62, 1.12, t, T_S["V4"], 1.2, 3.0)
+        tp = Rs("V4", 61.10)                                              # «плюс»
+        if t > tp:
+            x, y = mp(840, 1400); u = t - tp; ring(fr, x, y, 105 + 8 * np.sin(u * 5), min(1, u / 0.3), 6)
+            text_c(fr, "+", x + 140, y - 110, bebas(int(150 * eback(u / 0.35))), PINK)
+        ts = Rs("V4", 63.06)                                              # «выше пупка»
+        if t > ts: x0, y0 = mp(700, 1700); x1, y1 = mp(780, 1480); arrow(fr, (x0, y0), (x1, y1), eo((t - ts) / 0.4), WHITE, 6)
+    else:
+        u = t - tsw; fr = flash(draw_marking({**BELLY0, 4: ramp_(u, 0.1, 1.6)}, TZ["zoom"], 0.5, TZ["fy"]), u)
+        if u > 1.0: label(fr, "висцеральный жир", 640, sr_pt(TZ["zoom"], 0.5, TZ["fy"], 300, 470)[1] - 60, eo((u - 1.0) / 0.3), 26)
+    fr = dark(fr); HV4.draw(fr, t, T_S["V4"] + 0.05); return fr
+
+# V5 — the conclusion: first lose weight, then the abdominoplasty (her home video)
+HV5 = low(Drop(["СНАЧАЛА ПОХУДЕТЬ,", "*ПОТОМ АБДОМИНОПЛАСТИКА*"], 84, LX, 0, maxw=920))
+def s_v5(t):
+    lt = t - T_S["V5"]; fr = dark(home(0.4 + lt, lerp(1.0, 1.04, eo(lt / 4.0)), 0.5, 0.45))
+    HV5.draw(fr, t, T_S["V5"] + 0.05)
+    for k, (lab, w0) in enumerate((("1  снизить вес", 68.30), ("2  абдоминопластика", 70.50))):
+        u = t - Rs("V5", w0)
+        if u > 0: label(fr, lab, 640, 820 + k * 80, eo(u / 0.3), 30)
+    return fr
 
 # D — the new turn: the arms. The raised-arms photo, both upper arms outlined; then the tablet draws the arm zones
 HD = top(Drop(["А С *РУКАМИ* ЧТО ДЕЛАТЬ?"], 88, LX, 0, maxw=900), 262)        # top: over the wall above her head
@@ -764,14 +853,15 @@ def s_f(t):
     if t > T_END + 0.4: blend(fr, logo_alpha(340), 540 - 170, 760, WHITE, eo((t - T_END - 0.4) / 0.6))
     return fr
 
-SCENES = [(0, s_a), (T_S["B"], s_b), (T_S["C"], s_c), (T_S["D"], s_d), (T_S["E"], s_e), (T_S["F"], s_f)]
-TRANS = {T_S["B"]: ("zoom", 0.35), T_S["C"]: ("diag", 0.45), T_S["D"]: ("zoom", 0.35), T_S["E"]: ("diag", 0.45), T_S["F"]: ("zoom", 0.35)}
+SCENES = [(0, s_a), (T_S["B"], s_b), (T_S["C"], s_c), (T_S["V1"], s_v), (T_S["V4"], s_v4), (T_S["V5"], s_v5), (T_S["D"], s_d), (T_S["E"], s_e), (T_S["F"], s_f)]
+TRANS = {T_S["B"]: ("zoom", 0.35), T_S["C"]: ("diag", 0.45), T_S["V1"]: ("iris", 0.5), T_S["V4"]: ("zoom", 0.35), T_S["V5"]: ("diag", 0.45), T_S["D"]: ("zoom", 0.35), T_S["E"]: ("diag", 0.45), T_S["F"]: ("zoom", 0.35)}
 def base(t):
     k = max(i for i, (s0, _) in enumerate(SCENES) if t >= s0); s0, fn = SCENES[k]
     kind, d = TRANS.get(s0, ("none", 0))
     if kind != "none" and t < s0 + d:
         p = (t - s0) / d; old = np.asarray(SCENES[k - 1][1](t), np.float32); new = np.asarray(fn(t), np.float32)
         if kind == "zoom": return zoom_through(old, new, p)
+        if kind == "iris": return iris(old, new, p, 540, 900)
         if kind == "diag": return diag_wipe(old, new, p)
     return fn(t)
 LOGO_W = logo_alpha(200)
@@ -792,11 +882,13 @@ def track(n):
     return np.pad(seg, ((0, n - len(seg)), (0, 0)))
 def build_audio(path):
     n = int(DUR * SR); vo = np.zeros(n); act = np.zeros(n)
-    w = wave.open(os.path.join(WORK, "IMG_3153.wav")); x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64)
-    if w.getnchannels() == 2: x = x.reshape(-1, 2).mean(1)
-    x = hp(x / 32768, 90)
+    X = {}
+    for k in ("IMG_3153", "V23"):
+        w = wave.open(os.path.join(WORK, f"{k}.wav")); x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64)
+        if w.getnchannels() == 2: x = x.reshape(-1, 2).mean(1)
+        X[k] = hp(x / 32768, 90)
     for b, s_, parts, t0, d in SEG:
-        segs = []
+        segs = []; x = X[s_]
         for a, o in parts:                                                # each cut part with short fades, butted together
             sg = x[int(a * SR):int(o * SR)].copy(); fi, fo = int(0.02 * SR), int(0.05 * SR)
             sg[:fi] *= np.sin(np.linspace(0, np.pi / 2, fi)) ** 2; sg[-fo:] *= np.cos(np.linspace(0, np.pi / 2, fo)) ** 2; segs.append(sg)
@@ -825,6 +917,12 @@ def build_audio(path):
     typing(HC, T_S["C"] + 0.05, 0.3); put(TICK, T_S["C"] + 0.35, 0.5); put(TICK, Rs("C", 32.05), 0.45)
     for _, w0 in LIST[1:]: put(TICK, Rs("C", w0), 0.55)
     put(swoosh(0.8), Rs("C", 38.34) - 0.3, 0.12)
+    typing(HV1, T_S["V1"] + 0.05, 0.3); put(TICK, Rs("V1", 47.12), 0.55); put(TICK, Rs("V1", 48.40), 0.55)
+    typing(HV2, T_S["V2"] + 0.05, 0.25)
+    for j in range(5): put(water(450 + 90 * j, 1500 + 120 * j), Rs("V2", 50.0) + 0.1 * j, 0.12)
+    put(TICK, Rs("V2", 50.5), 0.6); typing(HV3, T_S["V3"] + 0.05, 0.25); put(felt(70, 0.35), Rs("V3", 58.06), 0.5)
+    typing(HV4, T_S["V4"] + 0.05, 0.3); put(TICK, Rs("V4", 61.10), 0.6); put(swoosh(0.5), Rs("V4", 64.0), 0.12)
+    typing(HV5, T_S["V5"] + 0.05, 0.3); put(TICK, Rs("V5", 68.30), 0.55); put(TICK, Rs("V5", 70.50), 0.55)
     typing(HD, T_S["D"] + 0.05, 0.3)
     typing(HE, T_S["E"] + 0.05, 0.25); put(TICK, Rs("E", 60.66), 0.55); put(felt(80, 0.3), Rs("E", 63.40) + 0.6, 0.45)
     typing(HF, T_S["F"] + 0.05, 0.25); put(TICK, Rs("F", 70.42) - 0.5, 0.5); put(TICK, Rs("F", 72.58), 0.5); put(glass(1174.7), T_END + 0.4, 0.09)
