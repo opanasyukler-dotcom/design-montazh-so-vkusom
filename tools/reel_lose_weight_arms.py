@@ -624,14 +624,16 @@ def strike(fr, txt, x, y, p, size=30):
 
 # A — the hook: the surgeon at her desk, then the patient's own video; «худеет… очень успешно»
 _EMB = ImageFont.truetype(os.path.join(ROOT, "fonts", "Lora-BoldItalic.ttf"), 86)
-HK1 = Drop(["ХУДЕЕТ ОЧЕНЬ УСПЕШНО,"], 92, LX, 0, maxw=900); HK2 = alpha_img("но хватит ли этого?", mont(66, 300))
+HK1 = Drop(["ПРОДОЛЖАТЬ ХУДЕТЬ"], 96, LX, 0, maxw=900); HK2 = [alpha_img(l, mont(62, 400)) for l in ("или уже делать", "пластическую операцию?")]
 def hook(fr, t, t0, t1, bottom=HB_):
     """two voices: a bold sans line, then a large serif italic phrase sliding in under it"""
     if t < t0 or t > t1 + 0.4: return
-    q = 1 - eio((t - t1) / 0.3) if t > t1 else 1.0; y = bottom - 66 - HK2.shape[0] + _pad(mont(66, 300)) + 6
+    q = 1 - eio((t - t1) / 0.3) if t > t1 else 1.0; y = bottom - 66 - 74 - HK2[0].shape[0] + _pad(mont(62, 300)) + 6
     HK1.y = y; HK1.draw(fr, t, t0, t1)
     u = t - t0 - 0.5
-    if u > 0: p = eo(u / 0.5); blend(fr, HK2, LX - 6 + 60 * (1 - p), y + 66, PINK, min(1, u / 0.25) * q)
+    for k, a_ in enumerate(HK2):
+        v = u - 0.15 * k
+        if v > 0: p = eo(v / 0.5); blend(fr, a_, LX - 6 + 60 * (1 - p), y + 70 + 74 * k, PINK, min(1, v / 0.25) * q)
 T_HOME = 1.7
 def s_a(t):
     if t < T_HOME: fr = surgeon(t, "A", lerp(1.3, 1.24, eo(t / T_HOME)), 0.5, 0.31)
@@ -938,7 +940,7 @@ GAIN = 1.5 if os.path.exists(MUSIC) else 1.0
 def make_cover(path):
     """the tablet with her full marking, the question as the title"""
     fr = dark(tablet(SR_FINAL, 1.12, 0.5, 0.42)); shade(fr, np.repeat((np.clip((yy[:, :1] - 860) / 420, 0, 1) * 0.78)[..., None], W, 1).astype(np.float32), DEEP)
-    hd = Drop(["ПОХУДЕЛА,", "А ЖИВОТ *ОСТАЛСЯ?*"], 120, 70, 1080, maxw=940); hd.draw(fr, 99, 0)
+    hd = Drop(["ПРОДОЛЖАТЬ ХУДЕТЬ", "ИЛИ УЖЕ ДЕЛАТЬ", "*ПЛАСТИЧЕСКУЮ ОПЕРАЦИЮ?*"], 104, 70, 1000, maxw=940); hd.draw(fr, 99, 0)
     ty = Track(["почему одного похудения недостаточно"], 34, 72, 0, 400); ty.y = 1080 + hd.h + 46 + ty.top; ty.draw(fr, 99, 0)
     blend(fr, logo_alpha(220), 540 - 110, 1500, WHITE, 0.9)
     cv2.imwrite(path, cv2.cvtColor((np.clip(fr, 0, 1) * 255).astype(np.uint8), cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])
