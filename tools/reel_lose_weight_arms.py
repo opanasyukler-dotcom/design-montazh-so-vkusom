@@ -512,14 +512,15 @@ def marked(prog):
             ft = _FIRST[ys, xs]; near = sel & (ft > cur - 0.12)
             if near.any(): tip = np.float32([xs[near].mean(), ys[near].mean()]) if near.sum() < 40 else np.float32([xs[near][np.argmax(ft[near])], ys[near][np.argmax(ft[near])]])
     return P, tip
+VIEW = (16, 40, 576, 792)                                                  # the photo without the app's white strip, its title and bottom bar
 def tab_geo(zoom, fx, fy):
-    pw, ph = SR_BOX[2] - SR_BOX[0], SR_BOX[3] - SR_BOX[1]; s_ = W / pw * zoom; tx = W / 2 - fx * pw * s_; ty = H / 2 - fy * ph * s_
+    pw, ph = VIEW[2] - VIEW[0], VIEW[3] - VIEW[1]; s_ = W / pw * zoom; tx = W / 2 - fx * pw * s_; ty = H / 2 - fy * ph * s_
     if pw * s_ >= W: tx = min(0, max(W - pw * s_, tx))
     if ph * s_ >= H: ty = min(0, max(H - ph * s_, ty))
     return s_, tx, ty
-def sr_pt(zoom, fx, fy, px, py): s_, tx, ty = tab_geo(zoom, fx, fy); return tx + px * s_, ty + py * s_
+def sr_pt(zoom, fx, fy, px, py): s_, tx, ty = tab_geo(zoom, fx, fy); return tx + (px - VIEW[0]) * s_, ty + (py - VIEW[1]) * s_
 def tablet(P, zoom=1.0, fx=0.5, fy=0.5):
-    s_, tx, ty = tab_geo(zoom, fx, fy); M = np.float32([[s_, 0, tx], [0, s_, ty]])
+    P = P[VIEW[1]:VIEW[3], VIEW[0]:VIEW[2]]; s_, tx, ty = tab_geo(zoom, fx, fy); M = np.float32([[s_, 0, tx], [0, s_, ty]])
     bg = cv2.resize(cv2.GaussianBlur(cv2.resize(P, (54, 96)), (0, 0), 3), (W, H)).astype(np.float32) / 255 * 0.55
     fg = cv2.warpAffine(P, M, (W, H), flags=cv2.INTER_CUBIC, borderValue=(0, 0, 0)).astype(np.float32) / 255
     m = cv2.warpAffine(np.ones(P.shape[:2], np.float32), M, (W, H))[..., None]
@@ -532,7 +533,7 @@ def stylus(fr, x, y, s=1.0):
     fill_poly(fr, quad(0, tl, 2.5 * s, w), np.float32([0.86, 0.86, 0.88])); fill_poly(fr, quad(tl, L, w, w), np.float32([0.98, 0.98, 0.98]))
     path_draw(fr, quad(0, L, 2.5 * s, w), 1, np.float32([0.72, 0.72, 0.75]), 2, True)
     fill_poly(fr, quad(tl + 4 * s, tl + 70 * s, w * 0.35, w * 0.35), np.float32([0.9, 0.9, 0.92])); dot(fr, x, y, 3.5 * s, np.float32([0.3, 0.3, 0.32]))
-def draw_marking(prog, zoom, fx, fy, pen=True):
+def draw_marking(prog, zoom, fx, fy, pen=False):                        # no stylus on screen (the client's call)
     P, tip = marked(prog); fr = tablet(P, zoom, fx, fy)
     if pen and tip is not None: stylus(fr, *sr_pt(zoom, fx, fy, tip[0], tip[1]))
     return fr
@@ -575,7 +576,7 @@ def subtitles(fr, t):
         ims = []
         for w, a, e, _ in ph:
             ww = w.strip(",.?!"); key = w in KEY
-            ims.append((alpha_img(ww, mont_i(50, 700) if key else mont(46, 500)), PINK if key else WHITE, a))
+            ims.append((alpha_img(ww, mont(48, 500) if key else mont(46, 400)), PINK if key else WHITE, a))
         sp = 14; tw = sum(a_.shape[1] for a_, _, _ in ims) + sp * (len(ims) - 1); x = 468 - tw / 2; y = CAP_Y + 16 * (1 - p)
         for a_, col, a in ims:
             lit = 1.0 if t >= a - 0.04 else 0.42
@@ -618,14 +619,14 @@ def strike(fr, txt, x, y, p, size=30):
 
 # A — the hook: the surgeon at her desk, then the patient's own video; «худеет… очень успешно»
 _EMB = ImageFont.truetype(os.path.join(ROOT, "fonts", "Lora-BoldItalic.ttf"), 86)
-HK1 = Drop(["ХУДЕЕТ ОЧЕНЬ УСПЕШНО,"], 92, LX, 0, maxw=900); HK2 = alpha_img("но хватит ли этого?", _EMB)
+HK1 = Drop(["ХУДЕЕТ ОЧЕНЬ УСПЕШНО,"], 92, LX, 0, maxw=900); HK2 = alpha_img("но хватит ли этого?", mont(66, 300))
 def hook(fr, t, t0, t1, bottom=HB_):
     """two voices: a bold sans line, then a large serif italic phrase sliding in under it"""
     if t < t0 or t > t1 + 0.4: return
-    q = 1 - eio((t - t1) / 0.3) if t > t1 else 1.0; y = bottom - 66 - HK2.shape[0] + _pad(_EMB) - 4
+    q = 1 - eio((t - t1) / 0.3) if t > t1 else 1.0; y = bottom - 66 - HK2.shape[0] + _pad(mont(66, 300)) + 6
     HK1.y = y; HK1.draw(fr, t, t0, t1)
     u = t - t0 - 0.5
-    if u > 0: p = eo(u / 0.5); blend(fr, HK2, LX - 10 + 60 * (1 - p), y + 40, PINK, min(1, u / 0.25) * q)
+    if u > 0: p = eo(u / 0.5); blend(fr, HK2, LX - 6 + 60 * (1 - p), y + 66, PINK, min(1, u / 0.25) * q)
 T_HOME = 1.7
 def s_a(t):
     if t < T_HOME: fr = surgeon(t, "A", lerp(1.3, 1.24, eo(t / T_HOME)), 0.5, 0.31)
@@ -660,32 +661,32 @@ def s_b(t):
     return fr
 
 # C — the plan: «СДЕЛАЛИ БЫ:» and the list grows as she names each step; the tablet marking alternates with her face
-HC = Drop(["СДЕЛАЛИ БЫ:"], 76, LX, 268, maxw=900)
+HC = Drop(["СДЕЛАЛИ БЫ:"], 76, LX, 1128, maxw=900)
 LIST = [("абдоминопластика", None), ("ушивание диастаза", 34.02), ("липосакция 360", 36.82)]
-TZ = dict(zoom=1.9, fx=0.5, fy=0.72)                                       # the belly close: her face out of the frame, the list over the shoulders
+TZ = dict(zoom=0.95, fx=0.5, fy=0.697)                                       # the belly close: her face out of the frame, the list over the shoulders
 def c_list(fr, t):
     HC.draw(fr, t, T_S["C"] + 0.05, vend("C") + 0.1)
     if t > vend("C") + 0.5: return
     q = 1 - eio((t - vend("C") - 0.1) / 0.3) if t > vend("C") + 0.1 else 1.0
-    x, y = LX, 372
+    x, y = LX, 1206
     for k, (lab, w0) in enumerate(LIST):
         t0 = T_S["C"] + 0.35 if w0 is None else Rs("C", w0)
         a = alpha_img(lab, mont(30, 600)); w = a.shape[1] + 90
-        if x + w > LX + 920: x, y = LX, y + 74
+        if x + w > LX + 920: x, y = LX, y + 70
         if t > t0: pillx(fr, lab, x, y, eo((t - t0) / 0.3) * q, eo((t - t0 - 0.15) / 0.3), 30)
         x += w + 14
 def s_c(t):
     lt = t - T_S["C"]; t1 = Rs("C", 32.48); t2 = Rs("C", 33.90); t3 = Rs("C", 36.26)
     if t < t1:                                                            # «перенести пупок»: the navel ring is drawn
-        p7 = ramp_(t, Rs("C", 31.30), 0.6); z_ = lerp(2.05, 1.9, eo(lt / 2.5)); fr = draw_marking({7: p7}, z_, TZ["fx"], TZ["fy"])
+        p7 = ramp_(t, Rs("C", 31.30), 0.6); z_ = TZ["zoom"]; fr = draw_marking({7: p7}, z_, TZ["fx"], TZ["fy"])
         x, y = sr_pt(z_, TZ["fx"], TZ["fy"], 284, 603)
         if p7 >= 1: leader(fr, x + 30, y, 760, y + 90, eo((t - Rs("C", 31.95)) / 0.3)); label(fr, "перенос пупка", 760, y + 90, eo((t - Rs("C", 32.05)) / 0.3), 28)
     elif t < t2: fr = flash(surgeon(t, "C", 1.28, 0.5, 0.31), t - t1)                 # «нужно обязательно сделать» — her face
     elif t < t3:                                                          # «ушивание диастаза»: the upper belly circled and hatched
-        fr = flash(draw_marking({7: 1, 4: ramp_(t, t2 + 0.1, t3 - t2 - 0.2)}, 1.9, 0.5, 0.72), t - t2)
+        fr = flash(draw_marking({7: 1, 4: ramp_(t, t2 + 0.1, t3 - t2 - 0.2)}, TZ["zoom"], 0.5, TZ["fy"]), t - t2)
     else:                                                                 # «липосакцию 360 по кругу»: the flanks, then an orbit round the waist
-        u = t - t3; fr = draw_marking({7: 1, 4: 1, 6: ramp_(u, 0.0, 0.25), 5: ramp_(u, 0.2, 1.5)}, lerp(1.9, 1.75, eio(u / 2.2)), 0.5, lerp(0.72, 0.70, eio(u / 2.2)))
-        z_ = lerp(1.9, 1.75, eio(u / 2.2)); fy_ = lerp(0.72, 0.70, eio(u / 2.2)); to = Rs("C", 38.34) - t3
+        u = t - t3; fr = draw_marking({7: 1, 4: 1, 6: ramp_(u, 0.0, 0.25), 5: ramp_(u, 0.2, 1.5)}, TZ["zoom"], 0.5, TZ["fy"])
+        z_ = TZ["zoom"]; fy_ = TZ["fy"]; to = Rs("C", 38.34) - t3
         if u > to - 0.3:                                                  # «по кругу»
             cx, cy = sr_pt(z_, 0.5, fy_, 288, 560); s_ = tab_geo(z_, 0.5, fy_)[0]; p = eio((u - to + 0.3) / 0.9)
             for k in range(2):
@@ -711,13 +712,13 @@ def s_d(t):
                 x, y = mp(cx, cy); s_ = mp(1, 0)[0] - mp(0, 0)[0]
                 path_draw(fr, ellipse_pts(x, y, rx * s_, 95 * s_, 0.04 if cx > 600 else -0.04), p, PINK, 6)
     else:
-        u = t - tsw; fr = flash(draw_marking({**BELLY, 2: ramp_(u, 0.1, 0.9), 3: ramp_(u, 0.95, 0.35), 1: ramp_(u, 1.35, 0.8)}, 1.25, 0.5, 0.47), u)
+        u = t - tsw; fr = flash(draw_marking({**BELLY, 2: ramp_(u, 0.1, 0.9), 3: ramp_(u, 0.95, 0.35), 1: ramp_(u, 1.35, 0.8)}, TA["zoom"], 0.5, TA["fy"]), u)
     fr = dark(fr); HD.draw(fr, t, T_S["D"] + 0.05)
     TD.y = HB_ - 20 + TD.top - 34; TD.draw(fr, t, T_S["D"] + 0.6); return fr
 
 # E — the interesting part: she is young → a small liposuction of the shoulders, maybe no brachioplasty
 HE = low(Drop(["ВОЗМОЖНО, ПОЛУЧИТСЯ ОБОЙТИСЬ", "*БЕЗ ПОДТЯЖКИ РУК*"], 84, LX, 0, maxw=920))
-TA = dict(zoom=3.0, fx=0.80, fy=0.48)                                       # the arm close-up on the tablet
+TA = dict(zoom=0.95, fx=0.5, fy=0.697)                                       # the arm close-up on the tablet
 _am = np.zeros(_LAB.shape, np.uint8); _am[(_LAB == 2) | (_LAB == 3)] = 1
 _cnt = max(cv2.findContours(_am, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0], key=cv2.contourArea)
 ARM_ZONE = cv2.convexHull(_cnt)[:, 0].astype(np.float32)                     # the marked zone on her right upper arm (photo px)
@@ -728,13 +729,12 @@ def zone_fill(fr, zoom, fx, fy, p, t):
     cx, cy = np.mean(pts, 0)
     for k in range(4):
         a_ = k * np.pi / 2 + np.pi / 4; u = ((t * 1.2 + k * 0.25) % 1.0)
-        r0, r1 = 230, 120; x0, y0 = cx + r0 * np.cos(a_) * 1.6, cy + r0 * np.sin(a_) * 0.6; x1, y1 = cx + r1 * np.cos(a_) * 1.6, cy + r1 * np.sin(a_) * 0.6
-        arrow(fr, (x0, y0), (lerp(x0, x1, eo(u)), lerp(y0, y1, eo(u))), p * (1 - u * 0.6), WHITE, 5)
+        k_ = tab_geo(zoom, fx, fy)[0] / 5.6; r0, r1 = 230 * k_, 120 * k_; x0, y0 = cx + r0 * np.cos(a_) * 1.6, cy + r0 * np.sin(a_) * 0.6; x1, y1 = cx + r1 * np.cos(a_) * 1.6, cy + r1 * np.sin(a_) * 0.6
 def s_e(t):
     lt = t - T_S["E"]; tsw = Rs("E", 60.20)
     if t < tsw: fr = surgeon(t, "E", lerp(1.12, 1.18, eo(lt / 3.0)), 0.5, 0.3)
     else:
-        u = t - tsw; z_ = lerp(1.6, TA["zoom"], eio(u / 1.4)); fx_ = lerp(0.62, TA["fx"], eio(u / 1.4)); fy_ = lerp(0.55, TA["fy"], eio(u / 1.4))
+        u = t - tsw; z_, fx_, fy_ = TA["zoom"], TA["fx"], TA["fy"]
         fr = flash(tablet(marked(ALL)[0], z_, fx_, fy_), u)
         zone_fill(fr, z_, fx_, fy_, eo((t - Rs("E", 61.0)) / 0.5) * (1 - eio((t - Rs("E", 63.4)) / 0.4)), t)
         tl = Rs("E", 60.66)                                               # «липосакция в области плеч»
@@ -758,7 +758,6 @@ def s_f(t):
             path_draw(fr, pts, p, np.float32([0.85, 0.12, 0.25]), 7)
             P = np.float32(pts); L = np.r_[0, np.cumsum(np.hypot(*np.diff(P, axis=0).T))]; d_ = p * L[-1]
             tip = (np.interp(d_, L, P[:, 0]), np.interp(d_, L, P[:, 1]))
-            if p < 1: stylus(fr, *tip)
         if t > te: dot(fr, *pts[-1], 11 * eback((t - te) / 0.3), PINK); label(fr, "локоть", min(1000, pts[-1][0] - 10), pts[-1][1] + 120, eo((t - te - 0.05) / 0.3), 28, anchor="r")
         if t > T_END + 0.2: fr = fr * (1 - 0.5 * eio((t - T_END - 0.2) / 1.0)) + DEEP * 0.5 * eio((t - T_END - 0.2) / 1.0)
     fr = dark(fr); HF.draw(fr, t, T_S["F"] + 0.05)
