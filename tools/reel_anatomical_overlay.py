@@ -558,6 +558,20 @@ def build_audio(dst):
     with wave.open(dst, "wb") as w:
         w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR); w.writeframes((y * 32767).astype(np.int16).tobytes())
 
+# the ДО photos straightened: the body stood upright and centred, full screen, the logo put back where the edit had it
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import collage_after_before as CAB
+def do_full(n, top=-20):
+    im, a = CAB.mask(n); y0, y1 = CAB.LM[n]; k, b = CAB.axis(a, max(0, y0), y1); ym = (y0 + y1) / 2; xm = k * ym + b
+    R = cv2.getRotationMatrix2D((float(xm), float(ym)), -float(np.degrees(np.arctan(k))), 1.0); s = W / im.shape[1] * 1.06
+    S_ = np.float32([[s, 0, W / 2 - xm * s], [0, s, top - y0 * s]]); M = (np.vstack([S_, [0, 0, 1]]) @ np.vstack([R, [0, 0, 1]]))[:2].astype(np.float32)
+    fr = cv2.warpAffine(im, M, (W, H), flags=cv2.INTER_AREA, borderMode=cv2.BORDER_REFLECT)
+    blend(fr, logo_alpha(275), 402, 1496, WHITE, 0.9); return fr
+DO_T = [(CUT["front"], "do_front"), (CUT["q34"], "do_34"), (CUT["side"], "do_side")]; DO_END = 10.88
+DOF = {n: do_full(n) for _, n in DO_T}
+def do_frame(t):
+    k = max(i for i, (a, _) in enumerate(DO_T) if t >= a); fr = DOF[DO_T[k][1]].copy(); v = t - DO_T[k][0]
+    if k and v < 0.2: q = eio(v / 0.2); fr = DOF[DO_T[k - 1][1]] * (1 - q) + fr * q
+    return fr
 INS_VID = os.path.join(SRC, "ins.mp4"); INS_WAV = os.path.join(SRC, "ins.wav"); INS_AT = CUT["close"]      # the surgeon at the table, after the first result shot
 INS_N = int(cv2.VideoCapture(INS_VID).get(cv2.CAP_PROP_FRAME_COUNT)) if os.path.exists(INS_VID) else 0; INS_D = INS_N / FPS
 def frames(only=None):
@@ -571,7 +585,8 @@ def frames(only=None):
         j = i - (INS_N if i >= a_i + INS_N else 0); t = j / FPS
         if t < CUT["end"]:
             ok, f = cap.read()
-            if only is None or i in only: fr = f[..., ::-1].astype(np.float32) / 255; overlay(fr, t); yield i, fr
+            if only is None or i in only:
+                fr = do_frame(t) if CUT["front"] <= t < DO_END else f[..., ::-1].astype(np.float32) / 255; overlay(fr, t); yield i, fr
         elif only is None or i in only: yield i, (collage(t - CUT["end"]) if t < CUT["end"] + CT else endcard(t - CT))
 if __name__ == "__main__":
     out = sys.argv[sys.argv.index("--out") + 1] if "--out" in sys.argv else os.path.join(SRC, "out.mp4")
