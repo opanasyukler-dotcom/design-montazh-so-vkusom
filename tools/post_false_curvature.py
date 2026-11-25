@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw, ImageOps, ImageFilter
 SRC, OUT = sys.argv[1:3]
 ONLY = {int(a) for a in sys.argv[3:]}
 SURGEON = "DSC00898.JPG"; AI_LEGS = "16282750-2831-4390-9648-FAF201E06D32.png"; HANDS = "5223F1B9-E4B1-4ABB-8DB1-EDB2B7955A04.png"
-MAIN = "IMG_1144.JPG"
+MAIN = "front_retouch.jpg"   # retouched front before/after of the main patient
 sys.argv = [sys.argv[0], os.path.join(SRC, MAIN), OUT]
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import surgeon_style as ss  # noqa: E402
@@ -208,10 +208,10 @@ def arrow_to(sl, a, b, col, bend=0.2, w=2.6):
 
 
 # contours on the main patient (fractions of a half image)
-B_L = [(0.46, 0.36), (0.44, 0.42), (0.43, 0.50), (0.435, 0.58), (0.44, 0.66), (0.45, 0.74), (0.46, 0.80)]
-B_R = [(0.47, 0.37), (0.505, 0.44), (0.51, 0.52), (0.505, 0.60), (0.495, 0.68), (0.49, 0.76), (0.485, 0.80)]
-T_L = [(0.46, 0.36), (0.452, 0.42), (0.455, 0.50), (0.458, 0.58), (0.46, 0.66), (0.462, 0.74), (0.465, 0.80)]
-T_R = [(0.47, 0.37), (0.486, 0.44), (0.483, 0.52), (0.481, 0.60), (0.479, 0.68), (0.478, 0.76), (0.48, 0.80)]
+B_L = [(0.46, 0.36), (0.43, 0.44), (0.43, 0.52), (0.43, 0.60), (0.44, 0.68), (0.45, 0.76), (0.455, 0.82)]
+B_R = [(0.47, 0.37), (0.50, 0.44), (0.505, 0.52), (0.50, 0.60), (0.495, 0.68), (0.49, 0.76), (0.485, 0.82)]
+T_L = [(0.46, 0.36), (0.45, 0.44), (0.455, 0.52), (0.457, 0.60), (0.46, 0.68), (0.462, 0.76), (0.462, 0.82)]
+T_R = [(0.47, 0.37), (0.484, 0.44), (0.482, 0.52), (0.48, 0.60), (0.478, 0.68), (0.476, 0.76), (0.476, 0.82)]
 A_L = [(0.52, 0.38), (0.515, 0.45), (0.515, 0.55), (0.51, 0.65), (0.505, 0.75)]
 A_R = [(0.535, 0.38), (0.545, 0.45), (0.55, 0.55), (0.555, 0.65), (0.56, 0.75)]
 
@@ -437,7 +437,7 @@ def s8():
     bg = navy_bg(); els = []
     els.append(E(lambda sl: sl.lines((80, 150), ["ТАКЖЕ ПОКАЗЫВАЮ ДРУГИЕ", "ПРИМЕРЫ МОИХ ПАЦИЕНТОК"], bebas(80), POWDER, lh=0.92), 0.2))
     s_, g = 455, 20; x0 = (W - 2 * s_ - g) // 2; y0 = 335
-    for i, f in enumerate(["IMG_1150.JPG", "IMG_1151.JPG", "IMG_1152.JPG", "IMG_1153.JPG"]):
+    for i, f in enumerate(["IMG_1150_black.JPG", "IMG_1151_black.JPG", "IMG_1152_black.JPG", "IMG_1153_black.JPG"]):  # backgrounds removed to black
         bx = x0 + (i % 2) * (s_ + g); byy = y0 + (i // 2) * (s_ + g); box = (bx, byy, bx + s_, byy + s_)
         els.append(card_el(photo(f), box, 0.8 + i * 0.6, "pop"))
         els.append(E(lambda sl, box=box: (pill(sl, box[0] + 12, box[3] - 52, "до", NAVY, WHITE, 20, 600),
