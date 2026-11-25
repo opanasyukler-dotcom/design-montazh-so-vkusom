@@ -516,6 +516,13 @@ def navy_card(fr, cx, cy, hw, hh, s, op=1.0):
 # F — the empty black tail becomes an end card
 HZ = Drop(["УВЕЛИЧЕНИЕ ГРУДИ", "*АНАТОМИЧЕСКИМИ*", "*ИМПЛАНТАМИ*"], 104, 80, 820, maxw=920)
 TZ = Track(["записаться на консультацию — в директ"], 32, 80, 0, 300)
+COL = [cv2.imread(os.path.join(SRC, f"col_{a}.png"))[..., ::-1].astype(np.float32) / 255 for a in ("front", "34", "side")]
+CD = 1.9; CT = CD * len(COL)                                               # ПОСЛЕ (top) / ДО (bottom) collages before the end card
+def collage(u):
+    """u = time since the first collage; a soft cross-fade between them, no flash, no sound"""
+    k = min(len(COL) - 1, int(u // CD)); fr = COL[k].copy(); v = u - k * CD
+    if k and v < 0.25: a_ = eio(v / 0.25); fr = COL[k - 1] * (1 - a_) + fr * a_
+    chip(fr, "ПОСЛЕ", 80, 262, cl(u / 0.3)); chip(fr, "ДО", 80, 1000, cl(u / 0.3)); return fr
 def endcard(t):
     fr = gbg(t); u = t - CUT["end"]
     blend(fr, logo_alpha(300), 540 - 150, 520, PINK, eo((u - 0.05) / 0.5)); HZ.draw(fr, t, CUT["end"] + 0.15)
@@ -534,22 +541,24 @@ def build_audio(dst):
     def put(y, t, g): i = int(t * SR); s = sfx[i:i + len(y)]; s += y[:len(s)] * g
     for t_, g in ((2.54, 0.35), (5.56, 0.4), (6.02, 0.4), (7.10, 0.45), (CUT["front"] + 0.05, 0.3), (CUT["mark"] + 0.1, 0.3), (CUT["table"] + 0.1, 0.3), (CUT["close"] + 0.6, 0.3)): put(TICK, t_, g)
     for t_ in (CUT["table"] + 0.4, CUT["close"] + 0.3, CUT["orside"] + 0.4): put(glass(1568.0), t_, 0.05)
-    for j in range(sum(len(q) for q, _ in HZ.rows)): put(KEYS[j % 8], CUT["end"] + 0.15 + j * HZ.stag, 0.25)
-    pk = np.abs(x).max() + 1e-9; y = x + (sfx[:n] * pk * 0.6)[:, None]; y /= max(1.0, np.abs(y).max() / 0.98)
+    pk = np.abs(x).max() + 1e-9; y = x + (sfx[:n] * pk * 0.6)[:, None]
+    e, c, f_ = int(CUT["end"] * SR), int(CT * SR), int(0.12 * SR)                 # the music stretched under the collages: its own bars before the tail repeated
+    ins = y[e - c:e].copy(); tail = y[e:].copy(); r = np.linspace(0, 1, f_)[:, None]
+    ins[:f_] = y[e:e + f_] * (1 - r) + ins[:f_] * r; tail[:f_] = y[e - f_:e] * (1 - r) + tail[:f_] * r
+    y = np.concatenate([y[:e], ins, tail]); sfx = np.zeros(len(y) + SR)
+    for j in range(sum(len(q) for q, _ in HZ.rows)): put(KEYS[j % 8], CUT["end"] + CT + 0.15 + j * HZ.stag, 0.25)
+    y = y + (sfx[:len(y)] * pk * 0.6)[:, None]; y /= max(1.0, np.abs(y).max() / 0.98)
     with wave.open(dst, "wb") as w:
         w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR); w.writeframes((y * 32767).astype(np.int16).tobytes())
 
 def frames(only=None):
-    cap = cv2.VideoCapture(VIN); i = 0
-    while True:
-        ok, f = cap.read()
-        if not ok: break
+    cap = cv2.VideoCapture(VIN); n_src = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)); N = n_src + int(round(CT * FPS))
+    for i in range(N):
         t = i / FPS
-        if only is None or i in only:
-            fr = endcard(t) if t >= CUT["end"] else f[..., ::-1].astype(np.float32) / 255
-            if t < CUT["end"]: overlay(fr, t)
-            yield i, fr
-        i += 1
+        if t < CUT["end"]:
+            ok, f = cap.read()
+            if only is None or i in only: fr = f[..., ::-1].astype(np.float32) / 255; overlay(fr, t); yield i, fr
+        elif only is None or i in only: yield i, (collage(t - CUT["end"]) if t < CUT["end"] + CT else endcard(t - CT))
 if __name__ == "__main__":
     out = sys.argv[sys.argv.index("--out") + 1] if "--out" in sys.argv else os.path.join(SRC, "out.mp4")
     if "--preview" in sys.argv:
