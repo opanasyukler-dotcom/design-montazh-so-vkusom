@@ -669,7 +669,7 @@ def s_b(t):
 
 # C — the plan: «СДЕЛАЛИ БЫ:» and the list grows as she names each step; the tablet marking alternates with her face
 HC = Drop(["СДЕЛАЛИ БЫ:"], 76, LX, 262, maxw=900)
-LIST = [("абдоминопластика", None, ""), ("липосакция 360", 36.82, ""), ("ушивание диастаза", 34.02, "(если он имеется)")]   # the diastasis pill on its own row
+LIST = [("абдоминопластика", None, ""), ("липосакция 360", 36.82, ""), ("ушивание диастаза", 34.02, "")]   # the diastasis pill on its own row
 def pill_alpha(lab, note, size=30):
     """the pill text; an optional note in brackets follows in thin Montserrat"""
     a = alpha_img(lab, mont(size, 600))
@@ -717,7 +717,13 @@ def s_c(t):
                 if p > 0.05:
                     (xa, ya), (xb, yb) = pts[-2], pts[-1]; ang = np.arctan2(yb - ya, xb - xa)
                     fill_poly(fr, [(xb + 18 * np.cos(ang), yb + 18 * np.sin(ang)), (xb + 14 * np.cos(ang + 2.2), yb + 14 * np.sin(ang + 2.2)), (xb + 14 * np.cos(ang - 2.2), yb + 14 * np.sin(ang - 2.2))], PINK)
-    fr = dark(fr); c_list(fr, t); return fr
+    fr = dark(fr); c_list(fr, t)
+    tn = Rs("C", 34.02)                                                   # «ушивание диастаза» → the condition written large under the midline
+    if tn <= t < t3 + 0.35:
+        u = t - tn; op = min(1, u / 0.25) * (1 - cl((t - t3 - 0.05) / 0.3)); a = alpha_img("(если он имеется)", mont(64, 500))
+        y = 1378 + 20 * (1 - eo(u / 0.35)); x = 468 - a.shape[1] / 2
+        blend(fr, cv2.GaussianBlur(a, (0, 0), 4), x + 2, y - a.shape[0] / 2 + 4, DEEP, 0.6 * op); blend(fr, a, x, y - a.shape[0] / 2, WHITE, op)
+    return fr
 
 
 # C helper — «ушивание диастаза»: the midline drawn, the two muscle edges pulled together
