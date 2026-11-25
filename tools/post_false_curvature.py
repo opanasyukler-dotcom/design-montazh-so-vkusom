@@ -1,4 +1,4 @@
-"""Carousel 'Ложная кривизна ног' (1080x1350): slide 1 static JPG, slides 2-11 animated MP4.
+"""Carousel 'Ложная кривизна ног' (1080x1350): slide 1 static JPG, slides 2-12 animated MP4.
 
 Brand post style (navy, powder Bebas, thin Montserrat, ANNA TVAURI mark). From slide 2 on, text
 appears in sequence and the explanation is shown on the pictures: the inner contour of the shins is
@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import surgeon_style as ss  # noqa: E402
 from surgeon_style import Slide, bebas, mont, logo, vshade, icon_circle, POWDER, NAVY, DEEP, WHITE, S  # noqa: E402
 
-W, H, FPS, TOTAL = 1080, 1350, 30, 11
+W, H, FPS, TOTAL = 1080, 1350, 30, 12
 HOLD = 3.0  # seconds of fully static final frame at the end of every animated slide
 _cache = {}
 
@@ -432,17 +432,30 @@ def s7():
     render(7, bg, els, 10.0)
 
 
-def s8():
+def example(n, title, front, back, title_size=80):
+    """one patient per slide: front and back before/after, stacked (backgrounds removed to black, retouched)"""
     bg = navy_bg(); els = []
-    els.append(E(lambda sl: sl.lines((80, 150), ["ТАКЖЕ ПОКАЗЫВАЮ ДРУГИЕ", "ПРИМЕРЫ МОИХ ПАЦИЕНТОК"], bebas(80), POWDER, lh=0.92), 0.2))
-    s_, g = 455, 20; x0 = (W - 2 * s_ - g) // 2; y0 = 335
-    for i, f in enumerate(["IMG_1150_black.JPG", "IMG_1151_black.JPG", "IMG_1152_black.JPG", "IMG_1153_black.JPG"]):  # backgrounds removed to black
-        bx = x0 + (i % 2) * (s_ + g); byy = y0 + (i // 2) * (s_ + g); box = (bx, byy, bx + s_, byy + s_)
-        els.append(card_el(photo(f), box, 0.8 + i * 0.6, "pop"))
-        els.append(E(lambda sl, box=box: (pill(sl, box[0] + 12, box[3] - 52, "до", NAVY, WHITE, 20, 600),
-                                          pill(sl, box[0] + s_ / 2 + 12, box[3] - 52, "после", POWDER, NAVY, 20, 600)),
-                     1.2 + i * 0.6, "fade"))
-    render(8, bg, els, 6.0)
+    y = 150 + len(title) * title_size * 0.92
+    els.append(E(lambda sl: sl.lines((80, 150), title, bebas(title_size), POWDER, lh=0.92), 0.2))
+    cw = 760; fr_ = (0.0, 0.30, 1.0, 0.90); ch = int(cw * (fr_[3] - fr_[1]))
+    top = int(y + 30); gap_ = 22; x0 = (W - cw) // 2
+    for i, (f, lab) in enumerate(((front, "спереди"), (back, "сзади"))):
+        box = (x0, top + i * (ch + gap_), x0 + cw, top + i * (ch + gap_) + ch)
+        im = photo(f); im = im.crop((0, int(im.height * fr_[1]), im.width, int(im.height * fr_[3])))
+        els.append(card_el(im, box, 0.7 + i * 0.9, "rise"))
+        els.append(E(lambda sl, box=box, lab=lab: (pill(sl, box[0] + 14, box[1] + 14, lab, WHITE, NAVY, 22, 600),
+                                                  pill(sl, box[0] + 14, box[3] - 54, "до", NAVY, WHITE, 20, 600),
+                                                  pill(sl, box[0] + cw / 2 + 14, box[3] - 54, "после", POWDER, NAVY, 20, 600)),
+                     1.1 + i * 0.9, "fade"))
+    render(n, bg, els, 5.0)
+
+
+def s8():
+    example(8, ["ТАКЖЕ ПОКАЗЫВАЮ ДРУГИЕ", "ПРИМЕРЫ МОИХ ПАЦИЕНТОК"], "IMG_1150_black.JPG", "IMG_1151_black.JPG")
+
+
+def s8b():
+    example(9, ["ЕЩЁ ОДИН ПРИМЕР"], "IMG_1153_black.JPG", "IMG_1154_black.JPG")
 
 
 def s9():
@@ -461,7 +474,7 @@ def s9():
         els.append(E(lambda sl, x=x, y=y, tw=tw: sl.poly([(x + 16, y + 37), (x + tw + 44, y + 33)], POWDER, 3.4), 3.0 + i * 0.4, "wipe", 0.5))
     els.append(E(lambda sl: (sl.poly([(82, 900), (200, 900)], POWDER, 2),
                              para(sl, 80, 930, "Но и липофилинг подходит не всем.", 40, 600, POWDER, 920)), 4.4))
-    render(9, bg, els, 7.0)
+    render(10, bg, els, 7.0)
 
 
 def s10():
@@ -474,7 +487,7 @@ def s10():
         els.append(E(lambda sl, yy=yy: icon_circle(sl, (124, yy + 28), "check", 36), 1.0 + i * 1.0, "pop"))
         els.append(E(lambda sl, t=t, yy=yy: para(sl, 190, yy, t, 36, 300, WHITE, 800), 1.2 + i * 1.0))
         if i < 2: els.append(E(lambda sl, yy=yy: sl.dashed([(124, yy + 70), (124, yy + 140)], POWDER, 1.6, 5, 6, 180), 1.6 + i * 1.0, "down", 0.4))
-    render(10, bg, els, 6.5)
+    render(11, bg, els, 6.5)
 
 
 def s11():
@@ -488,10 +501,10 @@ def s11():
     els.append(E(lambda sl: sl.poly([(82, y2), (200, y2)], POWDER, 2), 2.2, "wipe", 0.5))
     els.append(E(lambda sl: para(sl, 80, y2 + 34, "Я помогу разобраться в причине и расскажу, какой результат мы можем получить в вашем случае.",
                                  34, 300, WHITE, 920), 2.5))
-    render(11, bg, els, 7.0)
+    render(12, bg, els, 7.0)
 
 
-SLIDES = [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11]
+SLIDES = [s1, s2, s3, s4, s5, s6, s7, s8, s8b, s9, s10, s11]
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
