@@ -582,7 +582,9 @@ def subtitles(fr, t):
         for w, a, e, _ in ph:
             ww = w.strip(",.?!"); key = w in KEY
             ims.append((alpha_img(ww, mont(48, 500) if key else mont(46, 400)), PINK if key else WHITE, a))
-        sp = 14; tw = sum(a_.shape[1] for a_, _, _ in ims) + sp * (len(ims) - 1); x = 468 - tw / 2; y = CAP_Y + 16 * (1 - p)
+        sp = 14; tw = sum(a_.shape[1] for a_, _, _ in ims) + sp * (len(ims) - 1)
+        if tw > 640: k_ = 640 / tw; ims = [(scaled(a_, k_), c_, s_) for a_, c_, s_ in ims]; sp = int(sp * k_); tw = sum(a_.shape[1] for a_, _, _ in ims) + sp * (len(ims) - 1)   # centred and still clear of the buttons on the right (x ≤ 864)
+        x = W / 2 - tw / 2; y = CAP_Y + 16 * (1 - p)
         for a_, col, a in ims:
             lit = 1.0 if t >= a - 0.04 else 0.42
             blend(fr, a_, x + 2, y - a_.shape[0] / 2 + 3, DEEP, 0.45 * op); blend(fr, a_, x, y - a_.shape[0] / 2, col, op * lit)
@@ -721,7 +723,7 @@ def s_c(t):
     tn = Rs("C", 34.02)                                                   # «ушивание диастаза» → the condition written large under the midline
     if tn <= t < t3 + 0.35:
         u = t - tn; op = min(1, u / 0.25) * (1 - cl((t - t3 - 0.05) / 0.3)); a = alpha_img("(если он имеется)", mont(64, 500))
-        y = 1378 + 20 * (1 - eo(u / 0.35)); x = 468 - a.shape[1] / 2
+        y = 1378 + 20 * (1 - eo(u / 0.35)); x = W / 2 - a.shape[1] / 2
         blend(fr, cv2.GaussianBlur(a, (0, 0), 4), x + 2, y - a.shape[0] / 2 + 4, DEEP, 0.6 * op); blend(fr, a, x, y - a.shape[0] / 2, WHITE, op)
     return fr
 
@@ -889,7 +891,7 @@ def base(t):
 LOGO_W = logo_alpha(200)
 def render(t):
     fr = np.asarray(base(t), np.float32).copy(); subtitles(fr, t)
-    if t < T_END + 0.4: blend(fr, LOGO_W, 468 - 100, 1532, WHITE, 0.8)
+    if t < T_END + 0.4: blend(fr, LOGO_W, W // 2 - LOGO_W.shape[1] // 2, 1532, WHITE, 0.8)
     return fr
 
 # ---------------- audio
