@@ -669,18 +669,32 @@ def s_b(t):
 
 # C — the plan: «СДЕЛАЛИ БЫ:» and the list grows as she names each step; the tablet marking alternates with her face
 HC = Drop(["СДЕЛАЛИ БЫ:"], 76, LX, 262, maxw=900)
-LIST = [("абдоминопластика", None), ("ушивание диастаза", 34.02), ("липосакция 360", 36.82)]
+LIST = [("абдоминопластика", None, ""), ("липосакция 360", 36.82, ""), ("ушивание диастаза", 34.02, "(если он имеется)")]   # the diastasis pill on its own row
+def pill_alpha(lab, note, size=30):
+    """the pill text; an optional note in brackets follows in thin Montserrat"""
+    a = alpha_img(lab, mont(size, 600))
+    if not note: return a
+    n = alpha_img(" " + note, mont(size - 4, 300)); h = max(a.shape[0], n.shape[0]); out = np.zeros((h, a.shape[1] + n.shape[1] - 8), np.float32)
+    out[h - a.shape[0]:, :a.shape[1]] = a; dy = h - n.shape[0] - int(_pad(mont(size, 600)) - _pad(mont(size - 4, 300)))
+    out[max(0, dy):max(0, dy) + n.shape[0], a.shape[1] - 8:] = np.maximum(out[max(0, dy):max(0, dy) + n.shape[0], a.shape[1] - 8:], n[:h - max(0, dy)]); return out
+def pill_img(fr, a, x, y, p, tick_p):
+    if p <= 0: return
+    s = eback(p); w, h = a.shape[1] + 86, 64
+    blend(fr, rrect(x, y, x + w * s, y + h * s, 32 * s), 0, 0, NAVY, 0.9 * min(1, p * 2))
+    rrect_line(fr, x, y, x + w * s, y + h * s, 32 * s, PINK, 2, min(1, p * 2))
+    if s > 0.9: blend(fr, a, x + 64, y + h / 2 - a.shape[0] / 2 + 2, WHITE, cl((p - 0.5) * 2))
+    if s > 0.9 and tick_p > 0: path_draw(fr, [(x + 22, y + 33), (x + 32, y + 43), (x + 48, y + 22)], tick_p, PINK, 5)
 TZ = dict(zoom=1.0, fx=0.5, fy=0.5)                                        # the whole recorded photo, centred; blur above and below                                       # the belly close: her face out of the frame, the list over the shoulders
 def c_list(fr, t):
     HC.draw(fr, t, T_S["C"] + 0.05, vend("C") + 0.1)
     if t > vend("C") + 0.5: return
     q = 1 - eio((t - vend("C") - 0.1) / 0.3) if t > vend("C") + 0.1 else 1.0
     x, y = LX, 336
-    for k, (lab, w0) in enumerate(LIST):
+    for k, (lab, w0, note) in enumerate(LIST):
         t0 = T_S["C"] + 0.35 if w0 is None else Rs("C", w0)
-        a = alpha_img(lab, mont(30, 600)); w = a.shape[1] + 90
-        if x + w > LX + 920: x, y = LX, y + 70
-        if t > t0: pillx(fr, lab, x, y, eo((t - t0) / 0.3) * q, eo((t - t0 - 0.15) / 0.3), 30)
+        a = pill_alpha(lab, note); w = a.shape[1] + 90
+        if x + w > LX + 920 or note: x, y = LX, y + 70
+        if t > t0: pill_img(fr, a, x, y, eo((t - t0) / 0.3) * q, eo((t - t0 - 0.15) / 0.3))
         x += w + 14
 def s_c(t):
     lt = t - T_S["C"]; t1 = Rs("C", 32.48); t2 = Rs("C", 33.90); t3 = Rs("C", 36.26)
@@ -917,7 +931,7 @@ def build_audio(path):
     typing(HK1, 0.05, 0.45); put(TICK, Rs("A", 10.40), 0.5); put(glass(1318.5), Rs("A", 11.58), 0.08)
     typing(HB, T_S["B"] + 0.05, 0.3); put(swoosh(0.6), Rs("B", 20.30) + 0.4, 0.12); put(TICK, Rs("B", 24.32), 0.55)
     typing(HC, T_S["C"] + 0.05, 0.3); put(TICK, T_S["C"] + 0.35, 0.5); put(TICK, Rs("C", 32.05), 0.45)
-    for _, w0 in LIST[1:]: put(TICK, Rs("C", w0), 0.55)
+    for _, w0, _n in LIST[1:]: put(TICK, Rs("C", w0), 0.55)
     put(swoosh(0.8), Rs("C", 38.34) - 0.3, 0.12)
     typing(HV1, T_S["V1"] + 0.05, 0.3); put(TICK, Rs("V1", 47.12), 0.55); put(TICK, Rs("V1", 48.40), 0.55)
     typing(HV2, T_S["V2"] + 0.05, 0.25)
