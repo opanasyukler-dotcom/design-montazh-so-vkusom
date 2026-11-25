@@ -493,9 +493,7 @@ def overlay(fr, t):
     counter(fr, t)
     # C — ДО: the chip, the planned lower-pole contour on the front and 3/4 views
     if CUT["front"] <= t < CUT["mark"]: chip2(fr, "ДО", 80, 262, on(t, CUT["front"], CUT["side"] + 1.1, 0.25, 0.2))
-    plan_arcs(fr, t, [(300, 470, 150, 120), (720, 432, 150, 120)], CUT["front"] + 0.2, CUT["q34"])
-    plan_arcs(fr, t, [(480, 450, 165, 130)], CUT["q34"] + 0.1, CUT["side"])
-    if CUT["front"] + 0.5 < t < CUT["q34"]: label_pill(fr, "новый контур", 560, 640, eo((t - CUT["front"] - 0.6) / 0.3) * on(t, CUT["front"], CUT["q34"], 0.01, 0.15))
+    # (no drawing on the ДО photos — the client's call)
     # D — the marking
     if CUT["mark"] <= t < CUT["table"]: chip2(fr, "РАЗМЕТКА", 80, 262, on(t, CUT["mark"] + 0.1, CUT["table"] - 0.05))
     # E — on the table: ПОСЛЕ, sparkles, the implant
