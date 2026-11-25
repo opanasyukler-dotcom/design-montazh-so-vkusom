@@ -492,7 +492,7 @@ def overlay(fr, t):
     # B — the numbers on the white page
     counter(fr, t)
     # C — ДО: the chip, the planned lower-pole contour on the front and 3/4 views
-    if CUT["front"] <= t < CUT["mark"]: chip2(fr, "ДО", 80, 262, on(t, CUT["front"], CUT["side"] + 1.1, 0.25, 0.2))
+    if CUT["front"] <= t < CUT["mark"]: chip2(fr, "ДО", 80, 262, on(t, CUT["front"], CUT["mark"], 0.25, 0.2))
     # (no drawing on the ДО photos — the client's call)
     # D — the marking
     if CUT["mark"] <= t < CUT["table"]: chip2(fr, "РАЗМЕТКА", 80, 262, on(t, CUT["mark"] + 0.1, CUT["table"] - 0.05))
@@ -566,7 +566,7 @@ def do_full(n, top=-20):
     S_ = np.float32([[s, 0, W / 2 - xm * s], [0, s, top - y0 * s]]); M = (np.vstack([S_, [0, 0, 1]]) @ np.vstack([R, [0, 0, 1]]))[:2].astype(np.float32)
     fr = cv2.warpAffine(im, M, (W, H), flags=cv2.INTER_AREA, borderMode=cv2.BORDER_REFLECT)
     blend(fr, logo_alpha(275), 402, 1496, WHITE, 0.9); return fr
-DO_T = [(CUT["front"], "do_front"), (CUT["q34"], "do_34"), (CUT["side"], "do_side")]; DO_END = 10.88
+DO_T = [(CUT["front"], "do_front"), (CUT["q34"], "do_34")]; DO_END = CUT["mark"]      # the side view dropped (the client's call): 3/4 holds until the marking
 DOF = {n: do_full(n) for _, n in DO_T}
 def do_frame(t):
     k = max(i for i, (a, _) in enumerate(DO_T) if t >= a); fr = DOF[DO_T[k][1]].copy(); v = t - DO_T[k][0]
