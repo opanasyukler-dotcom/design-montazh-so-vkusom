@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ПОСЛЕ (top) / ДО (bottom) collages, neck to fingertips, same body scale in both halves, background removed (navy).
+"""ПОСЛЕ (top) / ДО (bottom) collages, neck to fingertips, same body scale in both halves, background removed (black).
 
 usage: python3 tools/collage_after_before.py <dir> → <dir>/col_<angle>.png
   <dir>/{po,do}_{front,34,side}.jpg and m_*.png (rembg masks); landmarks (neck y, fingertip y) below.
@@ -10,7 +10,7 @@ LM = {"po_front": (155, 1870), "po_34": (115, 1905), "po_side": (65, 1900),
       "do_front": (-10, 1990), "do_34": (70, 2275), "do_side": (30, 2265)}
 NAVY = np.float32([0, 12, 40]) / 255
 yy, xx = np.mgrid[0:PH, 0:W].astype(np.float32)
-BG = np.clip(NAVY * (1 + 0.45 * np.exp(-(((xx - 540) / 700) ** 2 + ((yy - 420) / 600) ** 2)))[..., None], 0, 1).astype(np.float32)
+BG = np.zeros((PH, W, 3), np.float32)                                          # plain black backdrop (the client's call)
 def mask(n):
     im = cv2.imread(os.path.join(D, n + ".jpg")); m = cv2.imread(os.path.join(D, "m_" + n + ".png"), 0) > 128
     g = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)[..., 2]; thr = g > 72                   # the backdrop is near-black: the bright body/leggings come out by brightness too
