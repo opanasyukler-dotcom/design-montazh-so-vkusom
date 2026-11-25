@@ -516,7 +516,7 @@ def navy_card(fr, cx, cy, hw, hh, s, op=1.0):
 # F — the empty black tail becomes an end card
 HZ = Drop(["УВЕЛИЧЕНИЕ ГРУДИ", "*АНАТОМИЧЕСКИМИ*", "*ИМПЛАНТАМИ*"], 104, 80, 820, maxw=920)
 TZ = Track(["записаться на консультацию — в директ"], 32, 80, 0, 300)
-COL = [cv2.imread(os.path.join(SRC, f"col_{a}.png"))[..., ::-1].astype(np.float32) / 255 for a in ("front", "34", "side")]
+COL = [cv2.imread(os.path.join(SRC, f"col_{a}.png"))[..., ::-1].astype(np.float32) / 255 for a in ("front", "34")]            # the side collage dropped (the client's call)
 CD = 1.9; CT = CD * len(COL)                                               # ПОСЛЕ (top) / ДО (bottom) collages before the end card
 def collage(u):
     """u = time since the first collage; a soft cross-fade between them, no flash, no sound"""
@@ -542,19 +542,33 @@ def build_audio(dst):
     for t_, g in ((2.54, 0.35), (5.56, 0.4), (6.02, 0.4), (7.10, 0.45), (CUT["front"] + 0.05, 0.3), (CUT["mark"] + 0.1, 0.3), (CUT["table"] + 0.1, 0.3), (CUT["close"] + 0.6, 0.3)): put(TICK, t_, g)
     for t_ in (CUT["table"] + 0.4, CUT["close"] + 0.3, CUT["orside"] + 0.4): put(glass(1568.0), t_, 0.05)
     pk = np.abs(x).max() + 1e-9; y = x + (sfx[:n] * pk * 0.6)[:, None]
-    e, c, f_ = int(CUT["end"] * SR), int(CT * SR), int(0.12 * SR)                 # the music stretched under the collages: its own bars before the tail repeated
+    f_ = int(0.12 * SR); r = np.linspace(0, 1, f_)[:, None]
+    if os.path.exists(INS_WAV):                                               # the surgeon's words at the table, the reel's music under them, ducked
+        w_ = wave.open(INS_WAV); v = np.frombuffer(w_.readframes(w_.getnframes()), np.int16).astype(np.float64).reshape(-1, 2) / 32768
+        a = int(INS_AT * SR); L = len(v); ref = np.sqrt(np.mean(x[int(0.5 * SR):int(7.5 * SR)] ** 2)); v *= ref / (np.sqrt(np.mean(v ** 2)) + 1e-9) * 1.1
+        bed = y[int(7.9 * SR):int(7.9 * SR) + L].copy() * 0.35; seg = bed + v
+        seg[:f_] = y[a:a + f_] * (1 - r) + seg[:f_] * r; rest = y[a:].copy(); rest[:f_] = seg[-f_:] * (1 - r) + rest[:f_] * r
+        y = np.concatenate([y[:a], seg, rest])
+    e, c = int((CUT["end"] + INS_D) * SR), int(CT * SR)                 # the music stretched under the collages: its own bars before the tail repeated
     ins = y[e - c:e].copy(); tail = y[e:].copy(); r = np.linspace(0, 1, f_)[:, None]
     ins[:f_] = y[e:e + f_] * (1 - r) + ins[:f_] * r; tail[:f_] = y[e - f_:e] * (1 - r) + tail[:f_] * r
     y = np.concatenate([y[:e], ins, tail]); sfx = np.zeros(len(y) + SR)
-    for j in range(sum(len(q) for q, _ in HZ.rows)): put(KEYS[j % 8], CUT["end"] + CT + 0.15 + j * HZ.stag, 0.25)
+    for j in range(sum(len(q) for q, _ in HZ.rows)): put(KEYS[j % 8], CUT["end"] + INS_D + CT + 0.15 + j * HZ.stag, 0.25)
     y = y + (sfx[:len(y)] * pk * 0.6)[:, None]; y /= max(1.0, np.abs(y).max() / 0.98)
     with wave.open(dst, "wb") as w:
         w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR); w.writeframes((y * 32767).astype(np.int16).tobytes())
 
+INS_VID = os.path.join(SRC, "ins.mp4"); INS_WAV = os.path.join(SRC, "ins.wav"); INS_AT = CUT["close"]      # the surgeon at the table, after the first result shot
+INS_N = int(cv2.VideoCapture(INS_VID).get(cv2.CAP_PROP_FRAME_COUNT)) if os.path.exists(INS_VID) else 0; INS_D = INS_N / FPS
 def frames(only=None):
-    cap = cv2.VideoCapture(VIN); n_src = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)); N = n_src + int(round(CT * FPS))
+    cap = cv2.VideoCapture(VIN); n_src = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)); N = n_src + INS_N + int(round(CT * FPS)); ic = cv2.VideoCapture(INS_VID) if INS_N else None
+    a_i = int(round(INS_AT * FPS))
     for i in range(N):
-        t = i / FPS
+        if a_i <= i < a_i + INS_N:                                            # her clip: frames as they are, the ПОСЛЕ chip kept
+            ok, f = ic.read()
+            if only is None or i in only: fr = f[..., ::-1].astype(np.float32) / 255; chip2(fr, "ПОСЛЕ", 80, 262, 1.0); yield i, fr
+            continue
+        j = i - (INS_N if i >= a_i + INS_N else 0); t = j / FPS
         if t < CUT["end"]:
             ok, f = cap.read()
             if only is None or i in only: fr = f[..., ::-1].astype(np.float32) / 255; overlay(fr, t); yield i, fr

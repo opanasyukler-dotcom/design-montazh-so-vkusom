@@ -14,11 +14,12 @@ BG = np.zeros((PH, W, 3), np.float32)                                          #
 def mask(n):
     im = cv2.imread(os.path.join(D, n + ".jpg")); m = cv2.imread(os.path.join(D, "m_" + n + ".png"), 0) > 128
     g = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)[..., 2]; thr = g > 72                   # the backdrop is near-black: the bright body/leggings come out by brightness too
-    k = (m | thr).astype(np.uint8); k = cv2.morphologyEx(k, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+    hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV); backdrop = (hsv[..., 2] < 62) & (hsv[..., 1] < 80)   # grey-black backdrop pixels the matte let through
+    k = ((m | thr) & ~backdrop).astype(np.uint8); k = cv2.morphologyEx(k, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
     n_, lab, st, _ = cv2.connectedComponentsWithStats(k, 8); big = 1 + np.argmax(st[1:, 4]); k = (lab == big).astype(np.uint8)
     n2, l2, s2, _ = cv2.connectedComponentsWithStats(1 - k, 4)                     # fill only small holes (stickers, gaps), never the backdrop
     for j in range(1, n2):
-        if s2[j, 4] < 0.004 * k.size: k[l2 == j] = 1
+        if s2[j, 4] < 0.004 * k.size and g[l2 == j].mean() > 60: k[l2 == j] = 1     # a dark hole is the backdrop showing through (between the legs)
     a = cv2.GaussianBlur(k.astype(np.float32), (0, 0), 1.6); return im[..., ::-1].astype(np.float32) / 255, a
 def panel(n, span_px=880, top=40):
     im, a = mask(n); y0, y1 = LM[n]; s = span_px / (y1 - y0)
