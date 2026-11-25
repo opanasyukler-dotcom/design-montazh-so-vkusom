@@ -20,6 +20,7 @@ import surgeon_style as ss  # noqa: E402
 from surgeon_style import Slide, bebas, mont, logo, vshade, icon_circle, POWDER, NAVY, DEEP, WHITE, S  # noqa: E402
 
 W, H, FPS, TOTAL = 1080, 1350, 30, 11
+HOLD = 3.0  # seconds of fully static final frame at the end of every animated slide
 _cache = {}
 
 
@@ -127,7 +128,7 @@ class El:
             cut = max(1, int(a.shape[1] * e)); rgb, a = rgb[:, :cut], a[:, :cut]
         elif self.kind == "down":
             cut = max(1, int(a.shape[0] * e)); rgb, a = rgb[:cut], a[:cut]
-        if self.pulse and p > 1:
+        if self.pulse and 0 < t - self.t0 - self.d < 3.2:   # two soft pulses, then it settles and stays
             k *= 0.72 + 0.28 * math.cos((t - self.t0 - self.d) * 2 * math.pi / 1.6)
         h, w = a.shape[:2]
         x0, y0, x1, y1 = max(x, 0), max(y, 0), min(x + w, W), min(y + h, H)
@@ -172,6 +173,7 @@ def render(n, bg_sl, els, dur):
                           "-i", "-", "-c:v", "libx264", "-crf", "17", "-preset", "medium", "-pix_fmt", "yuv420p",
                           "-movflags", "+faststart", out], stdin=subprocess.PIPE)
     last = None
+    dur = max(dur, max((e.t0 + e.d + (3.2 if e.pulse else 0)) for e in els)) + HOLD  # everything stays on screen, static
     for i in range(int(dur * FPS)):
         fr = base.copy(); t = i / FPS
         for e in els: e.draw(fr, t)
