@@ -235,28 +235,27 @@ def s2():
     els.append(E(lambda sl: para(sl, 80, 150, t, 32, 300, WHITE, 900), 0.2))
     y0 = 150 + para_h(t, 32, 300, 900) + 16
     els.append(E(lambda sl: sl.lines((80, y0), ["У ВАС ДЕФИЦИТ", "МЯГКИХ ТКАНЕЙ"], bebas(112), POWDER, lh=0.9), 1.3, "pop", 0.7))
-    top = y0 + 230; hgt = 1275 - top; wid = int(hgt * 900 / 985); x0 = (W - wid) // 2
-    box = (x0, int(top), x0 + wid, int(top + hgt))
-    els.append(card_el(photo(AI_LEGS), box, 0.6, "fade"))
-    m = mapper(box, (0, 0, 1, 1))
-    # left figure (like the patient): straight bones, but a gap where soft tissue is missing
-    els.append(E(lambda sl: (arrow_to(sl, (m(0.27, 0.30)[0], m(0, 0.32)[1]), m(0.245, 0.58), WHITE, 0.12),
-                             arrow_to(sl, (m(0.31, 0.30)[0], m(0, 0.32)[1]), m(0.36, 0.58), WHITE, -0.12),
-                             pill(sl, *m(0.29, 0.29), "кости ровные", WHITE, NAVY, 23, 500, "mm")), 2.6, "fade"))
-    def gap(sl):
-        cx, cy = m(0.292, 0.52); g = Image.new("RGBA", sl.im.size, (0, 0, 0, 0))
-        ImageDraw.Draw(g).ellipse(((cx - 24) * S, (cy - 95) * S, (cx + 24) * S, (cy + 95) * S), fill=POWDER + (150,))
-        sl.im.alpha_composite(g.filter(ImageFilter.GaussianBlur(10 * S)))
-        sl.dashed(ss.bez(m(0.278, 0.40), m(0.268, 0.52), m(0.275, 0.66)), POWDER, 2.2, 8, 7, 255)
-        sl.dashed(ss.bez(m(0.306, 0.40), m(0.316, 0.52), m(0.31, 0.66)), POWDER, 2.2, 8, 7, 255)
-    els.append(E(gap, 3.4, "fade", 0.8, pulse=True))
-    els.append(E(lambda sl: (arrow_to(sl, (m(0.29, 0.77)[0], m(0, 0.755)[1]), m(0.292, 0.64), POWDER, 0.0),
-                             pill(sl, *m(0.29, 0.79), "не хватает объёма", POWDER, NAVY, 23, 500, "mm")), 3.8, "fade"))
-    # right figure: the same bones, the soft tissue gives the contour
-    els.append(E(lambda sl: (arrow_to(sl, (m(0.66, 0.30)[0], m(0, 0.32)[1]), m(0.61, 0.48), POWDER, 0.15),
-                             arrow_to(sl, (m(0.72, 0.30)[0], m(0, 0.32)[1]), m(0.765, 0.48), POWDER, -0.15),
-                             pill(sl, *m(0.69, 0.29), "объём на месте", POWDER, NAVY, 23, 500, "mm")), 4.8, "fade"))
-    render(2, bg, els, 7.5)
+    # the patient right away: before with the gap where soft tissue is missing, after with the contour filled
+    top = int(y0 + 235); gap_ = 22; cw = (W - 120 - gap_) // 2
+    ch = int(cw * ((CROP[3] - CROP[1]) * photo(MAIN).height) / ((CROP[2] - CROP[0]) * (photo(MAIN).width // 2)))
+    ch = min(ch, 1272 - top); bb = (60, top, 60 + cw, top + ch); ab = (60 + cw + gap_, top, 60 + 2 * cw + gap_, top + ch)
+    mb, ma = mapper(bb, CROP), mapper(ab, CROP)
+    els.append(card_el(half("b", CROP), bb, 0.6))
+    els.append(E(lambda sl: pill(sl, bb[0] + 16, bb[1] + 16, "ДО", NAVY, WHITE, 24, 600), 0.9, "fade"))
+    els.append(E(lambda sl: contours(sl, mb, [B_L, B_R], WHITE), 2.3, "down", 1.0))
+    def gapfill(sl):
+        poly = [mb(*q) for q in smooth(B_L, 60)] + [mb(*q) for q in smooth(B_R, 60)[::-1]]
+        g = Image.new("RGBA", sl.im.size, (0, 0, 0, 0)); ImageDraw.Draw(g).polygon([(x * S, y * S) for x, y in poly], fill=(247, 196, 208, 175))
+        sl.im.alpha_composite(g.filter(ImageFilter.GaussianBlur(3 * S)))
+    els.append(E(gapfill, 3.2, "fade", 0.8, pulse=True))
+    gx, gy = mb(0.465, 0.62)
+    els.append(E(lambda sl: (arrow_to(sl, (bb[0] + cw / 2, bb[3] - 70), (gx, gy + 30), POWDER, 0.2),
+                             pill(sl, bb[0] + cw / 2, bb[3] - 50, "не хватает объёма", POWDER, NAVY, 22, 500, "mm")), 3.6, "fade"))
+    els.append(card_el(half("a", CROP), ab, 4.6, "wipe"))
+    els.append(E(lambda sl: pill(sl, ab[0] + 16, ab[1] + 16, "ПОСЛЕ", POWDER, NAVY, 24, 600), 5.2, "fade"))
+    els.append(E(lambda sl: contours(sl, ma, [A_L, A_R], POWDER, dashed=False, w=3), 5.4, "down", 1.0))
+    els.append(E(lambda sl: pill(sl, ab[0] + cw / 2, ab[3] - 50, "объём восполнен", POWDER, NAVY, 22, 500, "mm"), 6.0, "fade"))
+    render(2, bg, els, 8.0)
 
 
 def icon_dress(sl, c):
@@ -319,7 +318,7 @@ def s4():
     els.append(E(lambda sl: contours(sl, mp, [B_L, B_R], WHITE), 1.8, "down", 1.2))
     def gapfill(sl):
         poly = [mp(*q) for q in smooth(B_L, 60)] + [mp(*q) for q in smooth(B_R, 60)[::-1]]
-        g = Image.new("RGBA", sl.im.size, (0, 0, 0, 0)); ImageDraw.Draw(g).polygon([(x * S, y * S) for x, y in poly], fill=POWDER + (120,))
+        g = Image.new("RGBA", sl.im.size, (0, 0, 0, 0)); ImageDraw.Draw(g).polygon([(x * S, y * S) for x, y in poly], fill=(247, 196, 208, 175))
         sl.im.alpha_composite(g.filter(ImageFilter.GaussianBlur(3 * S)))
     els.append(E(gapfill, 3.0, "fade", 0.8, pulse=True))
     gx, gy = mp(0.47, 0.60)
