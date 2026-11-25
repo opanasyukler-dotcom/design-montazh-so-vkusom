@@ -550,9 +550,11 @@ def build_audio(dst):
         seg[:f_] = y[a:a + f_] * (1 - r) + seg[:f_] * r; rest = y[a:].copy(); rest[:f_] = seg[-f_:] * (1 - r) + rest[:f_] * r
         y = np.concatenate([y[:a], seg, rest])
     e, c = int((CUT["end"] + INS_D) * SR), int(CT * SR)                 # the music stretched under the collages: its own bars before the tail repeated
-    ins = y[e - c:e].copy(); tail = y[e:].copy(); r = np.linspace(0, 1, f_)[:, None]
-    ins[:f_] = y[e:e + f_] * (1 - r) + ins[:f_] * r; tail[:f_] = y[e - f_:e] * (1 - r) + tail[:f_] * r
-    y = np.concatenate([y[:e], ins, tail]); sfx = np.zeros(len(y) + SR)
+    if c > 0:
+        ins = y[e - c:e].copy(); tail = y[e:].copy(); r = np.linspace(0, 1, f_)[:, None]
+        ins[:f_] = y[e:e + f_] * (1 - r) + ins[:f_] * r; tail[:f_] = y[e - f_:e] * (1 - r) + tail[:f_] * r
+        y = np.concatenate([y[:e], ins, tail])
+    sfx = np.zeros(len(y) + SR)
     for j in range(sum(len(q) for q, _ in HZ.rows)): put(KEYS[j % 8], CUT["end"] + INS_D + CT + 0.15 + j * HZ.stag, 0.25)
     y = y + (sfx[:len(y)] * pk * 0.6)[:, None]
     y = y[:int((END_SRC + INS_D) * SR)]; fo = int(1.0 * SR); y[-fo:] *= np.linspace(1, 0, fo)[:, None] ** 1.5   # the music fades out with the last shot
