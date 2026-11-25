@@ -495,7 +495,7 @@ def overlay(fr, t):
     if CUT["front"] <= t < CUT["mark"]: chip2(fr, "ДО", 80, 262, on(t, CUT["front"], CUT["mark"], 0.25, 0.2))
     # (no drawing on the ДО photos — the client's call)
     # D — the marking
-    if CUT["mark"] <= t < CUT["table"]: chip2(fr, "РАЗМЕТКА", 80, 262, on(t, CUT["mark"] + 0.1, CUT["table"] - 0.05))
+    if CUT["mark"] <= t < CUT["table"]: chip2(fr, "РАЗМЕТКА", 80, 262, on(t, CUT["mark"] + 0.1, 13.07, 0.25, 0.15) if t < 13.07 else 0)
     # E — on the table: ПОСЛЕ, sparkles, the implant
     if CUT["table"] <= t < CUT["end"]:
         chip2(fr, "ПОСЛЕ", 80, 262, on(t, CUT["table"] + 0.1, CUT["end"] - 0.05))
@@ -517,7 +517,7 @@ def navy_card(fr, cx, cy, hw, hh, s, op=1.0):
 HZ = Drop(["УВЕЛИЧЕНИЕ ГРУДИ", "*АНАТОМИЧЕСКИМИ*", "*ИМПЛАНТАМИ*"], 104, 80, 820, maxw=920)
 TZ = Track(["записаться на консультацию — в директ"], 32, 80, 0, 300)
 COL = [cv2.imread(os.path.join(SRC, f"col_{a}.png"))[..., ::-1].astype(np.float32) / 255 for a in ("front", "34")]            # the side collage dropped (the client's call)
-CD = 1.9; CT = CD * len(COL)                                               # ПОСЛЕ (top) / ДО (bottom) collages before the end card
+CD = 1.9; CT = 0.0; END_SRC = CUT["close"]          # the reel now ends on the table shot: no collages, no end card (the client's call)                                               # ПОСЛЕ (top) / ДО (bottom) collages before the end card
 def collage(u):
     """u = time since the first collage; a soft cross-fade between them, no flash, no sound"""
     k = min(len(COL) - 1, int(u // CD)); fr = COL[k].copy(); v = u - k * CD
@@ -554,7 +554,9 @@ def build_audio(dst):
     ins[:f_] = y[e:e + f_] * (1 - r) + ins[:f_] * r; tail[:f_] = y[e - f_:e] * (1 - r) + tail[:f_] * r
     y = np.concatenate([y[:e], ins, tail]); sfx = np.zeros(len(y) + SR)
     for j in range(sum(len(q) for q, _ in HZ.rows)): put(KEYS[j % 8], CUT["end"] + INS_D + CT + 0.15 + j * HZ.stag, 0.25)
-    y = y + (sfx[:len(y)] * pk * 0.6)[:, None]; y /= max(1.0, np.abs(y).max() / 0.98)
+    y = y + (sfx[:len(y)] * pk * 0.6)[:, None]
+    y = y[:int((END_SRC + INS_D) * SR)]; fo = int(1.0 * SR); y[-fo:] *= np.linspace(1, 0, fo)[:, None] ** 1.5   # the music fades out with the last shot
+    y /= max(1.0, np.abs(y).max() / 0.98)
     with wave.open(dst, "wb") as w:
         w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR); w.writeframes((y * 32767).astype(np.int16).tobytes())
 
@@ -572,10 +574,10 @@ def do_frame(t):
     k = max(i for i, (a, _) in enumerate(DO_T) if t >= a); fr = DOF[DO_T[k][1]].copy(); v = t - DO_T[k][0]
     if k and v < 0.2: q = eio(v / 0.2); fr = DOF[DO_T[k - 1][1]] * (1 - q) + fr * q
     return fr
-INS_VID = os.path.join(SRC, "ins.mp4"); INS_WAV = os.path.join(SRC, "ins.wav"); INS_AT = CUT["close"]      # the surgeon at the table, after the first result shot
+INS_VID = os.path.join(SRC, "ins.mp4"); INS_WAV = os.path.join(SRC, "ins.wav"); INS_AT = 13.07      # the surgeon at the table, after the first result shot
 INS_N = int(cv2.VideoCapture(INS_VID).get(cv2.CAP_PROP_FRAME_COUNT)) if os.path.exists(INS_VID) else 0; INS_D = INS_N / FPS
 def frames(only=None):
-    cap = cv2.VideoCapture(VIN); n_src = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)); N = n_src + INS_N + int(round(CT * FPS)); ic = cv2.VideoCapture(INS_VID) if INS_N else None
+    cap = cv2.VideoCapture(VIN); n_src = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)); N = int(round(END_SRC * FPS)) + INS_N; ic = cv2.VideoCapture(INS_VID) if INS_N else None
     a_i = int(round(INS_AT * FPS))
     for i in range(N):
         if a_i <= i < a_i + INS_N:                                            # her clip: frames as they are, the ПОСЛЕ chip kept
