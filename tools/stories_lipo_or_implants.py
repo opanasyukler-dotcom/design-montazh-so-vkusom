@@ -261,7 +261,7 @@ def st4():
     t2 = "Он поможет понять различия между методами и какой вариант стоит обсудить на консультации."
     y1 = 1080
     els = [E(lambda sl: (dots(sl, 170), [sl.text((X, 230 + i * lh), r, mont(size, BOLD), WHITE) for i, r in enumerate(rows)]), 0.3, "rise", 0.7),
-           E(lambda sl: text_heart(sl, X, y1, t1, 42, BOLD), 1.5),
+           E(lambda sl: para(sl, X, y1, t1, 42, BOLD), 1.5),
            E(lambda sl: para(sl, X, y1 + para_h(t1, 42, BOLD, W - 2 * X - 42) + 22, t2, 38, THIN), 2.8)]
     def cta(sl):
         fb = mont(46, BOLD); bt = "«ТЕСТ»"; bw = fb.getlength(bt) / S
