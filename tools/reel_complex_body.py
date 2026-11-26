@@ -469,6 +469,11 @@ def photo(n): return cv2.imread(os.path.join(WORK, f"{n}.jpg"))[..., ::-1].copy(
 DO = {"front": photo("IMG_1189"), "side": photo("IMG_1191"), "34": photo("IMG_1190")}
 COL = {a: cv2.imread(os.path.join(WORK, f"col_{a}.png"))[..., ::-1].astype(np.float32) / 255 for a in ("front", "side", "34")}
 def clip(k, st, z=1.0, fx=0.5, fy=0.5): return full(V[k].at(st), fx, fy, z)
+NK = {"front": (140, 1720, 0.51), "side": (195, 1800, 0.47), "34": (205, 1800, 0.48)}     # neck y, knee y, body centre x (of the ДО photos)
+def neck_knee(img, nk, push=1.0):
+    """the photo cropped neck to knees (no face), filling the frame"""
+    y0, y1, fx = nk; ih = img.shape[0]; z = H / (y1 - y0) * push; s_ = max(W / img.shape[1], H / ih) * z
+    return full(img, fx, (H / 2 + y0 * s_) / (ih * s_), z)
 
 # ---------------- captions: phrases, the spoken word lights up, Montserrat (thin), key words pink, centred
 FIX = {"т": "Т-образная", "-образная": "", "уберем": "уберём", "начнется": "начнётся"}
@@ -529,7 +534,7 @@ HB = low(Drop(["ГРУДЬ, *ЖИВОТ,* ТАЛИЯ"], 96, LX, 0, maxw=920), HB
 TB = Track(["моя пациентка решилась на комплексную коррекцию"], 30, LX, 0, 300)
 def s_b(t):
     lt = t - T_DO; d = (T_P1 - T_DO) / 3; k = min(2, int(lt / d)); n = ("front", "side", "34")[k]
-    fr = dark(flash(full(DO[n], 0.5, 0.5, lerp(1.06, 1.0, eo((lt - k * d) / d))), lt - k * d if k else 1))
+    fr = dark(flash(neck_knee(DO[n], NK[n], lerp(1.04, 1.0, eo((lt - k * d) / d))), lt - k * d if k else 1))
     chip(fr, "ДО", LX, 262, cl(lt / 0.25)); HB.draw(fr, t, T_DO + 0.05)
     TB.y = HB_ - 70 + 34 + TB.top; TB.draw(fr, t, T_DO + 0.5); return fr
 # 0:08–0:15 — the surgeon explains the plan, then the marking
@@ -539,7 +544,7 @@ def plan_pills(fr, t):
         u = t - Rs(b, w0)
         if u > 0: label(fr, lab, LX, 300 + k * 74, eo(u / 0.3), 30)
 def s_p1(t):
-    lt = t - T_P1; fr = dark(clip("IMG_0843", Sr("C1", t), 1.26, 0.5, 0.0)); plan_pills(fr, t); return fr       # zoomed so her own burned-in captions fall off the frame
+    lt = t - T_P1; fr = dark(clip("IMG_0843", Sr("C1", t), 1.8, 0.42, (960 + 370 * 1.8) / (1920 * 1.8))); plan_pills(fr, t); return fr   # from her neck down: no face, her burned-in captions below the frame       # zoomed so her own burned-in captions fall off the frame
 def s_p2(t):
     lt = t - T_P2; fr = dark(flash(clip("IMG_0844", 1.2 + lt * 0.9, lerp(1.05, 1.12, eo(lt / 3.5)), 0.4, 0.35), lt)); plan_pills(fr, t); return fr
 # 0:15–0:19 — the operating room
