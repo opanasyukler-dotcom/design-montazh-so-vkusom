@@ -20,7 +20,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from surgeon_style import Slide, mont, logo, icon_circle, POWDER, NAVY, DEEP, WHITE, S  # noqa: E402
 
 W, H, FPS, X = 1080, 1920, 30, 78
-HOLD = 3.0
+HOLD = 0.0   # text is static, so no frozen tail: the footage plays to the end
+STATIC_TEXT = True  # all text is on screen from the first frame, no entrance animation
 BOLD, THIN = 700, 300
 
 
@@ -90,6 +91,7 @@ class El:
 
 
 def E(fn, t0=0.0, kind="rise", d=0.6, halo=True):
+    if STATIC_TEXT: t0, kind, d = 0.0, "fade", 1e-3
     sl = Slide(W, H, Image.new("RGBA", (W * S, H * S), (0, 0, 0, 0))); fn(sl)
     im = sl.im.resize((W, H), Image.LANCZOS)
     if halo:  # soft dark halo under the type: legible straight on the footage, no black plate
