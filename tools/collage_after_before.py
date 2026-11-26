@@ -8,6 +8,8 @@ import sys, os, numpy as np, cv2
 D = os.environ.get("COLLAGE_DIR") or sys.argv[1]; W, H = 1080, 1920; PH = H // 2
 LM = {"po_front": (155, 1870), "po_34": (115, 1905), "po_side": (65, 1900),
       "do_front": (-10, 1990), "do_34": (70, 2275), "do_side": (30, 2265)}
+import json
+if os.path.exists(os.path.join(D, "lm.json")): LM = {k: tuple(v) for k, v in json.load(open(os.path.join(D, "lm.json"))).items()}   # per-patient landmarks
 NAVY = np.float32([0, 12, 40]) / 255
 yy, xx = np.mgrid[0:PH, 0:W].astype(np.float32)
 BG = np.zeros((PH, W, 3), np.float32)                                          # plain black backdrop (the client's call)
