@@ -193,7 +193,7 @@ def headline(rows, y=230, size=76):
 
 def st1():
     rows = ["«ХОЧУ УВЕЛИЧИТЬ", "ГРУДЬ, НО ИМПЛАНТЫ", "НЕ ХОЧУ…»"]; size, lh, hy = headline(rows)
-    t1 = "После родов грудь потеряла объём. Или после похудения стала совсем другой."
+    t1 = "После родов грудь потеряла объём. Или после снижения веса стала совсем другой."
     t2 = "Хочется вернуть наполненность, но мысль об имплантах останавливает."
     y0, y1 = bottom_block(t1, t2, 40, 38)
     els = [E(lambda sl: (dots(sl, 170), [sl.text((X, 230 + i * lh), r, mont(size, BOLD), WHITE) for i, r in enumerate(rows)]), 0.3, "rise", 0.7),
@@ -268,8 +268,11 @@ def st4():
         fb = mont(46, BOLD); bt = "«ТЕСТ»"; bw = fb.getlength(bt) / S
         sl.rrect((W / 2 - bw / 2 - 60, 1550, W / 2 + bw / 2 + 60, 1650), 50, POWDER)
         sl.text((W / 2, 1600), bt, fb, NAVY, "mm")
+        fn = mont(28, THIN)
+        for i, r in enumerate(["Помним, что тест не заменяет индивидуальную", "консультацию по вашему случаю"]):
+            sl.text((W / 2, 1700 + i * 38), r, fn, WHITE, "mm")
     els.append(E(cta, 4.2, "rise", 0.7))
-    els.append(E(lambda sl: logo(sl, 1760, POWDER, 0.9, 0.85), 4.6, "fade"))
+    els.append(E(lambda sl: logo(sl, 1815, POWDER, 0.9, 0.85), 4.6, "fade"))
     render(4, lambda d: footage(PHOTO, 0, d, cx=0.5, cy=0.12, zoom=1.05), veil(640, 980, 0.6, 0.85), els, 6.5)
 
 
