@@ -222,7 +222,6 @@ def st2():
     def hf(sl):
         dots(sl, 170)
         for i, r in enumerate(rows): sl.text((X, 230 + i * lh), r, mont(size, BOLD), WHITE)
-        heart(sl, X + mont(size, BOLD).getlength(rows[-1]) / S + 40, 230 + 2 * lh + size * 0.58, size * 0.4)
     els = [E(hf)]
     gap = 18; cw = (W - 2 * 60 - gap) // 2; ch = int(cw * 355 / 490); y = int(hy + 70)
     for i in range(3):
