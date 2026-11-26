@@ -9,7 +9,7 @@ D = os.environ.get("COLLAGE_DIR") or sys.argv[1]; W, H = 1080, 1920; PH = H // 2
 LM = {"po_front": (155, 1870), "po_34": (115, 1905), "po_side": (65, 1900),
       "do_front": (-10, 1990), "do_34": (70, 2275), "do_side": (30, 2265)}
 import json
-if os.path.exists(os.path.join(D, "lm.json")): LM = {k: tuple(v) for k, v in json.load(open(os.path.join(D, "lm.json"))).items()}   # per-patient landmarks
+if os.path.exists(os.path.join(D, "lm.json")): LM = {k: tuple(v) for k, v in json.load(open(os.path.join(D, "lm.json"))).items() if k != "anchor"}   # per-patient landmarks
 NAVY = np.float32([0, 12, 40]) / 255
 yy, xx = np.mgrid[0:PH, 0:W].astype(np.float32)
 BG = np.zeros((PH, W, 3), np.float32)                                          # plain black backdrop (the client's call)
@@ -29,12 +29,15 @@ def axis(a, y0, y1):
     for y in ys:
         r = np.where(a[y] > 0.5)[0]; xs.append((r[0] + r[-1]) / 2 if len(r) else np.nan)
     xs = np.array(xs); ok = ~np.isnan(xs); k, b = np.polyfit(ys[ok], xs[ok], 1); return k, b
-def panel(n, span_px=930, top=12):
-    """neck at the top edge, fingertips at the bottom; the body turned upright and centred"""
-    im, a = mask(n); y0, y1 = LM[n]; y0c = max(0, y0); k, b = axis(a, y0c, y1)
+ANCH = {"front": (12, 942), "34": (12, 942), "side": (12, 942)}             # panel y of the two landmarks; the same for ДО and ПОСЛЕ, so the bodies match
+if os.path.exists(os.path.join(D, "lm.json")):
+    _j = json.load(open(os.path.join(D, "lm.json"))); ANCH.update({k: tuple(v) for k, v in _j.get("anchor", {}).items()})
+def panel(n, span_px=None, top=None):
+    """two landmarks (e.g. shoulder top and crotch) land on the same panel heights in ДО and ПОСЛЕ; the body turned upright and centred"""
+    im, a = mask(n); y0, y1 = LM[n]; y0c = max(0, y0); k, b = axis(a, y0c, y1); ya, yb = ANCH[n.split("_", 1)[1]]
     ang = np.degrees(np.arctan(k)); ym = (y0 + y1) / 2; xm = k * ym + b                 # pivot: the body's mid-point
     R = cv2.getRotationMatrix2D((float(xm), float(ym)), -ang, 1.0)                        # stand the axis upright
-    s = span_px / (y1 - y0); S = np.float32([[s, 0, W / 2 - xm * s], [0, s, top + span_px / 2 - ym * s]])
+    s = (yb - ya) / (y1 - y0); S = np.float32([[s, 0, W / 2 - xm * s], [0, s, (ya + yb) / 2 - ym * s]])
     M = (np.vstack([S, [0, 0, 1]]) @ np.vstack([R, [0, 0, 1]]))[:2].astype(np.float32)
     fg = cv2.warpAffine(im, M, (W, PH), flags=cv2.INTER_AREA, borderValue=(0, 0, 0)); al = cv2.warpAffine(a, M, (W, PH), flags=cv2.INTER_AREA)[..., None]
     return fg * al + BG * (1 - al)
