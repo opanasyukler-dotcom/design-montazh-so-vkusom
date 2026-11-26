@@ -264,7 +264,6 @@ def st4():
            E(lambda sl: text_heart(sl, X, y1, t1, 42, BOLD), 1.5),
            E(lambda sl: para(sl, X, y1 + para_h(t1, 42, BOLD, W - 2 * X - 42) + 22, t2, 38, THIN), 2.8)]
     def cta(sl):
-        f = mont(36, 400); sl.text((W / 2, 1500), "Пройти тест можно в актуальном", f, WHITE, "mm")
         fb = mont(46, BOLD); bt = "«ТЕСТ»"; bw = fb.getlength(bt) / S
         sl.rrect((W / 2 - bw / 2 - 60, 1550, W / 2 + bw / 2 + 60, 1650), 50, POWDER)
         sl.text((W / 2, 1600), bt, fb, NAVY, "mm")
