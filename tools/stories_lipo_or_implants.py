@@ -1,4 +1,4 @@
-"""Stories 9:16 'Хочу увеличить грудь, но импланты не хочу…' — 3 animated stories (1080x1920, 30 fps).
+"""Stories 9:16 'Хочу увеличить грудь, но импланты не хочу…' — 4 stories (1080x1920, 30 fps).
 Text sits straight on the footage (no black plate): light gradients + a soft dark halo under the type.
 
 Story design approved earlier (stories_ptoz): three powder dots + big bold caps headline on black at
@@ -203,29 +203,59 @@ def st1():
     render(1, lambda d: footage(VID_OR, 6.0, d, cx=0.55, cy=0.35), veil(820, 1080), els, 7.0)
 
 
+def case_card(sl, im, box, r=20):
+    x0, y0, x1, y1 = box; w, h = int((x1 - x0) * S), int((y1 - y0) * S)
+    m = Image.new("L", (w, h), 0); ImageDraw.Draw(m).rounded_rectangle((0, 0, w - 1, h - 1), radius=r * S, fill=255)
+    s_ = max(w / im.width, h / im.height); r_ = im.resize((int(im.width * s_) + 1, int(im.height * s_) + 1), Image.LANCZOS)
+    cx, cy = (r_.width - w) // 2, (r_.height - h) // 2
+    sl.im.paste(r_.crop((cx, cy, cx + w, cy + h)), (int(x0 * S), int(y0 * S)), m)
+
+
+def pill(sl, x, y, text, bg, fg, size=24):
+    f = mont(size, 600); tw = f.getlength(text) / S; ph = size + 20
+    sl.rrect((x, y, x + tw + 30, y + ph), ph / 2, bg, 235); sl.text((x + 15, y + ph / 2), text, f, fg, "lm")
+
+
 def st2():
+    """the proof right after the claim: three real lipofilling cases, before / after"""
     rows = ["А ВЕДЬ УВЕЛИЧИТЬ", "ГРУДЬ МОЖНО И", "СОБСТВЕННЫМ ЖИРОМ"]; size, lh, hy = headline(rows)
     def hf(sl):
         dots(sl, 170)
         for i, r in enumerate(rows): sl.text((X, 230 + i * lh), r, mont(size, BOLD), WHITE)
         heart(sl, X + mont(size, BOLD).getlength(rows[-1]) / S + 40, 230 + 2 * lh + size * 0.58, size * 0.4)
-    qs = ["А хватит ли своего жира?", "Какой объём получится?", "И что лучше выбрать именно мне?"]
-    kinds = ["question", "search", "chart"]
-    lead = "Ответ зависит от вашей анатомии и желаемого результата."
-    els = [E(hf, 0.3, "rise", 0.7),
-           E(lambda sl: para(sl, X, hy + 30, "Но здесь возникает другой вопрос:", 40, THIN, POWDER), 1.8)]
-    yq = hy + 150
-    for i, (q, k) in enumerate(zip(qs, kinds)):
-        yy = yq + i * 150
-        els.append(E(lambda sl, k=k, yy=yy: (sl.circle((X + 44, yy + 44), 44, NAVY, 0, 255, fill=NAVY + (200,)),
-                                             icon_circle(sl, (X + 44, yy + 44), k, 44)), 2.8 + i * 0.9, "rise", halo=False))
-        els.append(E(lambda sl, q=q, yy=yy: para(sl, X + 120, yy + 14, q, 40, BOLD, WHITE, W - 2 * X - 120), 3.0 + i * 0.9))
-    y0, _ = bottom_block(lead, None, 42)
-    els.append(E(lambda sl: (sl.poly([(X, y0 - 36), (X + 120, y0 - 36)], POWDER, 2.4), para(sl, X, y0, lead, 42, BOLD)), 6.0))
-    render(2, lambda d: footage(VID_HANDS, 1.0, d, cx=0.5, cy=0.5), veil(1250, 1250, 0.68, 0.8), els, 8.0)
+    els = [E(hf)]
+    gap = 18; cw = (W - 2 * 60 - gap) // 2; ch = int(cw * 355 / 490); y = int(hy + 70)
+    for i in range(3):
+        b = ImageOps.exif_transpose(Image.open(os.path.join(SRC, f"case{i + 1}_b.jpg"))).convert("RGB")
+        a = ImageOps.exif_transpose(Image.open(os.path.join(SRC, f"case{i + 1}_a.jpg"))).convert("RGB")
+        yy = y + i * (ch + 74)
+        def row(sl, b=b, a=a, yy=yy, i=i):
+            sl.text((60, yy), f"Кейс 0{i + 1}", mont(28, 600), POWDER)
+            bb = (60, yy + 44, 60 + cw, yy + 44 + ch); ab = (60 + cw + gap, yy + 44, 60 + 2 * cw + gap, yy + 44 + ch)
+            case_card(sl, b, bb); case_card(sl, a, ab)
+            pill(sl, bb[0] + 12, bb[1] + 12, "до", NAVY, WHITE, 22); pill(sl, ab[0] + 12, ab[1] + 12, "после", POWDER, NAVY, 22)
+        els.append(E(row, halo=False))
+    render(2, lambda d: footage(VID_OR, 0.2, d, cx=0.5, cy=0.4), veil(H, H, 0.0, 0.0, 0.72), els, 7.0)
 
 
 def st3():
+    rows = ["НО ЗДЕСЬ ВОЗНИКАЕТ", "ДРУГОЙ ВОПРОС:"]; size, lh, hy = headline(rows)
+    qs = ["А хватит ли своего жира?", "Какой объём получится?", "И что лучше выбрать именно мне?"]
+    kinds = ["question", "search", "chart"]
+    lead = "Ответ зависит от вашей анатомии и желаемого результата."
+    els = [E(lambda sl: (dots(sl, 170), [sl.text((X, 230 + i * lh), r, mont(size, BOLD), WHITE) for i, r in enumerate(rows)]))]
+    yq = hy + 110
+    for i, (q, k) in enumerate(zip(qs, kinds)):
+        yy = yq + i * 150
+        els.append(E(lambda sl, k=k, yy=yy: (sl.circle((X + 44, yy + 44), 44, NAVY, 0, 255, fill=NAVY + (200,)),
+                                             icon_circle(sl, (X + 44, yy + 44), k, 44)), halo=False))
+        els.append(E(lambda sl, q=q, yy=yy: para(sl, X + 120, yy + 14, q, 40, BOLD, WHITE, W - 2 * X - 120)))
+    y0, _ = bottom_block(lead, None, 42)
+    els.append(E(lambda sl: (sl.poly([(X, y0 - 36), (X + 120, y0 - 36)], POWDER, 2.4), para(sl, X, y0, lead, 42, BOLD))))
+    render(3, lambda d: footage(VID_HANDS, 1.0, d, cx=0.5, cy=0.5), veil(1100, 1250, 0.68, 0.8), els, 7.0)
+
+
+def st4():
     rows = ["ЛИПОФИЛИНГ", "ИЛИ ИМПЛАНТЫ?"]; size, lh, hy = headline(rows, size=92)
     t1 = "Чтобы вам было проще разобраться, я подготовила небольшой тест"
     t2 = "Он поможет понять различия между методами и какой вариант стоит обсудить на консультации."
@@ -240,10 +270,10 @@ def st3():
         sl.text((W / 2, 1600), bt, fb, NAVY, "mm")
     els.append(E(cta, 4.2, "rise", 0.7))
     els.append(E(lambda sl: logo(sl, 1760, POWDER, 0.9, 0.85), 4.6, "fade"))
-    render(3, lambda d: footage(PHOTO, 0, d, cx=0.5, cy=0.12, zoom=1.05), veil(640, 980, 0.6, 0.85), els, 6.5)
+    render(4, lambda d: footage(PHOTO, 0, d, cx=0.5, cy=0.12, zoom=1.05), veil(640, 980, 0.6, 0.85), els, 6.5)
 
 
-STORIES = [st1, st2, st3]
+STORIES = [st1, st2, st3, st4]
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
