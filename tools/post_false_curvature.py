@@ -333,30 +333,38 @@ def s4():
 
 
 def s5():
+    """the task: before with today's contour, the target contour and the volume to add; after next to it"""
     bg = navy_bg(); els = []
     els.append(E(lambda sl: sl.lines((80, 150), ["В ДАННОМ СЛУЧАЕ ПЕРЕДО МНОЙ", "СТОЯЛА ЗАДАЧА:"], bebas(80), POWDER, lh=0.92), 0.2))
     t = "Добавить объём именно там, где его не хватало, чтобы сформировать более плавный и гармоничный контур ног."
     els.append(E(lambda sl: para(sl, 80, 330, t, 31, 300, WHITE, 920), 0.9))
-    top = 330 + para_h(t, 31, 300, 920) + 30; hgt = 1240 - top; wid = int(hgt * (CROP[2] - CROP[0]) * 512 / ((CROP[3] - CROP[1]) * 761))
-    x0 = 80; box = (x0, int(top), x0 + wid, int(top + hgt)); mp = mapper(box, CROP)
-    els.append(card_el(half("b", CROP), box, 0.5))
+    top = int(330 + para_h(t, 31, 300, 920) + 28); gap_ = 22; cw = (W - 120 - gap_) // 2
+    ch = int(cw * ((CROP[3] - CROP[1]) * photo(MAIN).height) / ((CROP[2] - CROP[0]) * (photo(MAIN).width // 2)))
+    ch = min(ch, 1185 - top)
+    bb = (60, top, 60 + cw, top + ch); ab = (60 + cw + gap_, top, 60 + 2 * cw + gap_, top + ch)
+    mp, ma = mapper(bb, CROP), mapper(ab, CROP)
+    els.append(card_el(half("b", CROP), bb, 0.5))
+    els.append(E(lambda sl: pill(sl, bb[0] + 16, bb[1] + 16, "ДО", NAVY, WHITE, 24, 600), 0.8, "fade"))
     els.append(E(lambda sl: contours(sl, mp, [B_L, B_R], WHITE), 1.6, "fade"))
-    els.append(E(lambda sl: contours(sl, mp, [T_L, T_R], POWDER, dashed=False, w=3.2), 2.6, "down", 1.2))
+    els.append(E(lambda sl: contours(sl, mp, [T_L, T_R], POWDER, dashed=False, w=3.2), 2.4, "down", 1.2))
     def fill(sl):
         g = Image.new("RGBA", sl.im.size, (0, 0, 0, 0)); dg = ImageDraw.Draw(g)
         for a, b in ((B_L, T_L), (B_R, T_R)):
             poly = [mp(*q) for q in smooth(a, 60)] + [mp(*q) for q in smooth(b, 60)[::-1]]
             dg.polygon([(x * S, y * S) for x, y in poly], fill=(247, 196, 208, 225))
         sl.im.alpha_composite(g.filter(ImageFilter.GaussianBlur(4 * S))); sl.im.alpha_composite(g)
-    els.append(E(fill, 4.0, "fade", 0.8, pulse=True))
-    # legend on the right of the card
-    lx = box[2] + 50; ly = box[1] + 40
-    els.append(E(lambda sl: (sl.dashed([(lx, ly), (lx + 60, ly)], WHITE, 2.6, 10, 8), para(sl, lx, ly + 24, "контур сейчас", 28, 300, WHITE, 360)), 1.6, "fade"))
-    els.append(E(lambda sl: (sl.poly([(lx, ly + 130), (lx + 60, ly + 130)], POWDER, 3.2), para(sl, lx, ly + 154, "контур, который хотим получить", 28, 300, POWDER, 360)), 2.6, "fade"))
-    els.append(E(lambda sl: (sl.rrect((lx, ly + 290, lx + 60, ly + 316), 8, POWDER, 200),
-                             para(sl, lx, ly + 334, "здесь добавляем объём", 28, 500, POWDER, 360)), 4.0, "fade"))
-    gx, gy = mp(0.45, 0.56)
-    els.append(E(lambda sl: arrow_to(sl, (lx - 10, ly + 360), (gx - 4, gy), POWDER, -0.2), 4.4, "fade"))
+    els.append(E(fill, 3.6, "fade", 0.8, pulse=True))
+    gx, gy = mp(0.445, 0.62)
+    els.append(E(lambda sl: (arrow_to(sl, (bb[0] + cw / 2 - 40, bb[3] - 72), (gx - 6, gy + 20), POWDER, -0.25),
+                             pill(sl, bb[0] + cw / 2, bb[3] - 50, "здесь добавляем объём", POWDER, NAVY, 22, 500, "mm")), 4.0, "fade"))
+    els.append(card_el(half("a", CROP), ab, 5.0, "wipe"))
+    els.append(E(lambda sl: pill(sl, ab[0] + 16, ab[1] + 16, "ПОСЛЕ", POWDER, NAVY, 24, 600), 5.6, "fade"))
+    els.append(E(lambda sl: contours(sl, ma, [A_L, A_R], POWDER, dashed=False, w=3), 5.8, "down", 1.0))
+    els.append(E(lambda sl: pill(sl, ab[0] + cw / 2, ab[3] - 50, "плавный контур", POWDER, NAVY, 22, 500, "mm"), 6.5, "fade"))
+    # legend under the photos
+    ly = bb[3] + 46
+    els.append(E(lambda sl: (sl.dashed([(80, ly), (140, ly)], WHITE, 2.6, 10, 8), sl.text((156, ly), "контур сейчас", mont(26, 300), WHITE, "lm")), 1.6, "fade"))
+    els.append(E(lambda sl: (sl.poly([(420, ly), (480, ly)], POWDER, 3.2), sl.text((496, ly), "контур, который хотим получить", mont(26, 300), POWDER, "lm")), 2.4, "fade"))
     render(5, bg, els, 8.5)
 
 
