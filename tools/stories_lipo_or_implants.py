@@ -1,4 +1,5 @@
-"""Stories 9:16 'Хочу увеличить грудь, но импланты не хочу…' — 5 animated stories (1080x1920, 30 fps).
+"""Stories 9:16 'Хочу увеличить грудь, но импланты не хочу…' — 3 animated stories (1080x1920, 30 fps).
+Text sits straight on the footage (no black plate): light gradients + a soft dark halo under the type.
 
 Story design approved earlier (stories_ptoz): three powder dots + big bold caps headline on black at
 the top, footage fading in below, bold lead + thin line at the bottom over a dark gradient.
@@ -88,9 +89,14 @@ class El:
         d *= 1 - a[s_] * k; d += rgb[s_] * k
 
 
-def E(fn, t0=0.0, kind="rise", d=0.6):
+def E(fn, t0=0.0, kind="rise", d=0.6, halo=True):
     sl = Slide(W, H, Image.new("RGBA", (W * S, H * S), (0, 0, 0, 0))); fn(sl)
-    return El(sl.im.resize((W, H), Image.LANCZOS), t0, kind, d)
+    im = sl.im.resize((W, H), Image.LANCZOS)
+    if halo:  # soft dark halo under the type: legible straight on the footage, no black plate
+        a = im.split()[3].filter(ImageFilter.GaussianBlur(9)).point(lambda v: int(min(255, v * 1.6) * 0.55))
+        sh = Image.new("RGBA", im.size, DEEP + (0,)); sh.putalpha(a)
+        sh.alpha_composite(im); im = sh
+    return El(im, t0, kind, d)
 
 
 def shade(top_solid, top_fade, bot_start, bot_a=0.88):
@@ -169,85 +175,73 @@ def bottom_block(lead, body, lead_size=42, body_size=38, gap=22, y_end=1680):
 
 
 # ------------------------------------------------------------------ stories
+def veil(top_end=760, bot_start=1150, top_a=0.6, bot_a=0.75, base=0.12):
+    """light gradients only: the footage stays visible under the text"""
+    ys = np.arange(H, dtype=np.float32)
+    top = np.clip(1 - ys / top_end, 0, 1) ** 1.4 * top_a
+    bot = np.clip((ys - bot_start) / (H - bot_start), 0, 1) ** 1.2 * bot_a
+    return (base + (1 - base) * np.maximum(top, bot))[:, None, None].astype(np.float32)
+
+
+def headline(rows, y=230, size=76):
+    while max(mont(size, BOLD).getlength(l) / S for l in rows) > W - 2 * X - 60: size -= 2
+    lh = int(size * 1.1)
+    return size, lh, y + len(rows) * lh
+
+
 def st1():
-    hf, hy = head(["«ХОЧУ УВЕЛИЧИТЬ", "ГРУДЬ, НО ИМПЛАНТЫ", "НЕ ХОЧУ…»"])
-    sh = shade(hy + 60, 320, 1250)
-    els = [E(hf, 0.3, "rise", 0.7),
-           E(lambda sl: para(sl, X, 1580, "Знакомая мысль?", 52, BOLD), 1.8, "rise", 0.7)]
-    render(1, lambda d: footage(VID_OR, 6.0, d, cx=0.55, cy=0.35), sh, els, 4.5)
+    rows = ["«ХОЧУ УВЕЛИЧИТЬ", "ГРУДЬ, НО ИМПЛАНТЫ", "НЕ ХОЧУ…»"]; size, lh, hy = headline(rows)
+    t1 = "После родов грудь потеряла объём. Или после похудения стала совсем другой."
+    t2 = "Хочется вернуть наполненность, но мысль об имплантах останавливает."
+    y0, y1 = bottom_block(t1, t2, 40, 38)
+    els = [E(lambda sl: (dots(sl, 170), [sl.text((X, 230 + i * lh), r, mont(size, BOLD), WHITE) for i, r in enumerate(rows)]), 0.3, "rise", 0.7),
+           E(lambda sl: para(sl, X, hy + 30, "Знакомая мысль?", 44, THIN, POWDER), 1.6),
+           E(lambda sl: para(sl, X, y0, t1, 40, BOLD), 3.0),
+           E(lambda sl: para(sl, X, y1, t2, 38, THIN), 4.6)]
+    render(1, lambda d: footage(VID_OR, 6.0, d, cx=0.55, cy=0.35), veil(820, 1080), els, 7.0)
 
 
 def st2():
-    hf, hy = head(["ПОСЛЕ РОДОВ ГРУДЬ", "ПОТЕРЯЛА ОБЪЁМ."])
-    lead = "Или после похудения стала совсем другой."
-    body = "Хочется вернуть наполненность, но мысль об имплантах останавливает."
-    y0, y1 = bottom_block(lead, body)
-    sh = shade(hy + 60, 320, y0 - 380)
-    els = [E(hf, 0.3, "rise", 0.7),
-           E(lambda sl: para(sl, X, y0, lead, 42, BOLD), 1.6),
-           E(lambda sl: para(sl, X, y1, body, 38, THIN), 2.8)]
-    render(2, lambda d: footage(VID_HANDS, 1.0, d, cx=0.5, cy=0.5), sh, els, 5.0)
-
-
-def st3():
-    rows = ["А ВЕДЬ УВЕЛИЧИТЬ", "ГРУДЬ МОЖНО И", "СОБСТВЕННЫМ ЖИРОМ"]
-    hf0, hy = head(rows)
-    size = 76
-    while max(mont(size, BOLD).getlength(l) / S for l in rows) > W - 2 * X - 70: size -= 2
-    lh = int(size * 1.1)
+    rows = ["А ВЕДЬ УВЕЛИЧИТЬ", "ГРУДЬ МОЖНО И", "СОБСТВЕННЫМ ЖИРОМ"]; size, lh, hy = headline(rows)
     def hf(sl):
-        dots(sl)
-        for i, ln in enumerate(rows): sl.text((X, 210 + i * lh), ln, mont(size, BOLD), WHITE)
-        heart(sl, X + mont(size, BOLD).getlength(rows[-1]) / S + 40, 210 + 2 * lh + size * 0.58, size * 0.4)
-    hy = 210 + 3 * lh
-    lead = "Но здесь возникает другой вопрос:"
-    sh = shade(hy + 60, 320, 1250)
-    els = [E(hf, 0.3, "rise", 0.7),
-           E(lambda sl: para(sl, X, 1600, lead, 42, BOLD), 2.0)]
-    render(3, lambda d: footage(VID_OR, 0.2, d, cx=0.5, cy=0.4), sh, els, 4.5)
-
-
-def st4():
+        dots(sl, 170)
+        for i, r in enumerate(rows): sl.text((X, 230 + i * lh), r, mont(size, BOLD), WHITE)
+        heart(sl, X + mont(size, BOLD).getlength(rows[-1]) / S + 40, 230 + 2 * lh + size * 0.58, size * 0.4)
     qs = ["А хватит ли своего жира?", "Какой объём получится?", "И что лучше выбрать именно мне?"]
     kinds = ["question", "search", "chart"]
     lead = "Ответ зависит от вашей анатомии и желаемого результата."
-    sh = np.full((H, 1, 1), 0.62, np.float32)  # even dark veil over the photo
-    els = [E(lambda sl: dots(sl), 0.2, "fade")]
-    y = 330
+    els = [E(hf, 0.3, "rise", 0.7),
+           E(lambda sl: para(sl, X, hy + 30, "Но здесь возникает другой вопрос:", 40, THIN, POWDER), 1.8)]
+    yq = hy + 150
     for i, (q, k) in enumerate(zip(qs, kinds)):
-        yy = y + i * 230
-        els.append(E(lambda sl, k=k, yy=yy: (sl.circle((X + 52, yy + 52), 52, NAVY, 0, 255, fill=NAVY + (220,)),
-                                             icon_circle(sl, (X + 52, yy + 52), k, 52)), 0.5 + i * 1.0, "rise"))
-        els.append(E(lambda sl, q=q, yy=yy: para(sl, X + 140, yy + 12, q, 46, BOLD, WHITE, W - 2 * X - 140), 0.7 + i * 1.0))
-        if i < 2:
-            els.append(E(lambda sl, yy=yy: sl.dashed([(X + 52, yy + 118), (X + 52, yy + 216)], POWDER, 1.8, 6, 7, 200),
-                         1.0 + i * 1.0, "fade"))
+        yy = yq + i * 150
+        els.append(E(lambda sl, k=k, yy=yy: (sl.circle((X + 44, yy + 44), 44, NAVY, 0, 255, fill=NAVY + (200,)),
+                                             icon_circle(sl, (X + 44, yy + 44), k, 44)), 2.8 + i * 0.9, "rise", halo=False))
+        els.append(E(lambda sl, q=q, yy=yy: para(sl, X + 120, yy + 14, q, 40, BOLD, WHITE, W - 2 * X - 120), 3.0 + i * 0.9))
     y0, _ = bottom_block(lead, None, 42)
-    els.append(E(lambda sl: (sl.poly([(X, y0 - 40), (X + 120, y0 - 40)], POWDER, 2.4), para(sl, X, y0, lead, 42, THIN)), 3.8))
-    render(4, lambda d: footage(PHOTO, 0, d, cx=0.5, cy=0.3, zoom=1.0), sh, els, 6.0)
+    els.append(E(lambda sl: (sl.poly([(X, y0 - 36), (X + 120, y0 - 36)], POWDER, 2.4), para(sl, X, y0, lead, 42, BOLD)), 6.0))
+    render(2, lambda d: footage(VID_HANDS, 1.0, d, cx=0.5, cy=0.5), veil(1250, 1250, 0.68, 0.8), els, 8.0)
 
 
-def st5():
-    hf, hy = head(["ЛИПОФИЛИНГ", "ИЛИ ИМПЛАНТЫ?"], size=88, lh=96)
+def st3():
+    rows = ["ЛИПОФИЛИНГ", "ИЛИ ИМПЛАНТЫ?"]; size, lh, hy = headline(rows, size=92)
     t1 = "Чтобы вам было проще разобраться, я подготовила небольшой тест"
     t2 = "Он поможет понять различия между методами и какой вариант стоит обсудить на консультации."
-    sh = shade(hy + 40, 300, 620, 0.95)
-    y1 = 1110
-    els = [E(hf, 0.3, "rise", 0.7),
-           E(lambda sl: text_heart(sl, X, y1, t1, 42, BOLD), 1.4),
-           E(lambda sl: para(sl, X, y1 + para_h(t1, 42, BOLD, W - 2 * X - 42) + 22, t2, 38, THIN), 2.6)]
+    y1 = 1080
+    els = [E(lambda sl: (dots(sl, 170), [sl.text((X, 230 + i * lh), r, mont(size, BOLD), WHITE) for i, r in enumerate(rows)]), 0.3, "rise", 0.7),
+           E(lambda sl: text_heart(sl, X, y1, t1, 42, BOLD), 1.5),
+           E(lambda sl: para(sl, X, y1 + para_h(t1, 42, BOLD, W - 2 * X - 42) + 22, t2, 38, THIN), 2.8)]
     def cta(sl):
-        f = mont(36, 400); txt = "Пройти тест можно в актуальном"; tw = f.getlength(txt) / S
-        sl.text((W / 2, 1500), txt, f, WHITE, "mm")
+        f = mont(36, 400); sl.text((W / 2, 1500), "Пройти тест можно в актуальном", f, WHITE, "mm")
         fb = mont(46, BOLD); bt = "«ТЕСТ»"; bw = fb.getlength(bt) / S
         sl.rrect((W / 2 - bw / 2 - 60, 1550, W / 2 + bw / 2 + 60, 1650), 50, POWDER)
         sl.text((W / 2, 1600), bt, fb, NAVY, "mm")
-    els.append(E(cta, 4.0, "rise", 0.7))
-    els.append(E(lambda sl: logo(sl, 1760, POWDER, 0.85, 0.85), 4.4, "fade"))
-    render(5, lambda d: footage(PHOTO, 0, d, cx=0.5, cy=0.12, zoom=1.05), sh, els, 6.0)
+    els.append(E(cta, 4.2, "rise", 0.7))
+    els.append(E(lambda sl: logo(sl, 1760, POWDER, 0.9, 0.85), 4.6, "fade"))
+    render(3, lambda d: footage(PHOTO, 0, d, cx=0.5, cy=0.12, zoom=1.05), veil(640, 980, 0.6, 0.85), els, 6.5)
 
 
-STORIES = [st1, st2, st3, st4, st5]
+STORIES = [st1, st2, st3]
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
