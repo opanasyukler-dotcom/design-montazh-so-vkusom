@@ -451,15 +451,15 @@ def click():
 
 
 # ---------------- voice: the patient's interview and the surgeon, whole sentences
-VO = [("A", "IMG_1302", [(121.08, 123.14), (123.56, 125.60)]),     # а молодая женщина мне говорили, что думали, что я в положении всё время
+VO = [("C", "IMG_1233", [(14.00, 19.70)]),                          # это уже даже не красота, а физиология. человеку трудно нагнуться, ходить и вообще как-то что-то делать
+      ("A", "IMG_1302", [(121.08, 123.14), (123.56, 125.60)]),     # а молодая женщина мне говорили, что думали, что я в положении всё время
       ("B1", "IMG_1302", [(15.70, 18.26)]),                         # эта проблема беспокоит меня много лет
       ("B2", "IMG_1302", [(21.78, 22.62), (24.10, 27.42)]),         # четверо родов, постоянные диеты, похудение, а живот не уходил
-      ("C", "IMG_1233", [(14.00, 19.70)]),                          # это уже даже не красота, а физиология. человеку трудно нагнуться, ходить и вообще как-то что-то делать
       ("D", "IMG_1233", [(8.78, 10.08), (19.84, 23.55)]),           # вот этот фартук будем убирать, поэтому постараемся облегчить ей жизнь
       ("E", "IMG_1302", [(94.40, 96.70), (96.94, 98.70), (99.04, 100.96)]),   # ещё не могу пока поверить своему счастью. подхожу к зеркалу, смотрюсь, и мне пока даже не верится, что это я
       ("F", "IMG_1302", [(9.32, 10.06), (10.32, 11.92), (13.50, 15.05)]),   # но самое главное, моё эмоциональное состояние, это не передать, оно великолепное («что», «оно просто, ну» cut)
       ("G", "IMG_1302", [(101.14, 104.16)])]                        # если это ваша мечта, если это вас беспокоит
-GAP = {"B1": 0.35, "B2": 0.3, "C": 0.4, "D": 0.35, "E": 0.45, "F": 0.4, "G": 0.4}
+GAP = {"A": 0.4, "B1": 0.35, "B2": 0.3, "D": 0.35, "E": 0.45, "F": 0.4, "G": 0.4}
 SEG = []; _t = 0.1
 for _b, _s, _parts in VO:
     if SEG: _t += GAP[_b]
@@ -479,7 +479,7 @@ def Sr(b, t):
         if u <= acc + o - a: return a + u - acc
         acc += o - a
     return parts[-1][1] + u - acc
-T_S = {b: vstart(b) - 0.12 for b, *_ in VO}; T_S["A"] = 0.0
+T_S = {b: vstart(b) - 0.12 for b, *_ in VO}; T_S["C"] = 0.0             # opens on the surgeon at the table (the client's call)
 T_Z = vend("G") + 1.2; DUR = T_Z + 2.8
 
 V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ("IMG_1240", "IMG_1239", "IMG_1233", "IMG_1238", "IMG_1252", "IMG_1302")}
@@ -596,7 +596,7 @@ def white_card(img, t, t0, d=1.2, z1=0.78):
 HA = low(Drop(["МЕНЯ ПОСТОЯННО ПРИНИМАЛИ", "*ЗА БЕРЕМЕННУЮ*"], 92, LX, 0, maxw=920))
 T_TEASE = 2.35
 def s_a(t):
-    fr = dark(body("IMG_1240", 2.6 + t, lerp(1.12, 1.18, eo(t / 4.0)), 0.6)); HA.draw(fr, t, 0.05, T_S["B1"] - 0.3)
+    u = t - T_S["A"]; fr = dark(body("IMG_1240", 2.6 + u, lerp(1.12, 1.18, eo(u / 4.0)), 0.6)); HA.draw(fr, t, T_S["A"] + 0.05, T_S["B1"] - 0.3)
     for k, (w0, txt, x, y, tl) in enumerate(((123.82, "«в положении?»", 760, 470, -1), (124.38, "«ты беременная?»", 330, 640, 1))):
         u = t - Rs("A", w0)
         if u > 0: bubble(fr, txt, x, y, eo(u / 0.3) * (1 - cl((t - T_S["B1"] + 0.35) / 0.3)), tl)
@@ -687,8 +687,8 @@ def s_z(t):
     if t > DUR - 0.8: fr = fr * (1 - eio((t - DUR + 0.8) / 0.8))
     return fr
 
-SCENES = [(0, s_a), (T_S["B1"], s_b), (T_S["C"], s_c), (T_S["D"], s_d), (T_S["E"], s_e), (T_S["F"], s_f), (T_S["G"], s_g), (T_Z, s_z)]
-TRANS = {T_S["B1"]: ("zoom", 0.3), T_S["C"]: ("diag", 0.4), T_S["D"]: ("zoom", 0.3), T_S["E"]: ("iris", 0.5), T_S["F"]: ("diag", 0.4), T_S["G"]: ("zoom", 0.3), T_Z: ("iris", 0.5)}
+SCENES = [(0, s_c), (T_S["A"], s_a), (T_S["B1"], s_b), (T_S["D"], s_d), (T_S["E"], s_e), (T_S["F"], s_f), (T_S["G"], s_g), (T_Z, s_z)]
+TRANS = {T_S["A"]: ("diag", 0.4), T_S["B1"]: ("zoom", 0.3), T_S["D"]: ("diag", 0.4), T_S["E"]: ("iris", 0.5), T_S["F"]: ("diag", 0.4), T_S["G"]: ("zoom", 0.3), T_Z: ("iris", 0.5)}
 def base(t):
     k = max(i for i, (s0, _) in enumerate(SCENES) if t >= s0); s0, fn = SCENES[k]; kind, d = TRANS.get(s0, ("none", 0))
     if kind != "none" and t < s0 + d:
@@ -735,7 +735,7 @@ def build_audio(path):
     KEYS = [load(os.path.join(SRC, "keys", f"k{i:03d}.wav")) for i in range(1, 9)]; TICK = load(os.path.join(SRC, "tick.wav"))
     def typing(hd, t0, g_=0.3):
         for j in range(sum(len(q) for q, _ in hd.rows)): put(KEYS[j % 8], t0 + j * hd.stag, g_ * 0.8)
-    typing(HA, 0.05, 0.4); typing(HB, vstart("B2")); typing(HC, T_S["C"] + 0.05); typing(HD, T_S["D"] + 0.05); typing(HE, Rs("E", 99.68)); typing(HF, T_S["F"] + 0.05)
+    typing(HA, T_S["A"] + 0.05, 0.4); typing(HB, vstart("B2")); typing(HC, T_S["C"] + 0.05); typing(HD, T_S["D"] + 0.05); typing(HE, Rs("E", 99.68)); typing(HF, T_S["F"] + 0.05)
     typing(HG, T_S["G"] + 0.3); typing(HZ, T_Z + 0.2, 0.3)
     for w0 in (123.82, 124.38): put(pop(), Rs("A", w0), 0.5)                  # the comments pop
     ty = Rs("B1", 17.40)
