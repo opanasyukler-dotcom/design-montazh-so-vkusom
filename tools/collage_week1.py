@@ -22,12 +22,15 @@ W, H, HALF = 1080, 1920, 960
 #               scale taken from the front pair of the same session.
 ABOVE, BELOW = 200, 2100          # ДО source px kept above / below the shoulder line: under the chin to the knees
 S0 = 900 / (ABOVE + BELOW)        # scale of the ДО photos
-SH = {"b_front": ((115, 300), (1005, 300)), "a_front": ((290, 340), (1080, 335)),
-      "b_34": ((130, 320), (870, 420)), "a_34": ((370, 320), (1030, 375))}
+# shoulder corners found on the person mask (extreme point of the upper silhouette towards up-left /
+# up-right, below the chin) — checked by eye on each photo
+SH = {"b_front": ((140, 298), (974, 260)), "a_front": ((311, 338), (1060, 322)),
+      "b_34": ((207, 290), (863, 396)), "a_34": ((422, 292), (1001, 330))}
 SIDE = {"b_side": ((480, 300), (470, 2400)), "a_side": ((700, 320), (660, 2300))}
 # 3/4: the shoulder line is foreshortened by the turn, so levelling it tilts the legs; instead the body
 # axis (jugular notch -> between the knees) is made vertical, and the shoulder width still sets the scale
-AXIS = {"b_34": ((610, 330), (620, 2450)), "a_34": ((620, 330), (746, 2060))}
+# (ПОСЛЕ 3/4 stands with a lean: levelling its shoulders puts it upright, so it uses the shoulder rule; checked by eye)
+AXIS = {"b_34": ((610, 330), (620, 2450))}
 SIDE_SCALE = {"b_side": 1.0, "a_side": 890 / 790}   # same camera session as the front pair
 SESSION = new_session("u2net_human_seg")   # keeps the whole silhouette in profile (plain u2net lost legs and back)
 
