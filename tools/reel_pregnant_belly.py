@@ -705,7 +705,7 @@ def render(t):
     return fr
 
 # ---------------- audio
-MUSIC = os.path.join(SRC, "music.wav"); M0 = 0.6;     # the client's track G_VO, G_GAP = 0.022, 0.075
+MUSIC = os.path.join(SRC, "music.wav"); M0 = 0.6; G_VO, G_GAP = 0.022, 0.075      # the client's track
 def track(n):
     if not os.path.exists(MUSIC): return np.zeros((n, 2))
     w = wave.open(MUSIC); x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64).reshape(-1, w.getnchannels()) / 32768
