@@ -480,7 +480,7 @@ def Sr(b, t):
         acc += o - a
     return parts[-1][1] + u - acc
 T_S = {b: vstart(b) - 0.12 for b, *_ in VO}; T_S["C"] = 0.0             # opens on the surgeon at the table (the client's call)
-T_Z = vend("G") + 1.2; DUR = T_Z + 2.8
+T_Z = vend("G") + 1.8; DUR = T_Z + 2.8
 
 V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ("IMG_1240", "IMG_1239", "IMG_1233", "IMG_1238", "IMG_1252", "IMG_1302")}
 def photo(n): return cv2.imread(os.path.join(WORK, f"{n}.jpg"))[..., ::-1].copy()
@@ -679,11 +679,23 @@ def s_f(t):
 # G — two quick comparisons, then the result full; «если вы узнали себя»
 HG = low(Drop(["ЕСЛИ ВЫ УЗНАЛИ СЕБЯ", "*В ЭТОЙ ИСТОРИИ...*"], 92, LX, 0, maxw=920))
 def s_g(t):
-    u = t - T_S["G"]; d = (T_Z - T_S["G"]) / 2; k = min(1, int(u / d)); n = ("34", "side")[k]      # the 3/4 and side ПОСЛЕ/ДО collages
-    fr = full(COLS[n], 0.5, 0.5, 1.0)
-    if k: v = u - k * d; fr = full(COLS[("34", "side")[k - 1]], 0.5, 0.5, 1.0) * (1 - eio(v / 0.2)) + fr * eio(v / 0.2) if v < 0.2 else fr
-    chip(fr, "ПОСЛЕ", LX, 262); chip(fr, "ДО", LX, 1000)
+    u = t - T_S["G"]; t_sl, d_sl, t_col = 1.0, 1.2, 3.0                     # ДО 3/4 → slider → ПОСЛЕ 3/4, then the side collage
+    if u < t_col:
+        p = eio((u - t_sl) / d_sl); x = W * (1 - p); xi = int(round(x)); fr = SL_DO.copy()
+        if p > 0: fr[:, xi:] = SL_PO[:, xi:]
+        if 0 < p < 1: slider_handle(fr, x)
+        chip(fr, "ДО" if p < 0.5 else "ПОСЛЕ", LX, 262)
+    else:
+        fr = flash(full(COLS["side"], 0.5, 0.5, 1.0), u - t_col); chip(fr, "ПОСЛЕ", LX, 262); chip(fr, "ДО", LX, 1000)
     fr = np.asarray(fr, np.float32).copy(); text_shadow(fr, HG, t, T_S["G"] + 0.3); HG.draw(fr, t, T_S["G"] + 0.3); return fr
+SL_DO = cv2.imread(os.path.join(WORK, "sl_do.png"))[..., ::-1].astype(np.float32) / 255     # IMG_1486 (ДО 3/4) and IMG_1460 (ПОСЛЕ 3/4), the same scale and place
+SL_PO = cv2.imread(os.path.join(WORK, "sl_po.png"))[..., ::-1].astype(np.float32) / 255
+def slider_handle(fr, x):
+    m = np.zeros((H, W), np.uint8); xi = int(round(x)); cv2.line(m, (xi, 0), (xi, H), 255, 5, cv2.LINE_AA); cv2.circle(m, (xi, 960), 46, 255, -1, cv2.LINE_AA)
+    a = m.astype(np.float32)[..., None] / 255; fr[:] = fr * (1 - a) + a
+    ar = np.zeros((H, W), np.uint8)
+    for sgn in (-1, 1): cv2.fillPoly(ar, [np.int32([(xi + sgn * 12, 948), (xi + sgn * 12, 972), (xi + sgn * 28, 960)])], 255, cv2.LINE_AA)
+    a2 = ar.astype(np.float32)[..., None] / 255; fr[:] = fr * (1 - a2) + a2 * NAVY
 # Z — the end card
 HZ = Drop(["НА КОНСУЛЬТАЦИИ ОБСУДИМ,", "ЧТО МОЖНО СДЕЛАТЬ", "*В ВАШЕМ СЛУЧАЕ*"], 84, LX, 760, maxw=920, stag=0.02)
 def s_z(t):
@@ -752,7 +764,7 @@ def build_audio(path):
     put(TICK, Rs("D", 8.98), 0.5); put(swoosh(0.6), T_S["E"], 0.12)
     for k in range(3): put(glass(1318.5 + 200 * k), Rs("E", 96.02) + 0.15 * k, 0.05)
     put(swoosh(0.5), T_S["E"] + 2.2, 0.1)
-    put(glass(1174.7), T_Z + 0.2, 0.08)
+    put(swoosh(1.0), T_S["G"] + 1.1, 0.12); put(glass(1174.7), T_Z + 0.2, 0.08)
     sfx[:n] *= 1 - 0.55 * np.clip(dd, 0, 1)
     tt = np.arange(n) / SR; fade = np.clip((DUR - tt) / 2.5, 0, 1) ** 1.5 * np.clip(tt / 1.0, 0, 1)
     mus = track(n) * ((G_GAP - (G_GAP - G_VO) * np.clip(dd, 0, 1)) * fade)[:, None]
