@@ -667,12 +667,10 @@ GSPL = np.repeat((np.clip((yy[:, :1] - 600) / 350, 0, 1) ** 1.3 * 0.6 * (yy[:, :
 GBS = np.repeat((np.clip((yy[:, :1] - 1330) / 300, 0, 1) ** 1.2 * 0.5)[..., None], W, 1).astype(np.float32)
 def s_f(t):
     tsw = Rs("F", 13.52)                                                    # «это не передать»: cut to her result in 3/4 (no split — the client's call)
-    if t < tsw: fr = dark(interview(t, "F", lerp(1.0, 1.06, eo((t - T_S["F"]) / 2.0))))
-    else: fr = dark(flash(po_photo(PO34, lerp(1.16, 1.1, eo((t - tsw) / 2.0))), t - tsw)); chip(fr, "ПОСЛЕ", LX, 262)
+    fr = dark(interview(t, "F", lerp(1.0, 1.06, eo((t - T_S["F"]) / 4.0))))             # the interview only (no ПОСЛЕ photo — the client's call)
     HF.y = HB_ - HF.h
     HF.draw(fr, t, T_S["F"] + 0.05)
     th = Rs("F", 14.54)                                                     # «великолепное»: hearts float up
-    if t > th: hearts(fr, t, th, ((860, 820, 0.0), (220, 760, 0.3), (700, 640, 0.6)))
     return fr
 # G — two quick comparisons, then the result full; «если вы узнали себя»
 HG = low(Drop(["ЕСЛИ ВЫ УЗНАЛИ СЕБЯ", "*В ЭТОЙ ИСТОРИИ...*"], 92, LX, 0, maxw=920))
@@ -750,7 +748,6 @@ def build_audio(path):
     put(TICK, Rs("D", 8.98), 0.5); put(swoosh(0.6), T_S["E"], 0.12)
     for k in range(3): put(glass(1318.5 + 200 * k), Rs("E", 96.02) + 0.15 * k, 0.05)
     put(swoosh(0.5), T_S["E"] + 2.2, 0.1)
-    for k in range(3): put(pop(900, 500, 0.08), Rs("F", 14.54) + 0.3 * k, 0.35)
     put(glass(1174.7), T_Z + 0.2, 0.08)
     sfx[:n] *= 1 - 0.55 * np.clip(dd, 0, 1)
     tt = np.arange(n) / SR; fade = np.clip((DUR - tt) / 2.5, 0, 1) ** 1.5 * np.clip(tt / 1.0, 0, 1)
