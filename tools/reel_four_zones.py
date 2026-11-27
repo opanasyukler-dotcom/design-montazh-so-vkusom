@@ -480,11 +480,11 @@ T_G = vend("F") + 0.35; DUR = T_G + 4.2
 
 V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ("IMG_3155", "SR")}
 VIEW = (374, 64, 906, 822)                                                   # the photo inside the tablet recording, without the app's bars
-PZ, PTOP = 0.9, 170                                                         # the whole photo, centred, a blurred copy of itself around it
+PZ = 1.0; PS = W / (VIEW[2] - VIEW[0]); PTOP = int((H - (VIEW[3] - VIEW[1]) * PS) / 2)      # the photo full width, centred on white                                                         # the whole photo, centred, a blurred copy of itself around it
 def tab(st):
     f = V["SR"].at(st); P = f[VIEW[1]:VIEW[3], VIEW[0]:VIEW[2]]; s_ = W / P.shape[1] * PZ
     M = np.float32([[s_, 0, W / 2 - P.shape[1] * s_ / 2], [0, s_, PTOP]])
-    bg = cv2.resize(cv2.GaussianBlur(cv2.resize(P, (54, 96)), (0, 0), 3), (W, H)).astype(np.float32) / 255 * 0.5
+    bg = np.ones((H, W, 3), np.float32)                                                    # plain white page around the photo (the client's call)
     fg = cv2.warpAffine(P, M, (W, H), flags=cv2.INTER_CUBIC).astype(np.float32) / 255; m = cv2.warpAffine(np.ones(P.shape[:2], np.float32), M, (W, H))[..., None]
     return fg * m + bg * (1 - m)
 def tab_play(t, t0, t1, s0, s1):
@@ -535,7 +535,36 @@ def subtitles(fr, t):
 LX = 80; BLK = np.float32([0, 0, 0]); HB_ = 1336
 GTOP = np.repeat((np.clip(1 - (yy[:, :1] - 150) / 700, 0, 1) ** 1.3 * 0.35)[..., None], W, 1).astype(np.float32)
 GBOT = np.repeat((np.clip((yy[:, :1] - 950) / 560, 0, 1) ** 1.2 * 0.7)[..., None], W, 1).astype(np.float32)
-def dark(fr): fr = np.asarray(fr, np.float32).copy(); shade(fr, GTOP, BLK); shade(fr, GBOT, BLK); return fr
+PMASK = np.zeros((H, 1, 1), np.float32); PMASK[PTOP:PTOP + int((VIEW[3] - VIEW[1]) * PS)] = 1
+def dark(fr, page=False):
+    """the soft black gradients for the text; on the tablet shots only over the photo, the white page stays white"""
+    fr = np.asarray(fr, np.float32).copy(); m = PMASK if page else 1.0; shade(fr, GTOP * m, BLK); shade(fr, GBOT * m, BLK); return fr
+# ---- ADHD layer: the four zones numbered on the photo, the one she talks about pulses, leaders from the pills
+def zp(fx, fy): return (fx * W, PTOP + fy * (VIEW[3] - VIEW[1]) * PS)
+ZONES = {"belly": (zp(0.54, 0.58), (230, 150), (700, 1000)), "breast": (zp(0.55, 0.41), (210, 70), (790, 770)),
+         "arms": (zp(0.23, 0.32), (170, 45), (150, 600)), "thighs": (zp(0.53, 0.82), (110, 95), (190, 1430))}
+ZNUM = {"belly": 1, "breast": 2, "arms": 3, "thighs": 4}
+def badge(fr, n, x, y, p, hot=False, t=0.0):
+    if p <= 0: return
+    r = 34 * eback(p) * (1 + (0.08 * np.sin(t * 8) if hot else 0)); dot(fr, x, y, r + 4, WHITE if hot else NAVY, min(1, p * 2)); dot(fr, x, y, r, PINK if hot else NAVY, min(1, p * 2))
+    if p > 0.6: text_c(fr, str(n), x, y + 3, bebas(int(46 * min(1, p))), NAVY if hot else WHITE, cl((p - 0.6) / 0.3))
+def zone_ring(fr, z, t, t0, op=1.0):
+    (cx, cy), (rx, ry), _ = ZONES[z]; u = t - t0
+    if u <= 0 or op <= 0: return
+    k = 1 + 0.05 * np.sin(u * 6); path_draw(fr, ellipse_pts(cx, cy, rx * k, ry * k), eo(u / 0.6), PINK, 6, op=op)
+    if z == "arms": c2 = zp(0.86, 0.31); path_draw(fr, ellipse_pts(c2[0], c2[1], rx * k, ry * k), eo(u / 0.6), PINK, 6, op=op)
+def zones_layer(fr, t, t0, hot=None, hot_t=0.0, stagger=0.25):
+    """the four numbered badges; hot = the zone being discussed (pulses, ringed)"""
+    for k, z in enumerate(("belly", "breast", "arms", "thighs")):
+        _, _, (bx, by) = ZONES[z]; p = eo((t - t0 - k * stagger) / 0.35); badge(fr, ZNUM[z], bx, by, p, z == hot, t)
+    if hot: zone_ring(fr, hot, t, hot_t)
+def leader_to(fr, x0, y0, z, p):
+    if p <= 0: return
+    (cx, cy), _, _ = ZONES[z]; x1, y1 = lerp(x0, cx, eo(p)), lerp(y0, cy, eo(p)); path_draw(fr, [(x0, y0), (x1, y1)], 1, PINK, 3); dot(fr, x1, y1, 7, PINK)
+def navy_card(fr, cx, cy, hw, hh, s, op=1.0):
+    if s <= 0.02: return
+    blend(fr, rrect(cx - hw * s, cy - hh * s, cx + hw * s, cy + hh * s, 28 * s), 0, 0, NAVY, 0.92 * op)
+    rrect_line(fr, cx - hw * s, cy - hh * s, cx + hw * s, cy + hh * s, 28 * s, PINK, 3, op)
 def low(hd, bottom=HB_): hd.y = bottom - hd.h; return hd
 def label(fr, txt, x, y, p, size=28):
     if p <= 0: return
@@ -550,23 +579,33 @@ def small(lines, hd, gap=22): tr = Track(lines, 30, LX, 0, 300); tr.y = hd.y + h
 
 # A — hook: the whole marking on the tablet; 4 zones; her voice
 HA = low(Drop(["4 ЗОНЫ ДЛЯ КОРРЕКЦИИ.", "*МОЖНО ЛИ СДЕЛАТЬ ВСЁ СРАЗУ?*"], 80, LX, 0, maxw=920))
-def s_a(t): fr = dark(tab(FULLM)); HA.draw(fr, t, 0.05, T_S["B"] - 0.3); return fr
+def s_a(t):
+    fr = dark(tab(FULLM), True); zones_layer(fr, t, 0.9, stagger=0.35)                  # 1-2-3-4 pop onto the zones one by one
+    k = int(cl((t - 0.9) / 1.4) * 4 - 1e-6) if t > 0.9 else -1
+    if 0 <= k and t < 2.6: zone_ring(fr, ("belly", "breast", "arms", "thighs")[k], t, 0.9 + k * 0.35, 0.8)
+    HA.draw(fr, t, 0.05, T_S["B"] - 0.3); return fr
 # B — the story: the clean photo, then the surgeon at her desk
 HB = low(Drop(["ВЕС УШЁЛ,", "*А ИЗБЫТОК КОЖИ ОСТАЛСЯ*"], 88, LX, 0, maxw=920))
 def s_b(t):
     tsw = Rs("B", 4.86)
-    fr = tab(CLEAN) if t < tsw else flash(surgeon(t, "B", lerp(1.08, 1.0, eo((t - tsw) / 3.0))), t - tsw)
-    fr = dark(fr); HB.draw(fr, t, T_S["B"] + 0.05); return fr
+    fr = dark(tab(CLEAN), True) if t < tsw else dark(flash(surgeon(t, "B", lerp(1.08, 1.0, eo((t - tsw) / 3.0))), t - tsw))
+    tw = Rs("B", 4.26)                                                     # «сбросила вес»: a card with the weight arrow going down
+    if t > tw and t < tsw + 0.3:
+        s_ = 0.8 * eback((t - tw) / 0.35) * (1 - eio((t - tsw) / 0.3)); navy_card(fr, 860, 430, 110, 95, s_)
+        if s_ > 0.6: text_c(fr, "ВЕС", 860, 392, bebas(44), WHITE); arrow(fr, (860, 420), (860, 500), eo((t - tw - 0.15) / 0.45), PINK, 9)
+    if t > Rs("B", 8.80): zone_ring(fr, "belly", t, Rs("B", 8.80), 0.9) if t < tsw else None
+    HB.draw(fr, t, T_S["B"] + 0.05); return fr
 # C — first stage: the belly and waist marking plays
 HC = low(Drop(["*ПЕРВЫЙ ЭТАП*"], 96, LX, 0, maxw=920))
 TC = None
 C_P = [("абдоминопластика", 34.32), ("коррекция талии", 38.46), ("возможная липосакция 360", 39.2)]
 def s_c(t):
     global TC
-    fr = dark(tab_play(t, T_S["C"], vend("C"), 57.0, 76.0)); HC.draw(fr, t, T_S["C"] + 0.05)
+    fr = dark(tab_play(t, T_S["C"], vend("C"), 57.0, 76.0), True); zones_layer(fr, t, T_S["C"] - 5, "belly", Rs("C", 34.32)); HC.draw(fr, t, T_S["C"] + 0.05)
     for k, (lab, w0) in enumerate(C_P):
         u = t - Rs("C", w0)
-        if u > 0: label(fr, lab, LX, 790 + k * 60, eo(u / 0.3), 24)     # left column, on the wall beside her waist
+        if u > 0: label(fr, lab, LX, 790 + k * 60, eo(u / 0.3), 24)
+        if 0 < u < 1.6: leader_to(fr, LX + 30, 790 + k * 60 + 22, "belly", (u - 0.25) / 0.5)     # left column, on the wall beside her waist
     TC = TC or small(["(ушивание диастаза — если он есть)"], HC); TC.draw(fr, t, Rs("C", 35.74)); return fr
 # D — the breasts: the marking on the bra plays
 HD = low(Drop(["ГРУДЬ МОЖНО ПОДТЯНУТЬ", "БЕЗ УВЕЛИЧЕНИЯ *ИЛИ ДОБАВИТЬ ОБЪЁМ*"], 70, LX, 0, maxw=920), HB_ - 40)
@@ -574,10 +613,14 @@ TD = None
 D_P = [("Т-подтяжка груди", 64.96), ("импланты", 71.86), ("или липофилинг", 73.80)]
 def s_d(t):
     global TD
-    fr = dark(tab_play(t, T_S["D"], vend("D"), 75.0, 93.0)); HD.draw(fr, t, T_S["D"] + 0.05)
+    fr = dark(tab_play(t, T_S["D"], vend("D"), 75.0, 93.0), True); zones_layer(fr, t, T_S["D"] - 5, "breast", T_S["D"] + 0.3); HD.draw(fr, t, T_S["D"] + 0.05)
     for k, (lab, w0) in enumerate(D_P):
         u = t - Rs("D", w0)
-        if u > 0: label(fr, lab, LX, 790 + k * 60, eo(u / 0.3), 24)     # left column, on the wall beside her waist
+        if u > 0: label(fr, lab, LX, 790 + k * 60, eo(u / 0.3), 24)
+        if 0 < u < 1.6: leader_to(fr, LX + 30, 790 + k * 60 - 22, "breast", (u - 0.25) / 0.5)
+    for j, w0 in enumerate((67.58, 68.72)):                                 # «с увеличением» / «без увеличения»: + and − pop by the breasts
+        u = t - Rs("D", w0)
+        if 0 < u < 2.2: text_c(fr, "+" if j == 0 else "−", 930, 700 + j * 120, bebas(int(110 * eback(u / 0.3))), PINK, 1 - cl((u - 1.8) / 0.4))     # left column, on the wall beside her waist
     TD = TD or small(["вариант зависит от пожеланий пациентки и осмотра"], HD, 16); TD.draw(fr, t, T_S["D"] + 0.8); return fr
 # E — arms (green) and thighs (red)
 HE = low(Drop(["*РУКИ И БЁДРА*"], 96, LX, 0, maxw=920))
@@ -587,10 +630,11 @@ def s_e(t):
     global TE
     tm = Rs("E", 80.5)
     fr = tab_play(t, T_S["E"], tm, 100.0, 129.0) if t < tm else tab_play(t, tm, vend("E"), 135.0, 148.0)
-    fr = dark(fr); HE.draw(fr, t, T_S["E"] + 0.05)
+    fr = dark(fr, True); zones_layer(fr, t, T_S["E"] - 5, "arms" if t < tm else "thighs", T_S["E"] + 0.3 if t < tm else tm); HE.draw(fr, t, T_S["E"] + 0.05)
     for k, (lab, w0) in enumerate(E_P):
         u = t - Rs("E", w0)
-        if u > 0: label(fr, lab, LX, 790 + k * 60, eo(u / 0.3), 24)     # left column, on the wall beside her waist
+        if u > 0: label(fr, lab, LX, 790 + k * 60, eo(u / 0.3), 24)
+        if 0 < u < 1.6: leader_to(fr, LX + 30, 790 + k * 60 + (-22 if k == 0 else 22), ("arms", "thighs")[k], (u - 0.25) / 0.5)     # left column, on the wall beside her waist
     TE = TE or small(["возможная подтяжка кожи после снижения веса"], HE); TE.draw(fr, t, T_S["E"] + 0.6); return fr
 # F — the main point: the surgeon, then the whole marking
 HF = low(Drop(["А ПОЧЕМУ НЕ ВСЁ", "*ЗА ОДИН РАЗ?*"], 92, LX, 0, maxw=920))
@@ -598,15 +642,23 @@ TF = None
 def s_f(t):
     global TF
     tsw = Rs("F", 89.86)
-    fr = surgeon(t, "F", lerp(1.0, 1.08, eo((t - T_S["F"]) / 3.5))) if t < tsw else flash(tab(FULLM), t - tsw)
-    fr = dark(fr); HF.draw(fr, t, T_S["F"] + 0.05)
-    if t > Rs("F", 89.04): label(fr, "2 этапа", LX, 790, eo((t - Rs("F", 89.04)) / 0.3), 30)
+    fr = dark(surgeon(t, "F", lerp(1.0, 1.08, eo((t - T_S["F"]) / 3.5)))) if t < tsw else dark(flash(tab(FULLM), t - tsw), True)
+    if t >= tsw: zones_layer(fr, t, tsw, None)
+    HF.draw(fr, t, T_S["F"] + 0.05)
+    tk = Rs("F", 89.04)                                                    # «на два этапа»: two cards split apart
+    if t > tk:
+        u = t - tk; d_ = 150 * eo((u - 0.25) / 0.45)
+        for j in (0, 1):
+            s_ = 0.8 * eback(u / 0.35); x = 540 + (-1 if j == 0 else 1) * d_; navy_card(fr, x, 470, 95, 70, s_)
+            if s_ > 0.6: text_c(fr, f"ЭТАП {j + 1}", x, 478, bebas(46), PINK if j == 0 else WHITE)
     TF = TF or small(["объём операции и восстановление", "должны быть безопасными для пациентки"], HF, 12); TF.draw(fr, t, tsw); return fr
 # G — the question to the viewer
 HG = low(Drop(["А ВАШИ ЗАПРОСЫ", "МОЖНО ОБЪЕДИНИТЬ", "*В ОДНУ ОПЕРАЦИЮ?*"], 84, LX, 0, maxw=920), 1300)
 TG = Track(["узнайте на консультации"], 34, LX, 0, 400)
 def s_g(t):
-    fr = dark(tab(FULLM)); shade(fr, np.float32(0.35), BLK); HG.draw(fr, t, T_G + 0.1)
+    fr = dark(tab(FULLM), True); shade(fr, np.float32(0.25) * PMASK, BLK)
+    zones_layer(fr, t, T_G - 5, ("belly", "breast", "arms", "thighs")[int(((t - T_G) / 0.7) % 4)], T_G + 0.7 * int((t - T_G) / 0.7))
+    HG.draw(fr, t, T_G + 0.1)
     TG.y = HG.y + HG.h + 26 + TG.top; TG.draw(fr, t, T_G + 0.8)
     if t > DUR - 1.0: fr = fr * (1 - eio((t - DUR + 1.0) / 1.0))
     return fr
