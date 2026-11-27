@@ -484,7 +484,7 @@ T_Z = vend("G") + 1.2; DUR = T_Z + 2.8
 
 V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ("IMG_1240", "IMG_1239", "IMG_1233", "IMG_1238", "IMG_1252", "IMG_1302")}
 def photo(n): return cv2.imread(os.path.join(WORK, f"{n}.jpg"))[..., ::-1].copy()
-COLS = {"front": photo("IMG_1465"), "34": photo("IMG_1466"), "side": photo("IMG_1467")}     # the client's ПОСЛЕ (top) / ДО (bottom) collages
+COLS = {a: cv2.imread(os.path.join(WORK, f"col_{a}.png"))[..., ::-1].copy() for a in ("front", "34", "side")}   # ПОСЛЕ IMG_1459-1461 (top) / ДО IMG_1453-1455, aligned (tools/collage_after_before.py)
 PO34, POF = photo("IMG_1458"), photo("IMG_1459")
 TABLE_Y = {"IMG_1252": 1000}                                                 # only the OR wide shot (the client's call: no blur on the first OR shot)                               # the patient on the table: everything below this row of the frame is blurred
 def table_blur(f, y0):
