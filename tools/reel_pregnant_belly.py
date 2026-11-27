@@ -486,13 +486,22 @@ V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ("IMG_1240", "IMG_1239", "I
 def photo(n): return cv2.imread(os.path.join(WORK, f"{n}.jpg"))[..., ::-1].copy()
 COLS = {"front": photo("IMG_1465"), "34": photo("IMG_1466"), "side": photo("IMG_1467")}     # the client's ПОСЛЕ (top) / ДО (bottom) collages
 PO34, POF = photo("IMG_1458"), photo("IMG_1459")
-TABLE_Y = {"IMG_1233": 980, "IMG_1252": 1000}                               # the patient on the table: everything below this row of the frame is blurred
+TABLE_Y = {"IMG_1252": 1000}                                                 # only the OR wide shot (the client's call: no blur on the first OR shot)                               # the patient on the table: everything below this row of the frame is blurred
 def table_blur(f, y0):
     """a strong, soft blur over the patient's body on the operating table (the surgeon above it stays sharp)"""
     h, w = f.shape[:2]; y0 = int(y0 * h / 1920); reg = f[max(0, y0 - 80):].astype(np.float32)
     bl = cv2.resize(cv2.GaussianBlur(cv2.resize(reg, (max(1, w // 24), max(1, reg.shape[0] // 24))), (0, 0), 2), (w, reg.shape[0]))
     m = np.clip((np.arange(reg.shape[0]) - 0) / 80.0, 0, 1)[:, None, None]; out = f.copy(); out[max(0, y0 - 80):] = (reg * (1 - m) + bl * m).astype(np.uint8); return out
+def skin_blur(f, box=(0, 880, 760, 1480)):
+    """blur only the patient's exposed skin on the table (the drape, the room and the team stay sharp)"""
+    x0, y0, x1, y1 = box; reg = f[y0:y1, x0:x1]; hsv = cv2.cvtColor(reg, cv2.COLOR_RGB2HSV)
+    m = ((hsv[..., 0] < 25) | (hsv[..., 0] > 165)) & (hsv[..., 1] > 35) & (hsv[..., 2] > 80)
+    m = cv2.morphologyEx(m.astype(np.uint8), cv2.MORPH_OPEN, np.ones((9, 9), np.uint8)); m = cv2.dilate(m, np.ones((25, 25), np.uint8))
+    a = np.clip(cv2.GaussianBlur(m.astype(np.float32), (0, 0), 12) * 1.6, 0, 1)[..., None]
+    bl = cv2.resize(cv2.GaussianBlur(cv2.resize(reg, (max(1, (x1 - x0) // 20), max(1, (y1 - y0) // 20))), (0, 0), 1.5), (x1 - x0, y1 - y0)).astype(np.float32)
+    out = f.copy(); out[y0:y1, x0:x1] = (reg * (1 - a) + bl * a).astype(np.uint8); return out
 def raw(k, st):
+    if k == "IMG_1252": return skin_blur(V[k].at(st))
     f = V[k].at(st); return table_blur(f, TABLE_Y[k]) if k in TABLE_Y else f
 def clip(k, st, z=1.0, fx=0.5, fy=0.5): return full(raw(k, st), fx, fy, z)
 def body(k, st, z=1.15, fy=0.62): return clip(k, st, z, 0.5, fy)                # her body from the neck down (no face)
@@ -668,9 +677,9 @@ def s_f(t):
 # G — two quick comparisons, then the result full; «если вы узнали себя»
 HG = low(Drop(["ЕСЛИ ВЫ УЗНАЛИ СЕБЯ", "*В ЭТОЙ ИСТОРИИ...*"], 92, LX, 0, maxw=920))
 def s_g(t):
-    u = t - T_S["G"]; d = (T_Z - T_S["G"]) / 3; k = min(2, int(u / d)); n = ("front", "side", "34")[k]      # all three ПОСЛЕ/ДО collages
+    u = t - T_S["G"]; d = (T_Z - T_S["G"]) / 2; k = min(1, int(u / d)); n = ("34", "side")[k]      # the 3/4 and side ПОСЛЕ/ДО collages
     fr = full(COLS[n], 0.5, 0.5, lerp(1.04, 1.0, eo((u - k * d) / d)))
-    if k: v = u - k * d; fr = full(COLS[("front", "side", "34")[k - 1]], 0.5, 0.5, 1.0) * (1 - eio(v / 0.2)) + fr * eio(v / 0.2) if v < 0.2 else fr
+    if k: v = u - k * d; fr = full(COLS[("34", "side")[k - 1]], 0.5, 0.5, 1.0) * (1 - eio(v / 0.2)) + fr * eio(v / 0.2) if v < 0.2 else fr
     chip(fr, "ПОСЛЕ", LX, 262); chip(fr, "ДО", LX, 1000)
     fr = np.asarray(fr, np.float32); shade(fr, GBOT, BLK); HG.draw(fr, t, T_S["G"] + 0.3); return fr
 # Z — the end card
