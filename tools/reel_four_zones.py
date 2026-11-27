@@ -549,16 +549,20 @@ def badge(fr, n, x, y, p, hot=False, t=0.0):
     r = 34 * eback(p) * (1 + (0.08 * np.sin(t * 8) if hot else 0)); dot(fr, x, y, r + 4, WHITE if hot else NAVY, min(1, p * 2)); dot(fr, x, y, r, PINK if hot else NAVY, min(1, p * 2))
     if p > 0.6: text_c(fr, str(n), x, y + 3, bebas(int(46 * min(1, p))), NAVY if hot else WHITE, cl((p - 0.6) / 0.3))
 def zone_ring(fr, z, t, t0, op=1.0):
+    if not ANIM: return
     (cx, cy), (rx, ry), _ = ZONES[z]; u = t - t0
     if u <= 0 or op <= 0: return
     k = 1 + 0.05 * np.sin(u * 6); path_draw(fr, ellipse_pts(cx, cy, rx * k, ry * k), eo(u / 0.6), PINK, 6, op=op)
     if z == "arms": c2 = zp(0.86, 0.31); path_draw(fr, ellipse_pts(c2[0], c2[1], rx * k, ry * k), eo(u / 0.6), PINK, 6, op=op)
+ANIM = False                                                               # the ADHD layer switched off (the client's call)
 def zones_layer(fr, t, t0, hot=None, hot_t=0.0, stagger=0.25):
+    if not ANIM: return
     """the four numbered badges; hot = the zone being discussed (pulses, ringed)"""
     for k, z in enumerate(("belly", "breast", "arms", "thighs")):
         _, _, (bx, by) = ZONES[z]; p = eo((t - t0 - k * stagger) / 0.35); badge(fr, ZNUM[z], bx, by, p, z == hot, t)
     if hot: zone_ring(fr, hot, t, hot_t)
 def leader_to(fr, x0, y0, z, p):
+    if not ANIM: return
     if p <= 0: return
     (cx, cy), _, _ = ZONES[z]; x1, y1 = lerp(x0, cx, eo(p)), lerp(y0, cy, eo(p)); path_draw(fr, [(x0, y0), (x1, y1)], 1, PINK, 3); dot(fr, x1, y1, 7, PINK)
 def navy_card(fr, cx, cy, hw, hh, s, op=1.0):
@@ -590,7 +594,7 @@ def s_b(t):
     tsw = Rs("B", 4.86)
     fr = dark(tab(CLEAN), True) if t < tsw else dark(flash(surgeon(t, "B", lerp(1.08, 1.0, eo((t - tsw) / 3.0))), t - tsw))
     tw = Rs("B", 4.26)                                                     # «сбросила вес»: a card with the weight arrow going down
-    if t > tw and t < tsw + 0.3:
+    if ANIM and t > tw and t < tsw + 0.3:
         s_ = 0.8 * eback((t - tw) / 0.35) * (1 - eio((t - tsw) / 0.3)); navy_card(fr, 860, 430, 110, 95, s_)
         if s_ > 0.6: text_c(fr, "ВЕС", 860, 392, bebas(44), WHITE); arrow(fr, (860, 420), (860, 500), eo((t - tw - 0.15) / 0.45), PINK, 9)
     if t > Rs("B", 8.80): zone_ring(fr, "belly", t, Rs("B", 8.80), 0.9) if t < tsw else None
@@ -620,7 +624,7 @@ def s_d(t):
         if 0 < u < 1.6: leader_to(fr, LX + 30, 790 + k * 60 - 22, "breast", (u - 0.25) / 0.5)
     for j, w0 in enumerate((67.58, 68.72)):                                 # «с увеличением» / «без увеличения»: + and − pop by the breasts
         u = t - Rs("D", w0)
-        if 0 < u < 2.2: text_c(fr, "+" if j == 0 else "−", 930, 700 + j * 120, bebas(int(110 * eback(u / 0.3))), PINK, 1 - cl((u - 1.8) / 0.4))     # left column, on the wall beside her waist
+        if ANIM and 0 < u < 2.2: text_c(fr, "+" if j == 0 else "−", 930, 700 + j * 120, bebas(int(110 * eback(u / 0.3))), PINK, 1 - cl((u - 1.8) / 0.4))     # left column, on the wall beside her waist
     TD = TD or small(["вариант зависит от пожеланий пациентки и осмотра"], HD, 16); TD.draw(fr, t, T_S["D"] + 0.8); return fr
 # E — arms (green) and thighs (red)
 HE = low(Drop(["*РУКИ И БЁДРА*"], 96, LX, 0, maxw=920))
@@ -646,7 +650,8 @@ def s_f(t):
     if t >= tsw: zones_layer(fr, t, tsw, None)
     HF.draw(fr, t, T_S["F"] + 0.05)
     tk = Rs("F", 89.04)                                                    # «на два этапа»: two cards split apart
-    if t > tk:
+    if t > tk and not ANIM: label(fr, "2 этапа", LX, 790, eo((t - tk) / 0.3), 30)
+    if t > tk and ANIM:
         u = t - tk; d_ = 150 * eo((u - 0.25) / 0.45)
         for j in (0, 1):
             s_ = 0.8 * eback(u / 0.35); x = 540 + (-1 if j == 0 else 1) * d_; navy_card(fr, x, 470, 95, 70, s_)
