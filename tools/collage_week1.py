@@ -15,12 +15,20 @@ SRC, OUT = sys.argv[1:3]
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BEBAS = os.path.join(ROOT, "skills/montage-svg-typography/Шрифты/Коллекция шрифтов/BebasNeueCyrillic.ttf")
 W, H, HALF = 1080, 1920, 960
-ABOVE, BELOW = 560, 1720          # source px kept above / below the nipple line: from under the chin to the knees
-S = 900 / (ABOVE + BELOW)
-# nipple line y and body centre x, source pixels (images are 2576 px tall)
-ANCH = {"b_front": (657, 566), "a_front": (631, 690),
-        "b_34": (670, 550), "a_34": (631, 690),
-        "b_side": (631, 532), "a_side": (580, 711)}
+# Alignment rule: ДО and ПОСЛЕ are matched by the SHOULDERS, and every body is rotated upright.
+#  front (and the scale of 3/4): shoulder points (outer top corners, source px) -> the shoulder line is made level,
+#               its midpoint goes to the same spot and both shoulder widths are scaled to the same size;
+#  side:        shoulder joint point + a lower point on the leg axis (knee) -> the body axis is made vertical,
+#               scale taken from the front pair of the same session.
+ABOVE, BELOW = 200, 2100          # ДО source px kept above / below the shoulder line: under the chin to the knees
+S0 = 900 / (ABOVE + BELOW)        # scale of the ДО photos
+SH = {"b_front": ((115, 300), (1005, 300)), "a_front": ((290, 340), (1080, 335)),
+      "b_34": ((130, 320), (870, 420)), "a_34": ((370, 320), (1030, 375))}
+SIDE = {"b_side": ((480, 300), (470, 2400)), "a_side": ((700, 320), (660, 2300))}
+# 3/4: the shoulder line is foreshortened by the turn, so levelling it tilts the legs; instead the body
+# axis (jugular notch -> between the knees) is made vertical, and the shoulder width still sets the scale
+AXIS = {"b_34": ((610, 330), (620, 2450)), "a_34": ((620, 330), (746, 2060))}
+SIDE_SCALE = {"b_side": 1.0, "a_side": 890 / 790}   # same camera session as the front pair
 SESSION = new_session("u2net_human_seg")   # keeps the whole silhouette in profile (plain u2net lost legs and back)
 
 
@@ -34,8 +42,17 @@ def half(name):
     bgk = np.clip((60 - hsv[..., 2]) / 20, 0, 1) * np.clip((70 - hsv[..., 1]) / 30, 0, 1)
     m = m * (1 - cv2.GaussianBlur(bgk, (0, 0), 2)[..., None])
     img = img * m                                                   # background -> black
-    ny, cx = ANCH[name]; top = ny - ABOVE
-    M = np.float32([[S, 0, 540 - S * cx], [0, S, 30 - S * top]])
+    if name in SH:
+        (x1, y1), (x2, y2) = SH[name]; ang = np.degrees(np.arctan2(y2 - y1, x2 - x1))
+        if name in AXIS:
+            (nx, ny), (kx, ky) = AXIS[name]; ang = -np.degrees(np.arctan2(kx - nx, ky - ny))
+        width = np.hypot(x2 - x1, y2 - y1); ref = SH[name.replace("a_", "b_")]
+        k = S0 * np.hypot(ref[1][0] - ref[0][0], ref[1][1] - ref[0][1]) / width
+        ax, ay = (x1 + x2) / 2, (y1 + y2) / 2
+    else:
+        (ax, ay), (lx, ly) = SIDE[name]; ang = -np.degrees(np.arctan2(lx - ax, ly - ay)); k = S0 * SIDE_SCALE[name]
+    M = cv2.getRotationMatrix2D((float(ax), float(ay)), float(ang), float(k))
+    M[0, 2] += 540 - ax; M[1, 2] += 30 + S0 * ABOVE - ay      # anchor -> fixed spot on the shoulder line
     out = cv2.warpAffine(img, M, (W, HALF), flags=cv2.INTER_AREA, borderValue=(0, 0, 0))
     y = np.arange(HALF, dtype=np.float32)[:, None, None]
     fade = np.clip((y - 30) / 22 + 0.5, 0, 1) * np.clip((930 - y) / 22 + 0.5, 0, 1)   # soft cut under the chin and at the knees
