@@ -452,7 +452,7 @@ def click():
 VO = [("A", [(26.32, 32.10)]),                                  # здесь, конечно же, необходимо делать комплексную операцию, возможно, надо её делать в несколько этапов
       ("B", [(1.20, 7.14), (8.80, 9.96)]),                      # сегодня разбираем замечательную пациентку, которая сбросила вес. и, естественно, у неё появились избытки кожи
       ("C", [(32.26, 39.50)]),                                  # и я бы первым этапом, наверное, сделала живот. здесь можно ушить диастаз, перенести пупок, сделать хорошую талию
-      ("D", [(62.28, 63.72), (63.98, 74.62)]),  # можно сделать подтяжку т-образную в области груди и с увеличением, либо без увеличения. увеличение можно сделать при помощи имплантов, либо липофилинга
+      ("D", [(62.28, 63.70), (64.54, 70.14), (70.74, 73.22), (73.62, 74.62)]),  # «э» before «Т-образную», «а» after «можно», «э» after «либо» cut out;  # можно сделать подтяжку т-образную в области груди и с увеличением, либо без увеличения. увеличение можно сделать при помощи имплантов, либо липофилинга
       ("E", [(75.16, 79.62), (82.14, 85.44)]),                  # также необходимость, возможно, возникнет брахиопластики. и в области бёдер горизонтальную феморопластику
       ("F", [(86.30, 93.32)])]                                  # весь этот комплекс можно, в принципе, поделить на два этапа. это будет абсолютно безопасно и даст очень хороший выраженный эффект
 GAP = {"B": 0.45, "C": 0.4, "D": 0.4, "E": 0.4, "F": 0.45}
@@ -485,6 +485,7 @@ _BM = cv2.imread(os.path.join(WORK, "SR_bodymask2.png"), 0).astype(np.float32) /
 NECK = 132                                                                   # the photo row just under her chin: nothing above it is shown (no head)
 _BM[:NECK] = 0; _BM[NECK:NECK + 6] *= np.linspace(0, 1, 6)[:, None]
 _CLEAN = cv2.imread(os.path.join(WORK, "SR_clean_crop.png")).astype(np.float32)
+BCX = 0.541                                                                  # the body's centre line in the photo (torso and legs, measured on the matte): she stands right of the photo centre
 CUT_BG = False                                                             # the background kept (the client's call)
 def cutout(P):
     if not CUT_BG: return P[NECK:]                                          # the background kept; the photo starts at her neck (no head)
@@ -499,7 +500,7 @@ def cutout(P):
 BS = H / (VIEW[3] - VIEW[1] - NECK); BTOP = 0   # neck at the top edge, the legs to the bottom, full screen
 def tab(st):
     f = V["SR"].at(st); P = cutout(f[VIEW[1]:VIEW[3], VIEW[0]:VIEW[2]]); s_ = BS
-    M = np.float32([[s_, 0, W / 2 - P.shape[1] * s_ / 2], [0, s_, BTOP]])
+    M = np.float32([[s_, 0, W / 2 - BCX * P.shape[1] * s_], [0, s_, BTOP]])       # the body's own centre line on the frame's centre
     bg = np.zeros((H, W, 3), np.float32)                                                   # plain black backdrop (the client's call)
     fg = cv2.warpAffine(P, M, (W, H), flags=cv2.INTER_CUBIC).astype(np.float32) / 255; m = cv2.warpAffine(np.ones(P.shape[:2], np.float32), M, (W, H))[..., None]
     return fg * m + bg * (1 - m)
@@ -601,7 +602,7 @@ def small(lines, hd, gap=22): tr = Track(lines, 30, LX, 0, 300); tr.y = hd.y + h
 
 # ---- shots: the tablet full screen, the surgeon full screen, or the split (the patient on the tablet on top, the surgeon talking below)
 def tab_raw(st): f = V["SR"].at(st); return cutout(f[VIEW[1]:VIEW[3], VIEW[0]:VIEW[2]])
-FOCUS = {"all": (0.5, 0.45, 1.0), "belly": (0.54, 0.6, 1.25), "breast": (0.55, 0.4, 1.25), "arms": (0.5, 0.36, 1.0), "thighs": (0.53, 0.78, 1.2)}
+FOCUS = {"all": (BCX, 0.45, 1.0), "belly": (BCX, 0.6, 1.25), "breast": (BCX, 0.4, 1.25), "arms": (BCX, 0.36, 1.0), "thighs": (BCX, 0.78, 1.2)}
 YDIV = 960
 GSPL = np.repeat((np.clip((yy[:, :1] - 600) / 350, 0, 1) ** 1.3 * 0.6 * (yy[:, :1] < YDIV))[..., None], W, 1).astype(np.float32)
 def split(t, b, st, zone="all"):
