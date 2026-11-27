@@ -481,9 +481,21 @@ T_G = vend("F") + 0.35; DUR = T_G + 4.2
 V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ("IMG_3155", "SR")}
 VIEW = (374, 64, 906, 822)                                                   # the photo inside the tablet recording, without the app's bars
 PZ = 1.0; PS = W / (VIEW[2] - VIEW[0]); PTOP = int((H - (VIEW[3] - VIEW[1]) * PS) / 2)      # the photo full width, centred on white                                                         # the whole photo, centred, a blurred copy of itself around it
+_BM = cv2.imread(os.path.join(WORK, "SR_bodymask.png"), 0).astype(np.float32); _BM = np.clip((_BM - 40) / 170, 0, 1)
+_CLEAN = cv2.imread(os.path.join(WORK, "SR_clean_crop.png")).astype(np.float32)
+def cutout(P):
+    """the patient without her background (white), the surgeon's strokes kept even where they leave the body"""
+    d = np.abs(P.astype(np.float32) - _CLEAN).max(2); sat = cv2.cvtColor(P, cv2.COLOR_BGR2HSV)[..., 1]
+    raw = ((d > 45) & (sat > 90)).astype(np.uint8); n_, lab, stt, _ = cv2.connectedComponentsWithStats(raw, 8)
+    keep = np.zeros_like(raw)
+    for k in range(1, n_):
+        if stt[k, 4] >= 25: keep[lab == k] = 1                              # real strokes only, not compression specks
+    st = cv2.dilate(keep, np.ones((3, 3), np.uint8)).astype(np.float32)
+    a = np.maximum(_BM, cv2.GaussianBlur(st, (0, 0), 0.8))[..., None]; return (P.astype(np.float32) * a + 255 * (1 - a)).astype(np.uint8)
+BS, BTOP = 2.3, 60                                                           # the cutout body nearly full screen (arm tips just off the sides)
 def tab(st):
-    f = V["SR"].at(st); P = f[VIEW[1]:VIEW[3], VIEW[0]:VIEW[2]]; s_ = W / P.shape[1] * PZ
-    M = np.float32([[s_, 0, W / 2 - P.shape[1] * s_ / 2], [0, s_, PTOP]])
+    f = V["SR"].at(st); P = cutout(f[VIEW[1]:VIEW[3], VIEW[0]:VIEW[2]]); s_ = BS
+    M = np.float32([[s_, 0, W / 2 - P.shape[1] * s_ / 2], [0, s_, BTOP]])
     bg = np.ones((H, W, 3), np.float32)                                                    # plain white page around the photo (the client's call)
     fg = cv2.warpAffine(P, M, (W, H), flags=cv2.INTER_CUBIC).astype(np.float32) / 255; m = cv2.warpAffine(np.ones(P.shape[:2], np.float32), M, (W, H))[..., None]
     return fg * m + bg * (1 - m)
@@ -538,7 +550,9 @@ GBOT = np.repeat((np.clip((yy[:, :1] - 950) / 560, 0, 1) ** 1.2 * 0.7)[..., None
 PMASK = np.zeros((H, 1, 1), np.float32); PMASK[PTOP:PTOP + int((VIEW[3] - VIEW[1]) * PS)] = 1
 def dark(fr, page=False):
     """the soft black gradients for the text; on the tablet shots only over the photo, the white page stays white"""
-    fr = np.asarray(fr, np.float32).copy(); m = PMASK if page else 1.0; shade(fr, GTOP * m, BLK); shade(fr, GBOT * m, BLK); return fr
+    fr = np.asarray(fr, np.float32).copy()
+    if not page: shade(fr, GTOP, BLK)                                       # on the white page only the bottom gradient (for the white text)
+    shade(fr, GBOT, BLK); return fr
 # ---- ADHD layer: the four zones numbered on the photo, the one she talks about pulses, leaders from the pills
 def zp(fx, fy): return (fx * W, PTOP + fy * (VIEW[3] - VIEW[1]) * PS)
 ZONES = {"belly": (zp(0.54, 0.58), (230, 150), (700, 1000)), "breast": (zp(0.55, 0.41), (210, 70), (790, 770)),
@@ -582,7 +596,7 @@ def flash(fr, lt, d=0.12):
 def small(lines, hd, gap=22): tr = Track(lines, 30, LX, 0, 300); tr.y = hd.y + hd.h + gap + tr.top; return tr
 
 # ---- shots: the tablet full screen, the surgeon full screen, or the split (the patient on the tablet on top, the surgeon talking below)
-def tab_raw(st): f = V["SR"].at(st); return f[VIEW[1]:VIEW[3], VIEW[0]:VIEW[2]]
+def tab_raw(st): f = V["SR"].at(st); return cutout(f[VIEW[1]:VIEW[3], VIEW[0]:VIEW[2]])
 FOCUS = {"all": (0.5, 0.36, 1.0), "belly": (0.54, 0.6, 1.25), "breast": (0.55, 0.4, 1.25), "arms": (0.5, 0.3, 1.0), "thighs": (0.53, 0.78, 1.2)}
 YDIV = 960
 GSPL = np.repeat((np.clip((yy[:, :1] - 600) / 350, 0, 1) ** 1.3 * 0.6 * (yy[:, :1] < YDIV))[..., None], W, 1).astype(np.float32)
@@ -615,7 +629,7 @@ t_now = [0.0]
 # A — hook: the whole marking on the tablet, then the split with her talking
 HA = Drop(["4 ЗОНЫ ДЛЯ КОРРЕКЦИИ.", "*МОЖНО ЛИ СДЕЛАТЬ ВСЁ СРАЗУ?*"], 80, LX, 0, maxw=920)
 def s_a(t):
-    fr, kind = shot(t, "A", [(0, "tab", FULLM), (Rs("A", 28.16), "split", (FULLM, "all"))]); head(HA, fr, t, 0.05, kind, T_S["B"] - 0.3); return fr
+    fr, kind = shot(t, "A", [(0, "surg", None), (Rs("A", 28.70), "tab", FULLM), (Rs("A", 30.34), "split", (FULLM, "all"))]); head(HA, fr, t, 0.05, kind, T_S["B"] - 0.3); return fr   # opens on the surgeon (the client's call)
 # B — the story: the clean photo, the surgeon, the split
 HB = Drop(["ВЕС УШЁЛ,", "*А ИЗБЫТОК КОЖИ ОСТАЛСЯ*"], 88, LX, 0, maxw=920)
 def s_b(t):
@@ -653,7 +667,7 @@ def s_f(t):
 HG = low(Drop(["А ВАШИ ЗАПРОСЫ", "МОЖНО ОБЪЕДИНИТЬ", "*В ОДНУ ОПЕРАЦИЮ?*"], 84, LX, 0, maxw=920), 1300)
 TG = Track(["узнайте на консультации"], 34, LX, 0, 400)
 def s_g(t):
-    fr = dark(tab(FULLM), True); shade(fr, np.float32(0.25) * PMASK, BLK); HG.draw(fr, t, T_G + 0.1)
+    fr = dark(tab(FULLM), True);  HG.draw(fr, t, T_G + 0.1)
     TG.y = HG.y + HG.h + 26 + TG.top; TG.draw(fr, t, T_G + 0.8)
     if t > DUR - 1.0: fr = fr * (1 - eio((t - DUR + 1.0) / 1.0))
     return fr
