@@ -584,6 +584,10 @@ def counter_card(fr, t, t0, cx, cy, top_txt, vals, step=0.22, col=PINK, t1=1e9):
     if s_ > 0.6:
         k = min(len(vals) - 1, int((t - t0 - 0.1) / step)) if t > t0 + 0.1 else 0
         text_c(fr, vals[k], cx, cy + 18, bebas(110), col); text_c(fr, top_txt, cx, cy - 72, mont(24, 500), WHITE)
+def text_shadow(fr, hd, t, t0):
+    """no darkening of the picture: only a soft shadow right under the headline letters (the collages stay clean)"""
+    m = np.zeros((H, W, 3), np.float32); hd.draw(m, t, t0); a = cv2.GaussianBlur(m[..., 0], (0, 0), 9) * 1.6
+    shade(fr, np.clip(a, 0, 0.75)[..., None], BLK)
 def white_card(img, t, t0, d=1.2, z1=0.78):
     """the photo pulls back from full screen to a card on a white page (a soft shadow under it)"""
     p = eio((t - t0) / d); z = lerp(1.0, z1, p); fr = np.ones((H, W, 3), np.float32)
@@ -653,13 +657,13 @@ HE = low(Drop(["МНЕ ДАЖЕ НЕ ВЕРИТСЯ,", "*ЧТО ЭТО Я*"], 96
 def s_e(t):
     tf = Rs("E", 99.04)
     if t < tf:
-        u = t - T_S["E"]; fr = full(COLS["side"], 0.5, 0.5, lerp(1.05, 1.0, eo(u / 1.5))) if u < 2.2 else white_card(COLS["side"], t, T_S["E"] + 2.2, 1.0, 0.8)
+        u = t - T_S["E"]; fr = full(COLS["side"], 0.5, 0.5, 1.0) if u < 2.2 else white_card(COLS["side"], t, T_S["E"] + 2.2, 1.0, 0.8)
         if u < 2.2: chip(fr, "ПОСЛЕ", LX, 262); chip(fr, "ДО", LX, 1000)
         ts = Rs("E", 96.02)                                                 # «счастью»: sparkles
         for k, (x, y) in enumerate(((870, 300), (210, 420), (880, 760))): sparkle(fr, x, y, 36, t, ts + 0.15 * k)
     else:
-        fr = flash(full(COLS["front"], 0.5, 0.5, lerp(1.04, 1.0, eo((t - tf) / 2.0))), t - tf); chip(fr, "ПОСЛЕ", LX, 262); chip(fr, "ДО", LX, 1000)
-    fr = np.asarray(fr, np.float32); shade(fr, GBOT, BLK); HE.draw(fr, t, Rs("E", 99.68)); return fr
+        fr = flash(full(COLS["front"], 0.5, 0.5, 1.0), t - tf); chip(fr, "ПОСЛЕ", LX, 262); chip(fr, "ДО", LX, 1000)
+    fr = np.asarray(fr, np.float32).copy(); text_shadow(fr, HE, t, Rs("E", 99.68)); HE.draw(fr, t, Rs("E", 99.68)); return fr
 # F — the interview for the first time (blurred face), split with ПОСЛЕ 3/4 on top; hearts on «великолепное»
 YD = 960
 HF = Drop(["САМОЕ ГЛАВНОЕ,", "*МОЁ ЭМОЦИОНАЛЬНОЕ СОСТОЯНИЕ*"], 72, LX, 0, maxw=920)
@@ -676,10 +680,10 @@ def s_f(t):
 HG = low(Drop(["ЕСЛИ ВЫ УЗНАЛИ СЕБЯ", "*В ЭТОЙ ИСТОРИИ...*"], 92, LX, 0, maxw=920))
 def s_g(t):
     u = t - T_S["G"]; d = (T_Z - T_S["G"]) / 2; k = min(1, int(u / d)); n = ("34", "side")[k]      # the 3/4 and side ПОСЛЕ/ДО collages
-    fr = full(COLS[n], 0.5, 0.5, lerp(1.04, 1.0, eo((u - k * d) / d)))
+    fr = full(COLS[n], 0.5, 0.5, 1.0)
     if k: v = u - k * d; fr = full(COLS[("34", "side")[k - 1]], 0.5, 0.5, 1.0) * (1 - eio(v / 0.2)) + fr * eio(v / 0.2) if v < 0.2 else fr
     chip(fr, "ПОСЛЕ", LX, 262); chip(fr, "ДО", LX, 1000)
-    fr = np.asarray(fr, np.float32); shade(fr, GBOT, BLK); HG.draw(fr, t, T_S["G"] + 0.3); return fr
+    fr = np.asarray(fr, np.float32).copy(); text_shadow(fr, HG, t, T_S["G"] + 0.3); HG.draw(fr, t, T_S["G"] + 0.3); return fr
 # Z — the end card
 HZ = Drop(["НА КОНСУЛЬТАЦИИ ОБСУДИМ,", "ЧТО МОЖНО СДЕЛАТЬ", "*В ВАШЕМ СЛУЧАЕ*"], 84, LX, 760, maxw=920, stag=0.02)
 def s_z(t):
