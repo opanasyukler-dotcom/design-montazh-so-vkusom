@@ -480,13 +480,21 @@ def Sr(b, t):
         acc += o - a
     return parts[-1][1] + u - acc
 T_S = {b: vstart(b) - 0.12 for b, *_ in VO}; T_S["A"] = 0.0
-T_Z = vend("G") + 0.9; DUR = T_Z + 2.8
+T_Z = vend("G") + 1.2; DUR = T_Z + 2.8
 
 V = {k: Src(os.path.join(WORK, f"{k}.mp4")) for k in ("IMG_1240", "IMG_1239", "IMG_1233", "IMG_1238", "IMG_1252", "IMG_1302")}
 def photo(n): return cv2.imread(os.path.join(WORK, f"{n}.jpg"))[..., ::-1].copy()
 COLS = {"front": photo("IMG_1465"), "34": photo("IMG_1466"), "side": photo("IMG_1467")}     # the client's ПОСЛЕ (top) / ДО (bottom) collages
 PO34, POF = photo("IMG_1458"), photo("IMG_1459")
-def clip(k, st, z=1.0, fx=0.5, fy=0.5): return full(V[k].at(st), fx, fy, z)
+TABLE_Y = {"IMG_1233": 980, "IMG_1252": 1000}                               # the patient on the table: everything below this row of the frame is blurred
+def table_blur(f, y0):
+    """a strong, soft blur over the patient's body on the operating table (the surgeon above it stays sharp)"""
+    h, w = f.shape[:2]; y0 = int(y0 * h / 1920); reg = f[max(0, y0 - 80):].astype(np.float32)
+    bl = cv2.resize(cv2.GaussianBlur(cv2.resize(reg, (max(1, w // 24), max(1, reg.shape[0] // 24))), (0, 0), 2), (w, reg.shape[0]))
+    m = np.clip((np.arange(reg.shape[0]) - 0) / 80.0, 0, 1)[:, None, None]; out = f.copy(); out[max(0, y0 - 80):] = (reg * (1 - m) + bl * m).astype(np.uint8); return out
+def raw(k, st):
+    f = V[k].at(st); return table_blur(f, TABLE_Y[k]) if k in TABLE_Y else f
+def clip(k, st, z=1.0, fx=0.5, fy=0.5): return full(raw(k, st), fx, fy, z)
 def body(k, st, z=1.15, fy=0.62): return clip(k, st, z, 0.5, fy)                # her body from the neck down (no face)
 def interview(t, b, z=1.0): return full(V["IMG_1302"].at(Sr(b, t)), 0.5, 0.5, z)
 def po_photo(img, z=1.1): return full(img, 0.5, 0.42, z)                          # zoomed so the photo's own watermark at the bottom is off the frame
@@ -579,9 +587,8 @@ def white_card(img, t, t0, d=1.2, z1=0.78):
 HA = low(Drop(["МЕНЯ ПОСТОЯННО ПРИНИМАЛИ", "*ЗА БЕРЕМЕННУЮ*"], 92, LX, 0, maxw=920))
 T_TEASE = 2.35
 def s_a(t):
-    if T_TEASE <= t < T_TEASE + 0.45: fr = dark(flash(full(COLS["front"][:960], 0.5, 0.5, 1.0), t - T_TEASE)); chip(fr, "ПОСЛЕ", LX, 262); return fr
     fr = dark(body("IMG_1240", 2.6 + t, lerp(1.12, 1.18, eo(t / 4.0)), 0.6)); HA.draw(fr, t, 0.05, T_S["B1"] - 0.3)
-    for k, (w0, txt, x, y, tl) in enumerate(((123.82, "«в положении?»", 760, 470, -1), (124.38, "«ты беременная?»", 330, 640, 1), (124.90, "«всё время...»", 720, 820, -1))):
+    for k, (w0, txt, x, y, tl) in enumerate(((123.82, "«в положении?»", 760, 470, -1), (124.38, "«ты беременная?»", 330, 640, 1))):
         u = t - Rs("A", w0)
         if u > 0: bubble(fr, txt, x, y, eo(u / 0.3) * (1 - cl((t - T_S["B1"] + 0.35) / 0.3)), tl)
     return fr
@@ -611,7 +618,7 @@ def s_c(t):
     if t < tb: fr = dark(clip("IMG_1233", Sr("C", t), lerp(1.12, 1.04, eo((t - T_S["C"]) / 2.5)), 0.5, 0.42))
     else:
         fr = dark(flash(body("IMG_1239", 7.4 + (t - tb), 1.22, 0.62), t - tb))
-        pip(fr, V["IMG_1233"].at(Sr("C", t))[..., :], 820, 470, 150, eo((t - tb - 0.1) / 0.35), 0.5, 0.25, 1.4)
+        pip(fr, raw("IMG_1233", Sr("C", t)), 820, 470, 150, eo((t - tb - 0.1) / 0.35), 0.5, 0.25, 1.4)
         for k, (w0, lab) in enumerate(((16.70, "нагнуться"), (17.16, "ходить"), (19.50, "делать"))):
             u = t - Rs("C", w0)
             if u > 0: label(fr, lab, LX, 330 + k * 66, eo(u / 0.3), 28)
@@ -650,12 +657,10 @@ HF = Drop(["САМОЕ ГЛАВНОЕ,", "*МОЁ ЭМОЦИОНАЛЬНОЕ С�
 GSPL = np.repeat((np.clip((yy[:, :1] - 600) / 350, 0, 1) ** 1.3 * 0.6 * (yy[:, :1] < YD))[..., None], W, 1).astype(np.float32)
 GBS = np.repeat((np.clip((yy[:, :1] - 1330) / 300, 0, 1) ** 1.2 * 0.5)[..., None], W, 1).astype(np.float32)
 def s_f(t):
-    tsplit = Rs("F", 10.52)
-    if t < tsplit: fr = dark(interview(t, "F", lerp(1.0, 1.06, eo((t - T_S["F"]) / 2.0)))); HF.y = HB_ - HF.h
-    else:
-        top_, _ = cover(PO34, W, YD, 0.5, 0.42, 1.05); bot, _ = cover(V["IMG_1302"].at(Sr("F", t)), W, H - YD, 0.5, 0.5, 1.0)
-        fr = np.vstack([top_, bot]).astype(np.float32); shade(fr, GSPL, BLK); shade(fr, GBS, BLK); fr[YD - 2:YD + 2] = PINK; fr = flash(fr, t - tsplit)
-        chip(fr, "ПОСЛЕ", LX, 262); HF.y = YD - 30 - HF.h
+    tsw = Rs("F", 13.52)                                                    # «это не передать»: cut to her result in 3/4 (no split — the client's call)
+    if t < tsw: fr = dark(interview(t, "F", lerp(1.0, 1.06, eo((t - T_S["F"]) / 2.0))))
+    else: fr = dark(flash(po_photo(PO34, lerp(1.16, 1.1, eo((t - tsw) / 2.0))), t - tsw)); chip(fr, "ПОСЛЕ", LX, 262)
+    HF.y = HB_ - HF.h
     HF.draw(fr, t, T_S["F"] + 0.05)
     th = Rs("F", 14.54)                                                     # «великолепное»: hearts float up
     if t > th: hearts(fr, t, th, ((860, 820, 0.0), (220, 760, 0.3), (700, 640, 0.6)))
@@ -663,11 +668,11 @@ def s_f(t):
 # G — two quick comparisons, then the result full; «если вы узнали себя»
 HG = low(Drop(["ЕСЛИ ВЫ УЗНАЛИ СЕБЯ", "*В ЭТОЙ ИСТОРИИ...*"], 92, LX, 0, maxw=920))
 def s_g(t):
-    u = t - T_S["G"]
-    if u < 0.7: fr = full(COLS["34"], 0.5, 0.5, 1.0); chip(fr, "ПОСЛЕ", LX, 262); chip(fr, "ДО", LX, 1000)
-    elif u < 1.4: fr = flash(full(COLS["front"], 0.5, 0.5, 1.0), u - 0.7); chip(fr, "ПОСЛЕ", LX, 262); chip(fr, "ДО", LX, 1000)
-    else: fr = flash(po_photo(POF, lerp(1.2, 1.1, eo((u - 1.4) / 2.5))), u - 1.4); chip(fr, "ПОСЛЕ", LX, 262)
-    fr = np.asarray(fr, np.float32); shade(fr, GBOT, BLK); HG.draw(fr, t, T_S["G"] + 1.4); return fr
+    u = t - T_S["G"]; d = (T_Z - T_S["G"]) / 3; k = min(2, int(u / d)); n = ("front", "side", "34")[k]      # all three ПОСЛЕ/ДО collages
+    fr = full(COLS[n], 0.5, 0.5, lerp(1.04, 1.0, eo((u - k * d) / d)))
+    if k: v = u - k * d; fr = full(COLS[("front", "side", "34")[k - 1]], 0.5, 0.5, 1.0) * (1 - eio(v / 0.2)) + fr * eio(v / 0.2) if v < 0.2 else fr
+    chip(fr, "ПОСЛЕ", LX, 262); chip(fr, "ДО", LX, 1000)
+    fr = np.asarray(fr, np.float32); shade(fr, GBOT, BLK); HG.draw(fr, t, T_S["G"] + 0.3); return fr
 # Z — the end card
 HZ = Drop(["НА КОНСУЛЬТАЦИИ ОБСУДИМ,", "ЧТО МОЖНО СДЕЛАТЬ", "*В ВАШЕМ СЛУЧАЕ*"], 84, LX, 760, maxw=920, stag=0.02)
 def s_z(t):
@@ -724,9 +729,8 @@ def build_audio(path):
     def typing(hd, t0, g_=0.3):
         for j in range(sum(len(q) for q, _ in hd.rows)): put(KEYS[j % 8], t0 + j * hd.stag, g_ * 0.8)
     typing(HA, 0.05, 0.4); typing(HB, vstart("B2")); typing(HC, T_S["C"] + 0.05); typing(HD, T_S["D"] + 0.05); typing(HE, Rs("E", 99.68)); typing(HF, T_S["F"] + 0.05)
-    typing(HG, T_S["G"] + 1.4); typing(HZ, T_Z + 0.2, 0.3)
-    put(swoosh(0.4), T_TEASE - 0.05, 0.14); put(glass(1568.0), T_TEASE + 0.05, 0.06)
-    for w0 in (123.82, 124.38, 124.90): put(pop(), Rs("A", w0), 0.5)                  # the comments pop
+    typing(HG, T_S["G"] + 0.3); typing(HZ, T_Z + 0.2, 0.3)
+    for w0 in (123.82, 124.38): put(pop(), Rs("A", w0), 0.5)                  # the comments pop
     ty = Rs("B1", 17.40)
     for j in range(5): put(tick(), ty + 0.1 + 0.15 * j, 0.25)
     tr = Rs("B2", 21.82)
@@ -738,7 +742,7 @@ def build_audio(path):
     for k in range(3): put(glass(1318.5 + 200 * k), Rs("E", 96.02) + 0.15 * k, 0.05)
     put(swoosh(0.5), T_S["E"] + 2.2, 0.1)
     for k in range(3): put(pop(900, 500, 0.08), Rs("F", 14.54) + 0.3 * k, 0.35)
-    put(swoosh(0.3), T_S["G"] + 0.7, 0.12); put(swoosh(0.3), T_S["G"] + 1.4, 0.12); put(glass(1174.7), T_Z + 0.2, 0.08)
+    put(glass(1174.7), T_Z + 0.2, 0.08)
     sfx[:n] *= 1 - 0.55 * np.clip(dd, 0, 1)
     tt = np.arange(n) / SR; fade = np.clip((DUR - tt) / 2.5, 0, 1) ** 1.5 * np.clip(tt / 1.0, 0, 1)
     mus = track(n) * ((G_GAP - (G_GAP - G_VO) * np.clip(dd, 0, 1)) * fade)[:, None]
