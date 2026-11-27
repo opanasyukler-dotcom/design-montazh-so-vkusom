@@ -485,9 +485,9 @@ _BM = cv2.imread(os.path.join(WORK, "SR_bodymask2.png"), 0).astype(np.float32) /
 NECK = 132                                                                   # the photo row just under her chin: nothing above it is shown (no head)
 _BM[:NECK] = 0; _BM[NECK:NECK + 6] *= np.linspace(0, 1, 6)[:, None]
 _CLEAN = cv2.imread(os.path.join(WORK, "SR_clean_crop.png")).astype(np.float32)
-CUT_BG = True                                                              # the background kept (the client's call)
+CUT_BG = False                                                             # the background kept (the client's call)
 def cutout(P):
-    if not CUT_BG: return P
+    if not CUT_BG: return P[NECK:]                                          # the background kept; the photo starts at her neck (no head)
     """the patient without her background (white), the surgeon's strokes kept even where they leave the body"""
     d = np.abs(P.astype(np.float32) - _CLEAN).max(2); sat = cv2.cvtColor(P, cv2.COLOR_BGR2HSV)[..., 1]
     raw = ((d > 45) & (sat > 90)).astype(np.uint8); n_, lab, stt, _ = cv2.connectedComponentsWithStats(raw, 8)
@@ -495,8 +495,8 @@ def cutout(P):
     for k in range(1, n_):
         if stt[k, 4] >= 25: keep[lab == k] = 1                              # real strokes only, not compression specks
     st = cv2.dilate(keep, np.ones((3, 3), np.uint8)).astype(np.float32)
-    st[:NECK] = 0; a = np.maximum(_BM, cv2.GaussianBlur(st, (0, 0), 0.8))[..., None]; return (P.astype(np.float32) * a + 0 * (1 - a)).astype(np.uint8)
-BS = H / (VIEW[3] - VIEW[1] - NECK); BTOP = -NECK * BS   # neck at the top edge, the legs to the bottom, full screen
+    st[:NECK] = 0; a = np.maximum(_BM, cv2.GaussianBlur(st, (0, 0), 0.8))[..., None]; P = P[NECK:]; a = a[NECK:]; return (P.astype(np.float32) * a + 0 * (1 - a)).astype(np.uint8)
+BS = H / (VIEW[3] - VIEW[1] - NECK); BTOP = 0   # neck at the top edge, the legs to the bottom, full screen
 def tab(st):
     f = V["SR"].at(st); P = cutout(f[VIEW[1]:VIEW[3], VIEW[0]:VIEW[2]]); s_ = BS
     M = np.float32([[s_, 0, W / 2 - P.shape[1] * s_ / 2], [0, s_, BTOP]])
